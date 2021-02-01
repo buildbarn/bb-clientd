@@ -1,0 +1,87 @@
+# gazelle:ignore
+
+load("@bazel_gomock//:gomock.bzl", "gomock")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+gomock(
+    name = "blobstore",
+    out = "blobstore.go",
+    interfaces = ["BlobAccess"],
+    library = "@com_github_buildbarn_bb_storage//pkg/blobstore",
+    package = "mock",
+)
+
+gomock(
+    name = "cas",
+    out = "cas.go",
+    interfaces = ["IndexedTreeFetcher"],
+    library = "//pkg/cas",
+    package = "mock",
+)
+
+gomock(
+    name = "filesystem_fuse",
+    out = "filesystem_fuse.go",
+    interfaces = [
+        "DigestLookupFunc",
+        "DirectoryContext",
+        "InstanceNameLookupFunc",
+    ],
+    library = "//pkg/filesystem/fuse",
+    package = "mock",
+)
+
+gomock(
+    name = "re_cas",
+    out = "re_cas.go",
+    interfaces = ["DirectoryFetcher"],
+    library = "@com_github_buildbarn_bb_remote_execution//pkg/cas",
+    package = "mock",
+)
+
+gomock(
+    name = "re_filesystem_fuse",
+    out = "re_filesystem_fuse.go",
+    interfaces = [
+        "Directory",
+        "Leaf",
+        "NativeLeaf",
+    ],
+    library = "@com_github_buildbarn_bb_remote_execution//pkg/filesystem/fuse",
+    package = "mock",
+)
+
+gomock(
+    name = "storage_util",
+    out = "storage_util.go",
+    interfaces = ["ErrorLogger"],
+    library = "@com_github_buildbarn_bb_storage//pkg/util",
+    package = "mock",
+)
+
+go_library(
+    name = "go_default_library",
+    srcs = [
+        ":blobstore.go",
+        ":cas.go",
+        ":filesystem_fuse.go",
+        ":re_cas.go",
+        ":re_filesystem_fuse.go",
+        ":storage_util.go",
+    ],
+    importpath = "github.com/buildbarn/bb-clientd/internal/mock",
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "//pkg/cas",
+        "@com_github_bazelbuild_remote_apis//build/bazel/remote/execution/v2:execution",
+        "@com_github_buildbarn_bb_remote_execution//pkg/filesystem/fuse",
+        "@com_github_buildbarn_bb_remote_execution//pkg/proto/remoteoutputservice",
+        "@com_github_buildbarn_bb_storage//pkg/blobstore",
+        "@com_github_buildbarn_bb_storage//pkg/blobstore/buffer",
+        "@com_github_buildbarn_bb_storage//pkg/digest",
+        "@com_github_buildbarn_bb_storage//pkg/filesystem",
+        "@com_github_buildbarn_bb_storage//pkg/filesystem/path",
+        "@com_github_golang_mock//gomock",
+        "@com_github_hanwen_go_fuse_v2//fuse",
+    ],
+)

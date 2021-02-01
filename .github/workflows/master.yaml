@@ -1,0 +1,177 @@
+{
+   "jobs": {
+      "build_and_test": {
+         "container": "docker://l.gcr.io/google/bazel:3.5.0",
+         "runs-on": "ubuntu-latest",
+         "steps": [
+            {
+               "name": "Check out source code",
+               "uses": "actions/checkout@v1"
+            },
+            {
+               "name": "Buildifier",
+               "run": "bazel run @com_github_bazelbuild_buildtools//:buildifier"
+            },
+            {
+               "name": "Gazelle",
+               "run": "bazel run //:gazelle -- update-repos -from_file=go.mod -to_macro go_dependencies.bzl%go_dependencies -prune && bazel run //:gazelle"
+            },
+            {
+               "name": "Gofmt",
+               "run": "bazel run @cc_mvdan_gofumpt//:gofumpt -- -s -w -extra $(pwd)"
+            },
+            {
+               "name": "Clang format",
+               "run": "find . -name '*.proto' -exec bazel run @llvm_toolchain//:bin/clang-format -- -i {} +"
+            },
+            {
+               "name": "GitHub workflows",
+               "run": "bazel build //tools/github_workflows && cp bazel-bin/tools/github_workflows/* .github/workflows"
+            },
+            {
+               "name": "Test style conformance",
+               "run": "git diff --exit-code HEAD --"
+            },
+            {
+               "name": "Golint",
+               "run": "bazel run @org_golang_x_lint//golint -- -set_exit_status $(pwd)/..."
+            },
+            {
+               "name": "Check for ineffective assignments",
+               "run": "bazel run @com_github_gordonklaus_ineffassign//:ineffassign $(pwd)"
+            },
+            {
+               "name": "linux_amd64: build and test",
+               "run": "bazel test --test_output=errors --platforms=@io_bazel_rules_go//go/toolchain:linux_amd64 //..."
+            },
+            {
+               "name": "linux_amd64: copy bb_clientd",
+               "run": "bazel run --run_under cp --platforms=@io_bazel_rules_go//go/toolchain:linux_amd64 //cmd/bb_clientd $(pwd)/bb_clientd"
+            },
+            {
+               "name": "linux_amd64: upload bb_clientd",
+               "uses": "actions/upload-artifact@v2-preview",
+               "with": {
+                  "name": "bb_clientd.linux_amd64",
+                  "path": "bb_clientd"
+               }
+            },
+            {
+               "name": "linux_386: build and test",
+               "run": "bazel test --test_output=errors --platforms=@io_bazel_rules_go//go/toolchain:linux_386 //..."
+            },
+            {
+               "name": "linux_386: copy bb_clientd",
+               "run": "bazel run --run_under cp --platforms=@io_bazel_rules_go//go/toolchain:linux_386 //cmd/bb_clientd $(pwd)/bb_clientd"
+            },
+            {
+               "name": "linux_386: upload bb_clientd",
+               "uses": "actions/upload-artifact@v2-preview",
+               "with": {
+                  "name": "bb_clientd.linux_386",
+                  "path": "bb_clientd"
+               }
+            },
+            {
+               "name": "linux_arm: build and test",
+               "run": "bazel build --platforms=@io_bazel_rules_go//go/toolchain:linux_arm //..."
+            },
+            {
+               "name": "linux_arm: copy bb_clientd",
+               "run": "bazel run --run_under cp --platforms=@io_bazel_rules_go//go/toolchain:linux_arm //cmd/bb_clientd $(pwd)/bb_clientd"
+            },
+            {
+               "name": "linux_arm: upload bb_clientd",
+               "uses": "actions/upload-artifact@v2-preview",
+               "with": {
+                  "name": "bb_clientd.linux_arm",
+                  "path": "bb_clientd"
+               }
+            },
+            {
+               "name": "linux_arm64: build and test",
+               "run": "bazel build --platforms=@io_bazel_rules_go//go/toolchain:linux_arm64 //..."
+            },
+            {
+               "name": "linux_arm64: copy bb_clientd",
+               "run": "bazel run --run_under cp --platforms=@io_bazel_rules_go//go/toolchain:linux_arm64 //cmd/bb_clientd $(pwd)/bb_clientd"
+            },
+            {
+               "name": "linux_arm64: upload bb_clientd",
+               "uses": "actions/upload-artifact@v2-preview",
+               "with": {
+                  "name": "bb_clientd.linux_arm64",
+                  "path": "bb_clientd"
+               }
+            },
+            {
+               "name": "darwin_amd64: build and test",
+               "run": "bazel build --platforms=@io_bazel_rules_go//go/toolchain:darwin_amd64 //..."
+            },
+            {
+               "name": "darwin_amd64: copy bb_clientd",
+               "run": "bazel run --run_under cp --platforms=@io_bazel_rules_go//go/toolchain:darwin_amd64 //cmd/bb_clientd $(pwd)/bb_clientd"
+            },
+            {
+               "name": "darwin_amd64: upload bb_clientd",
+               "uses": "actions/upload-artifact@v2-preview",
+               "with": {
+                  "name": "bb_clientd.darwin_amd64",
+                  "path": "bb_clientd"
+               }
+            },
+            {
+               "name": "freebsd_amd64: build and test",
+               "run": "bazel build --platforms=@io_bazel_rules_go//go/toolchain:freebsd_amd64 //cmd/bb_clientd"
+            },
+            {
+               "name": "freebsd_amd64: copy bb_clientd",
+               "run": "bazel run --run_under cp --platforms=@io_bazel_rules_go//go/toolchain:freebsd_amd64 //cmd/bb_clientd $(pwd)/bb_clientd"
+            },
+            {
+               "name": "freebsd_amd64: upload bb_clientd",
+               "uses": "actions/upload-artifact@v2-preview",
+               "with": {
+                  "name": "bb_clientd.freebsd_amd64",
+                  "path": "bb_clientd"
+               }
+            },
+            {
+               "name": "windows_amd64: build and test",
+               "run": "bazel build --platforms=@io_bazel_rules_go//go/toolchain:windows_amd64 //..."
+            },
+            {
+               "name": "windows_amd64: copy bb_clientd",
+               "run": "bazel run --run_under cp --platforms=@io_bazel_rules_go//go/toolchain:windows_amd64 //cmd/bb_clientd $(pwd)/bb_clientd.exe"
+            },
+            {
+               "name": "windows_amd64: upload bb_clientd",
+               "uses": "actions/upload-artifact@v2-preview",
+               "with": {
+                  "name": "bb_clientd.windows_amd64",
+                  "path": "bb_clientd.exe"
+               }
+            },
+            {
+               "env": {
+                  "DOCKER_CONFIG_JSON": "${{ secrets.DOCKER_CONFIG_JSON }}"
+               },
+               "name": "Install Docker credentials",
+               "run": "mkdir ~/.docker && echo \"${DOCKER_CONFIG_JSON}\" > ~/.docker/config.json"
+            },
+            {
+               "name": "Push container bb_clientd:bb_clientd",
+               "run": "bazel run //cmd/bb_clientd:bb_clientd_container_push"
+            }
+         ]
+      }
+   },
+   "name": "master",
+   "on": {
+      "push": {
+         "branches": [
+            "master"
+         ]
+      }
+   }
+}

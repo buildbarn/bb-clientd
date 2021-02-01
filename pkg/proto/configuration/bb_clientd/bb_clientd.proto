@@ -1,0 +1,49 @@
+syntax = "proto3";
+
+package buildbarn.configuration.bb_clientd;
+
+import "pkg/proto/configuration/blobstore/blobstore.proto";
+import "pkg/proto/configuration/builder/builder.proto";
+import "pkg/proto/configuration/fuse/fuse.proto";
+import "pkg/proto/configuration/global/global.proto";
+import "pkg/proto/configuration/grpc/grpc.proto";
+
+option go_package = "github.com/buildbarn/bb-clientd/pkg/proto/configuration/bb_clientd";
+
+message ApplicationConfiguration {
+  // Content Addressable Storage (CAS) and Action Cache (AC) storage
+  // configuration.
+  buildbarn.configuration.blobstore.BlobstoreConfiguration blobstore = 1;
+
+  // Maximum Protobuf message size to unmarshal.
+  int64 maximum_message_size_bytes = 2;
+
+  // Common configuration options that apply to all Buildbarn binaries.
+  buildbarn.configuration.global.Configuration global = 3;
+
+  // FUSE mount under which the contents of the Content Addressable
+  // Storage (CAS) are exposed for reading. The following pathname
+  // schemes are supported:
+  //
+  // - ${instance_name}/blobs/directory/${hash}-${size_bytes}:
+  //   View the contents of a Directory object.
+  // - ${instance_name}/blobs/executable/${hash}-${size_bytes}:
+  //   Access a single file, having the executable bit (+x) set.
+  // - ${instance_name}/blobs/file/${hash}-${size_bytes}:
+  //   Access a single file, having the executable bit (+x) clear.
+  // - ${instance_name}/blobs/tree/${hash}-${size_bytes}:
+  //   View the contents of a Tree object.
+  //
+  // Instance names containing slashes are permitted. It automatically
+  // causes intermediate directories to be created. "blobs" directories
+  // exist at every level.
+  buildbarn.configuration.fuse.MountConfiguration fuse = 4;
+
+  // gRPC servers to spawn to listen for requests from clients.
+  repeated buildbarn.configuration.grpc.ServerConfiguration grpc_servers = 5;
+
+  // Map of schedulers available capable of running build actions, where
+  // the key corresponds to the instance name prefix.
+  map<string, buildbarn.configuration.builder.SchedulerConfiguration>
+      schedulers = 6;
+}
