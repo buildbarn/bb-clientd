@@ -155,6 +155,7 @@ def go_dependencies():
     go_repository(
         name = "com_github_buildbarn_bb_storage",
         importpath = "github.com/buildbarn/bb-storage",
+        patches = ["//:patches/com_github_buildbarn_bb_storage/no-incompatible-platforms.diff"],
         sum = "h1:msmt9lZQYiSwJ146nCmdhaOY5so6ac5yHjnJ/7hVLDk=",
         version = "v0.0.0-20210131130004-9cb6a9efe057",
     )
