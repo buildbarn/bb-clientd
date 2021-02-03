@@ -149,15 +149,15 @@ def go_dependencies():
     go_repository(
         name = "com_github_buildbarn_bb_remote_execution",
         importpath = "github.com/buildbarn/bb-remote-execution",
-        sum = "h1:W8l2wxREnX+G/E/7kamvxBAtSGX7itzULNVOOdAnUN4=",
-        version = "v0.0.0-20210131145154-c4d129936883",
+        sum = "h1:sJ4VnSsGds627V2jEUngLgxb4e69/rnPrzA9o6E3pkY=",
+        version = "v0.0.0-20210203060324-24e7d51b89e3",
     )
     go_repository(
         name = "com_github_buildbarn_bb_storage",
         importpath = "github.com/buildbarn/bb-storage",
         patches = ["//:patches/com_github_buildbarn_bb_storage/no-incompatible-platforms.diff"],
-        sum = "h1:msmt9lZQYiSwJ146nCmdhaOY5so6ac5yHjnJ/7hVLDk=",
-        version = "v0.0.0-20210131130004-9cb6a9efe057",
+        sum = "h1:V94tQm9tWpLeP5cMZlB+6r6Vr1eGr6fSOOUJqG3RjLI=",
+        version = "v0.0.0-20210203060058-592b5ee108b6",
     )
     go_repository(
         name = "com_github_burntsushi_toml",
