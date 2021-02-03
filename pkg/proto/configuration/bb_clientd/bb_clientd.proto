@@ -4,6 +4,7 @@ package buildbarn.configuration.bb_clientd;
 
 import "pkg/proto/configuration/blobstore/blobstore.proto";
 import "pkg/proto/configuration/builder/builder.proto";
+import "pkg/proto/configuration/filesystem/filesystem.proto";
 import "pkg/proto/configuration/fuse/fuse.proto";
 import "pkg/proto/configuration/global/global.proto";
 import "pkg/proto/configuration/grpc/grpc.proto";
@@ -25,14 +26,27 @@ message ApplicationConfiguration {
   // Storage (CAS) are exposed for reading. The following pathname
   // schemes are supported:
   //
-  // - ${instance_name}/blobs/directory/${hash}-${size_bytes}:
+  // - cas/${instance_name}/blobs/directory/${hash}-${size_bytes}/:
   //   View the contents of a Directory object.
-  // - ${instance_name}/blobs/executable/${hash}-${size_bytes}:
+  // - cas/${instance_name}/blobs/executable/${hash}-${size_bytes}:
   //   Access a single file, having the executable bit (+x) set.
-  // - ${instance_name}/blobs/file/${hash}-${size_bytes}:
+  // - cas/${instance_name}/blobs/file/${hash}-${size_bytes}:
   //   Access a single file, having the executable bit (+x) clear.
-  // - ${instance_name}/blobs/tree/${hash}-${size_bytes}:
+  // - cas/${instance_name}/blobs/tree/${hash}-${size_bytes}/:
   //   View the contents of a Tree object.
+  //
+  // - outputs/${output_base}/:
+  //   Location where Bazel may store the per-workspace bazel-out/
+  //   directory. Files yielded by remote build actions are loaded
+  //   lazily. Using this feature gives the same performance
+  //   improvements as --remote_download_minimal, with the added
+  //   advantage that remote output files remain accessible locally.
+  //   More details: https://github.com/bazelbuild/bazel/pull/12823
+  //
+  // - scratch/:
+  //   A writable directory where arbitrary path layouts may be
+  //   constructed. Files that reference CAS objects may be created by
+  //   hardlinking them from the "cas" directory.
   //
   // Instance names containing slashes are permitted. It automatically
   // causes intermediate directories to be created. "blobs" directories
@@ -46,4 +60,9 @@ message ApplicationConfiguration {
   // the key corresponds to the instance name prefix.
   map<string, buildbarn.configuration.builder.SchedulerConfiguration>
       schedulers = 6;
+
+  // Location where files are stored that are created in the "outputs"
+  // and "scratch" directories. Files that are hardlinked from the "cas"
+  // directory don't take up any space in the file pool.
+  buildbarn.configuration.filesystem.FilePoolConfiguration file_pool = 7;
 }

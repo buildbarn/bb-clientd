@@ -10,7 +10,9 @@ import (
 	cd_fuse "github.com/buildbarn/bb-clientd/pkg/filesystem/fuse"
 	"github.com/buildbarn/bb-clientd/pkg/proto/configuration/bb_clientd"
 	re_cas "github.com/buildbarn/bb-remote-execution/pkg/cas"
+	re_filesystem "github.com/buildbarn/bb-remote-execution/pkg/filesystem"
 	re_fuse "github.com/buildbarn/bb-remote-execution/pkg/filesystem/fuse"
+	"github.com/buildbarn/bb-remote-execution/pkg/proto/remoteoutputservice"
 	blobstore_configuration "github.com/buildbarn/bb-storage/pkg/blobstore/configuration"
 	"github.com/buildbarn/bb-storage/pkg/blobstore/grpcservers"
 	"github.com/buildbarn/bb-storage/pkg/builder"
@@ -18,6 +20,7 @@ import (
 	"github.com/buildbarn/bb-storage/pkg/filesystem/path"
 	"github.com/buildbarn/bb-storage/pkg/global"
 	bb_grpc "github.com/buildbarn/bb-storage/pkg/grpc"
+	"github.com/buildbarn/bb-storage/pkg/random"
 	"github.com/buildbarn/bb-storage/pkg/util"
 	"github.com/hanwen/go-fuse/v2/fuse"
 
@@ -57,6 +60,12 @@ func main() {
 		log.Fatal(err)
 	}
 
+	// Storage of files created through the FUSE file system.
+	filePool, err := re_filesystem.NewFilePoolFromConfiguration(configuration.FilePool)
+	if err != nil {
+		log.Fatal("Failed to create file pool: ", err)
+	}
+
 	// Factories for FUSE nodes corresponding to plain files,
 	// executable files, directories and trees.
 	//
@@ -65,6 +74,9 @@ func main() {
 	// directory and tree objects. Let's not address this for the
 	// time being, as we mainly care about accessing individual
 	// files.
+	indexedTreeFetcher := cd_cas.NewBlobAccessIndexedTreeFetcher(
+		contentAddressableStorage,
+		int(configuration.MaximumMessageSizeBytes))
 	globalFileContext := NewGlobalFileContext(
 		context.Background(),
 		contentAddressableStorage,
@@ -74,11 +86,7 @@ func main() {
 		re_cas.NewBlobAccessDirectoryFetcher(
 			contentAddressableStorage,
 			int(configuration.MaximumMessageSizeBytes)))
-	globalTreeContext := NewGlobalTreeContext(
-		globalFileContext,
-		cd_cas.NewBlobAccessIndexedTreeFetcher(
-			contentAddressableStorage,
-			int(configuration.MaximumMessageSizeBytes)))
+	globalTreeContext := NewGlobalTreeContext(globalFileContext, indexedTreeFetcher)
 
 	// Factory function for per instance name "blobs" directories
 	// that give access to arbitrary files, directories and trees.
@@ -133,21 +141,73 @@ func main() {
 		return d, nil
 	}
 
-	// Top-level directory that parses instance names until a
-	// "blobs" pathname component is accessed.
-	rootDirectoryInodeNumberTree := re_fuse.NewRandomInodeNumberTree()
-	rootDirectory := cd_fuse.NewInstanceNameParsingDirectory(
-		rootDirectoryInodeNumberTree,
-		map[path.Component]cd_fuse.InstanceNameLookupFunc{
-			path.MustNewComponent("blobs"): blobsDirectoryLookupFunc,
+	// Implementation of the Remote Output Service. The Remote
+	// Output Service allows Bazel to place its bazel-out/
+	// directories on a FUSE file system, thereby allowing data to
+	// be loaded lazily.
+	var serverCallbacks re_fuse.SimpleRawFileSystemServerCallbacks
+	outputsInodeNumber := random.FastThreadSafeGenerator.Uint64()
+	outputsDirectory := cd_fuse.NewRemoteOutputServiceDirectory(
+		outputsInodeNumber,
+		random.NewFastSingleThreadedGenerator(),
+		serverCallbacks.EntryNotify,
+		func(errorLogger util.ErrorLogger, inodeNumber uint64) re_fuse.PrepopulatedDirectory {
+			return re_fuse.NewInMemoryPrepopulatedDirectory(
+				re_fuse.NewPoolBackedFileAllocator(
+					filePool,
+					errorLogger,
+					random.FastThreadSafeGenerator),
+				errorLogger,
+				inodeNumber,
+				random.FastThreadSafeGenerator,
+				serverCallbacks.EntryNotify)
+		},
+		contentAddressableStorage,
+		indexedTreeFetcher)
+
+	// Construct the top-level directory of the FUSE mount. It contains
+	// three subdirectories:
+	//
+	// - "cas": raw access to the Content Addressable Storage.
+	// - "outputs": outputs of builds performed using Bazel.
+	// - "scratch": a writable directory for testing.
+	rootInodeNumber := random.FastThreadSafeGenerator.Uint64()
+	casInodeNumberTree := re_fuse.NewRandomInodeNumberTree()
+	scratchInodeNumber := random.FastThreadSafeGenerator.Uint64()
+	rootDirectory := cd_fuse.NewStaticDirectory(
+		rootInodeNumber,
+		map[path.Component]cd_fuse.StaticDirectoryEntry{
+			path.MustNewComponent("cas"): {
+				Child: cd_fuse.NewInstanceNameParsingDirectory(
+					casInodeNumberTree,
+					map[path.Component]cd_fuse.InstanceNameLookupFunc{
+						path.MustNewComponent("blobs"): blobsDirectoryLookupFunc,
+					}),
+				InodeNumber: casInodeNumberTree.Get(),
+			},
+			path.MustNewComponent("outputs"): {
+				Child:       outputsDirectory,
+				InodeNumber: outputsInodeNumber,
+			},
+			path.MustNewComponent("scratch"): {
+				Child: re_fuse.NewInMemoryPrepopulatedDirectory(
+					re_fuse.NewPoolBackedFileAllocator(
+						filePool,
+						util.DefaultErrorLogger,
+						random.FastThreadSafeGenerator),
+					util.DefaultErrorLogger,
+					scratchInodeNumber,
+					random.FastThreadSafeGenerator,
+					serverCallbacks.EntryNotify),
+				InodeNumber: scratchInodeNumber,
+			},
 		})
 
 	// Expose the FUSE file system.
-	var serverCallbacks re_fuse.SimpleRawFileSystemServerCallbacks
 	if err := re_fuse.NewMountFromConfiguration(
 		configuration.Fuse,
 		rootDirectory,
-		rootDirectoryInodeNumberTree.Get(),
+		rootInodeNumber,
 		&serverCallbacks,
 		"bb_clientd"); err != nil {
 		log.Fatal("Failed to mount FUSE file system: ", err)
@@ -177,6 +237,8 @@ func main() {
 							1<<16))
 					remoteexecution.RegisterCapabilitiesServer(s, buildQueue)
 					remoteexecution.RegisterExecutionServer(s, buildQueue)
+
+					remoteoutputservice.RegisterRemoteOutputServiceServer(s, outputsDirectory)
 				}))
 	}()
 

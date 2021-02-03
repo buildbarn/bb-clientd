@@ -5,6 +5,8 @@ load("@bazel_gazelle//:def.bzl", "gazelle")
 # gazelle:resolve proto go pkg/proto/configuration/blobstore/blobstore.proto @com_github_buildbarn_bb_storage//pkg/proto/configuration/blobstore
 # gazelle:resolve proto pkg/proto/configuration/builder/builder.proto @com_github_buildbarn_bb_storage//pkg/proto/configuration/builder:builder_proto
 # gazelle:resolve proto go pkg/proto/configuration/builder/builder.proto @com_github_buildbarn_bb_storage//pkg/proto/configuration/builder
+# gazelle:resolve proto pkg/proto/configuration/filesystem/filesystem.proto @com_github_buildbarn_bb_remote_execution//pkg/proto/configuration/filesystem:filesystem_proto
+# gazelle:resolve proto go pkg/proto/configuration/filesystem/filesystem.proto @com_github_buildbarn_bb_remote_execution//pkg/proto/configuration/filesystem
 # gazelle:resolve proto pkg/proto/configuration/fuse/fuse.proto @com_github_buildbarn_bb_remote_execution//pkg/proto/configuration/fuse:fuse_proto
 # gazelle:resolve proto go pkg/proto/configuration/fuse/fuse.proto @com_github_buildbarn_bb_remote_execution//pkg/proto/configuration/fuse
 # gazelle:resolve proto pkg/proto/configuration/global/global.proto @com_github_buildbarn_bb_storage//pkg/proto/configuration/global:global_proto
