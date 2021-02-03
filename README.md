@@ -9,6 +9,10 @@ for short. The goal of bb\_clientd is twofold:
    [Remote Execution](https://github.com/bazelbuild/remote-apis) services.
 2. To speed up builds that use Remote Execution.
 
+Even though this project is developed as part of the Buildbarn project,
+and also reuses many of Buildbarn's components, bb\_clientd is expected
+to be compatible with other implementations of the Remote Execution API.
+
 This document will explain how to set up bb\_clientd and demonstrate its
 features.
 
