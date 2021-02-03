@@ -129,7 +129,7 @@ $ find . -ls
  7642484527095133707  0 -r-xr-xr-x 9999 root  root   744 Jan  1  2000 ./grep-includes.sh
 ```
 
-All of the content accessed through the "cas" directory is lazy loading,
+All of the content accessed through the "cas" directory is lazy-loading,
 and is cached locally.
 
 ### ... as a playground
@@ -147,10 +147,11 @@ $ ls -l ~/bb_clientd/scratch/foo.cpp
 -r--r--r-- 9999 root root 799796 Jan  1  2000 ~/bb_clientd/scratch/foo.cpp
 ```
 
-It is also possible to directory write data into the file system. The
-backing store for this is configured through "filePool" in the
-bb\_clientd configuration file. Keep in mind that none of the data
-written into the "scratch" directory is persisted across restarts!
+It is also possible to directly write data into the file system. The
+backing store for this is configured through the "filePool" option in
+the bb\_clientd configuration file. Keep in mind that none of the data
+written into the "scratch" directory is persisted across restarts of
+bb\_clientd!
 
 ### ... to perform Remote Builds without the Bytes
 
@@ -160,22 +161,22 @@ longer download output files of build actions and store them in
 `bazel-out/`. Though this speeds up builds significantly, there are two
 disadvantages:
 
-- You can no longer access output files. This may not be an issue if you
+- You can no longer access output files. This may be acceptable if you
   only want to know whether a build succeeds (e.g., CI presubmit
-  checks), it cannot be used universally.
+  checks), but it cannot be used universally.
 - It doesn't provide fast incremental builds. For each of the files that
-  is normally downloaded, Bazel creates a reference to the remote
-  instance of the file. This information is discarded at the end of the
-  build, meaning that Bazel can't continue where it left off.
+  is normally downloaded, Bazel creates an in-memory reference to the
+  remote instance of the file. This information is discarded at the end
+  of the build, meaning that Bazel can't continue where it left off.
 
 To solve these issues, bb\_clientd implements a gRPC API named the
 Remote Output Service. Bazel can use this API to store the entire
 `bazel-out/` directory inside the FUSE file system. Every time Bazel
-needs to download a file from the Remote Execution, it calls into a
-`BatchCreate()` gRPC method. bb\_clientd implements this method by
-creating lazy-loading files, just like the ones in the "cas" directory.
-This means that you can enjoy the performance improvements of "Remote
-Builds without the Bytes", but not with the restrictions that it
+needs to download a file from the Remote Execution service, it calls
+into a `BatchCreate()` gRPC method. bb\_clientd implements this method
+by creating lazy-loading files, just like the ones in the "cas"
+directory. This means that you can enjoy the performance improvements of
+"Remote Builds without the Bytes", but not with the restrictions that it
 currently imposes.
 
 The Remote Output Service can be used by building a copy of Bazel that
