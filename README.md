@@ -94,6 +94,10 @@ traffic needs to be routed.
 
 Note that you need Bazel 3.5.0 for this to work, as older versions of
 Bazel [don't allow you to provide UNIX socket endpoints](https://github.com/bazelbuild/bazel/pull/11722).
+The caching of FindMissingBlobs() results (as enabled in the example
+configuration file using `existenceCaching`) is only safe to use with
+clusters that guarantee that data remains present after
+FindMissingBlobs() is called initially.
 
 ### ... as a tool for exploring the Content Addressable Storage
 
