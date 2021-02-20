@@ -32,7 +32,7 @@ func TestStaticDirectoryFUSELookup(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
 		child.EXPECT().FUSEGetAttr(gomock.Any()).DoAndReturn(func(out *fuse.Attr) {
 			out.Ino = 456
-			out.Mode = fuse.S_IFDIR | 0555
+			out.Mode = fuse.S_IFDIR | 0o555
 			out.Nlink = re_fuse.EmptyDirectoryLinkCount
 		})
 
@@ -42,7 +42,7 @@ func TestStaticDirectoryFUSELookup(t *testing.T) {
 		require.Equal(t, child, actualChild)
 		require.Equal(t, fuse.Attr{
 			Ino:   456,
-			Mode:  fuse.S_IFDIR | 0555,
+			Mode:  fuse.S_IFDIR | 0o555,
 			Nlink: re_fuse.EmptyDirectoryLinkCount,
 		}, out)
 	})

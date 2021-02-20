@@ -39,7 +39,7 @@ func (d *staticDirectory) FUSEAccess(mask uint32) fuse.Status {
 
 func (d *staticDirectory) FUSEGetAttr(out *fuse.Attr) {
 	out.Ino = d.inodeNumber
-	out.Mode = fuse.S_IFDIR | 0555
+	out.Mode = fuse.S_IFDIR | 0o555
 	out.Nlink = uint32(re_fuse.EmptyDirectoryLinkCount + len(d.directories))
 }
 

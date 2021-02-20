@@ -129,7 +129,7 @@ func TestContentAddressableStorageDirectoryFUSELookup(t *testing.T) {
 			gomock.Any(),
 		).DoAndReturn(func(digest digest.Digest, out *fuse.Attr) re_fuse.Directory {
 			out.Ino = 123
-			out.Mode = fuse.S_IFDIR | 0111
+			out.Mode = fuse.S_IFDIR | 0o111
 			out.Nlink = 456
 			return childDirectory
 		})
@@ -141,7 +141,7 @@ func TestContentAddressableStorageDirectoryFUSELookup(t *testing.T) {
 		require.Nil(t, actualLeaf)
 		require.Equal(t, fuse.Attr{
 			Ino:   123,
-			Mode:  fuse.S_IFDIR | 0111,
+			Mode:  fuse.S_IFDIR | 0o111,
 			Nlink: 456,
 		}, out)
 	})
@@ -155,7 +155,7 @@ func TestContentAddressableStorageDirectoryFUSELookup(t *testing.T) {
 			gomock.Any(),
 		).DoAndReturn(func(digest digest.Digest, isExecutable bool, out *fuse.Attr) re_fuse.Leaf {
 			out.Ino = 123
-			out.Mode = fuse.S_IFREG | 0555
+			out.Mode = fuse.S_IFREG | 0o555
 			out.Nlink = 456
 			return childLeaf
 		})
@@ -167,7 +167,7 @@ func TestContentAddressableStorageDirectoryFUSELookup(t *testing.T) {
 		require.Equal(t, childLeaf, actualLeaf)
 		require.Equal(t, fuse.Attr{
 			Ino:   123,
-			Mode:  fuse.S_IFREG | 0555,
+			Mode:  fuse.S_IFREG | 0o555,
 			Nlink: 456,
 		}, out)
 	})
@@ -181,7 +181,7 @@ func TestContentAddressableStorageDirectoryFUSELookup(t *testing.T) {
 			gomock.Any(),
 		).DoAndReturn(func(digest digest.Digest, isExecutable bool, out *fuse.Attr) re_fuse.Leaf {
 			out.Ino = 123
-			out.Mode = fuse.S_IFREG | 0444
+			out.Mode = fuse.S_IFREG | 0o444
 			out.Nlink = 456
 			return childLeaf
 		})
@@ -193,7 +193,7 @@ func TestContentAddressableStorageDirectoryFUSELookup(t *testing.T) {
 		require.Equal(t, childLeaf, actualLeaf)
 		require.Equal(t, fuse.Attr{
 			Ino:   123,
-			Mode:  fuse.S_IFREG | 0444,
+			Mode:  fuse.S_IFREG | 0o444,
 			Nlink: 456,
 		}, out)
 	})
@@ -204,7 +204,7 @@ func TestContentAddressableStorageDirectoryFUSELookup(t *testing.T) {
 		actualDirectory, actualLeaf, s := d.FUSELookup(path.MustNewComponent("symlink"), &out)
 		require.Equal(t, fuse.OK, s)
 		require.Nil(t, actualDirectory)
-		require.Equal(t, uint32(fuse.S_IFLNK|0777), out.Mode)
+		require.Equal(t, uint32(fuse.S_IFLNK|0o777), out.Mode)
 
 		target, s := actualLeaf.FUSEReadlink()
 		require.Equal(t, fuse.OK, s)

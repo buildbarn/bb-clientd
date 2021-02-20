@@ -698,7 +698,7 @@ func (d *RemoteOutputServiceDirectory) FUSEAccess(mask uint32) fuse.Status {
 // Remote Output Service.
 func (d *RemoteOutputServiceDirectory) FUSEGetAttr(out *fuse.Attr) {
 	out.Ino = d.inodeNumber
-	out.Mode = fuse.S_IFDIR | 0555
+	out.Mode = fuse.S_IFDIR | 0o555
 	d.lock.Lock()
 	out.Nlink = re_fuse.EmptyDirectoryLinkCount + uint32(len(d.outputBaseIDs))
 	d.lock.Unlock()

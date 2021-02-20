@@ -32,7 +32,7 @@ func TestInstanceNameParsingDirectory(t *testing.T) {
 			gomock.Any(),
 		).DoAndReturn(func(instanceName digest.InstanceName, out *fuse.Attr) (re_fuse.Directory, re_fuse.Leaf) {
 			out.Ino = 123
-			out.Mode = fuse.S_IFDIR | 0777
+			out.Mode = fuse.S_IFDIR | 0o777
 			out.Nlink = 456
 			return mockChildDirectory, nil
 		})
@@ -44,7 +44,7 @@ func TestInstanceNameParsingDirectory(t *testing.T) {
 		require.Nil(t, childFile)
 		require.Equal(t, fuse.Attr{
 			Ino:   123,
-			Mode:  fuse.S_IFDIR | 0777,
+			Mode:  fuse.S_IFDIR | 0o777,
 			Nlink: 456,
 		}, out)
 	})
@@ -58,7 +58,7 @@ func TestInstanceNameParsingDirectory(t *testing.T) {
 			gomock.Any(),
 		).DoAndReturn(func(instanceName digest.InstanceName, out *fuse.Attr) (re_fuse.Directory, re_fuse.Leaf) {
 			out.Ino = 123
-			out.Mode = fuse.S_IFREG | 0777
+			out.Mode = fuse.S_IFREG | 0o777
 			out.Nlink = 456
 			return nil, mockChildFile
 		})
@@ -69,7 +69,7 @@ func TestInstanceNameParsingDirectory(t *testing.T) {
 		require.Nil(t, childFile1)
 		require.Equal(t, fuse.Attr{
 			Ino:   14973036441362892679,
-			Mode:  fuse.S_IFDIR | 0111,
+			Mode:  fuse.S_IFDIR | 0o111,
 			Nlink: re_fuse.ImplicitDirectoryLinkCount,
 		}, out1)
 
@@ -80,7 +80,7 @@ func TestInstanceNameParsingDirectory(t *testing.T) {
 		require.Equal(t, mockChildFile, childFile2)
 		require.Equal(t, fuse.Attr{
 			Ino:   123,
-			Mode:  fuse.S_IFREG | 0777,
+			Mode:  fuse.S_IFREG | 0o777,
 			Nlink: 456,
 		}, out2)
 	})
@@ -94,7 +94,7 @@ func TestInstanceNameParsingDirectory(t *testing.T) {
 			gomock.Any(),
 		).DoAndReturn(func(instanceName digest.InstanceName, out *fuse.Attr) (re_fuse.Directory, re_fuse.Leaf) {
 			out.Ino = 123
-			out.Mode = fuse.S_IFREG | 0777
+			out.Mode = fuse.S_IFREG | 0o777
 			out.Nlink = 456
 			return nil, mockChildFile
 		})
@@ -105,7 +105,7 @@ func TestInstanceNameParsingDirectory(t *testing.T) {
 		require.Nil(t, childFile1)
 		require.Equal(t, fuse.Attr{
 			Ino:   14973036441362892679,
-			Mode:  fuse.S_IFDIR | 0111,
+			Mode:  fuse.S_IFDIR | 0o111,
 			Nlink: re_fuse.ImplicitDirectoryLinkCount,
 		}, out1)
 
@@ -115,7 +115,7 @@ func TestInstanceNameParsingDirectory(t *testing.T) {
 		require.Nil(t, childFile2)
 		require.Equal(t, fuse.Attr{
 			Ino:   15913511176745189594,
-			Mode:  fuse.S_IFDIR | 0111,
+			Mode:  fuse.S_IFDIR | 0o111,
 			Nlink: re_fuse.ImplicitDirectoryLinkCount,
 		}, out2)
 
@@ -126,7 +126,7 @@ func TestInstanceNameParsingDirectory(t *testing.T) {
 		require.Equal(t, mockChildFile, childFile3)
 		require.Equal(t, fuse.Attr{
 			Ino:   123,
-			Mode:  fuse.S_IFREG | 0777,
+			Mode:  fuse.S_IFREG | 0o777,
 			Nlink: 456,
 		}, out3)
 	})
@@ -142,7 +142,7 @@ func TestInstanceNameParsingDirectory(t *testing.T) {
 		require.Nil(t, childFile1)
 		require.Equal(t, fuse.Attr{
 			Ino:   3542646155446109460,
-			Mode:  fuse.S_IFDIR | 0111,
+			Mode:  fuse.S_IFDIR | 0o111,
 			Nlink: re_fuse.ImplicitDirectoryLinkCount,
 		}, out1)
 

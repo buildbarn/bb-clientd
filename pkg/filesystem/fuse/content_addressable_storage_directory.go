@@ -64,7 +64,7 @@ func (d *contentAddressableStorageDirectory) FUSEAccess(mask uint32) fuse.Status
 
 func (d *contentAddressableStorageDirectory) FUSEGetAttr(out *fuse.Attr) {
 	out.Ino = d.inodeNumber
-	out.Mode = fuse.S_IFDIR | 0555
+	out.Mode = fuse.S_IFDIR | 0o555
 	// This should be 2 + nDirectories, but that requires us to load
 	// the directory. This is highly inefficient and error prone.
 	out.Nlink = re_fuse.ImplicitDirectoryLinkCount

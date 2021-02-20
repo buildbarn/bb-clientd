@@ -41,7 +41,7 @@ func NewDigestParsingDirectory(instanceName digest.InstanceName, inodeNumber uin
 
 func (d *digestParsingDirectory) FUSEGetAttr(out *fuse.Attr) {
 	out.Ino = d.inodeNumber
-	out.Mode = fuse.S_IFDIR | 0111
+	out.Mode = fuse.S_IFDIR | 0o111
 	out.Nlink = re_fuse.ImplicitDirectoryLinkCount
 }
 

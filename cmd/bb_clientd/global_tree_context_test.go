@@ -33,7 +33,7 @@ func TestGlobalTreeContextLookupTree(t *testing.T) {
 	treeDigest := digest.MustNewDigest("hello", "e0f28d311a9b2deff103e32f6105b2b29d636c287797ca72077a648cd736cd36", 123)
 	var out fuse.Attr
 	dRoot := globalTreeContext.LookupTree(treeDigest, &out)
-	require.Equal(t, uint32(fuse.S_IFDIR|0555), out.Mode)
+	require.Equal(t, uint32(fuse.S_IFDIR|0o555), out.Mode)
 	require.Equal(t, uint32(re_fuse.ImplicitDirectoryLinkCount), out.Nlink)
 
 	t.Run("RootIOError", func(t *testing.T) {
@@ -119,7 +119,7 @@ func TestGlobalTreeContextLookupTree(t *testing.T) {
 	var outChild fuse.Attr
 	dChild, _, s := dRoot.FUSELookup(path.MustNewComponent("directory"), &outChild)
 	require.Equal(t, fuse.OK, s)
-	require.Equal(t, uint32(fuse.S_IFDIR|0555), out.Mode)
+	require.Equal(t, uint32(fuse.S_IFDIR|0o555), out.Mode)
 	require.Equal(t, uint32(re_fuse.ImplicitDirectoryLinkCount), out.Nlink)
 
 	t.Run("ChildIOError", func(t *testing.T) {

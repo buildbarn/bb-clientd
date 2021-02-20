@@ -60,7 +60,7 @@ func TestDigestParsingDirectory(t *testing.T) {
 			gomock.Any(),
 		).DoAndReturn(func(digest digest.Digest, out *fuse.Attr) (re_fuse.Directory, re_fuse.Leaf) {
 			out.Ino = 123
-			out.Mode = fuse.S_IFREG | 0777
+			out.Mode = fuse.S_IFREG | 0o777
 			out.Nlink = 456
 			return nil, mockChildFile
 		})
@@ -72,7 +72,7 @@ func TestDigestParsingDirectory(t *testing.T) {
 		require.Equal(t, mockChildFile, childFile)
 		require.Equal(t, fuse.Attr{
 			Ino:   123,
-			Mode:  fuse.S_IFREG | 0777,
+			Mode:  fuse.S_IFREG | 0o777,
 			Nlink: 456,
 		}, out)
 	})

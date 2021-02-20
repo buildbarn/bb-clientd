@@ -985,7 +985,7 @@ func TestRemoteOutputServiceDirectoryFUSELookup(t *testing.T) {
 
 	outputPath.EXPECT().FUSEGetAttr(gomock.Any()).Do(func(out *fuse.Attr) {
 		out.Ino = 101
-		out.Mode = fuse.S_IFDIR | 0555
+		out.Mode = fuse.S_IFDIR | 0o555
 		out.Nlink = 1
 	})
 
@@ -997,7 +997,7 @@ func TestRemoteOutputServiceDirectoryFUSELookup(t *testing.T) {
 	require.Nil(t, leaf)
 	require.Equal(t, fuse.Attr{
 		Ino:   101,
-		Mode:  fuse.S_IFDIR | 0555,
+		Mode:  fuse.S_IFDIR | 0o555,
 		Nlink: 1,
 	}, out2)
 

@@ -31,7 +31,7 @@ func TestGlobalDirectoryContextLookupDirectory(t *testing.T) {
 	var out fuse.Attr
 	d := globalDirectoryContext.LookupDirectory(directoryDigest, &out)
 	require.Equal(t, fuse.Attr{
-		Mode:  fuse.S_IFDIR | 0555,
+		Mode:  fuse.S_IFDIR | 0o555,
 		Ino:   globalDirectoryContext.GetDirectoryInodeNumber(directoryDigest),
 		Nlink: re_fuse.ImplicitDirectoryLinkCount,
 	}, out)

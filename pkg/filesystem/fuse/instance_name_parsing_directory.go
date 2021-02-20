@@ -39,7 +39,7 @@ func NewInstanceNameParsingDirectory(inodeNumberTree re_fuse.InodeNumberTree, lo
 
 func (d *instanceNameParsingDirectory) FUSEGetAttr(out *fuse.Attr) {
 	out.Ino = d.inodeNumberTree.Get()
-	out.Mode = fuse.S_IFDIR | 0111
+	out.Mode = fuse.S_IFDIR | 0o111
 	out.Nlink = re_fuse.ImplicitDirectoryLinkCount
 }
 

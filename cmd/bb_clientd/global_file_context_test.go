@@ -30,7 +30,7 @@ func TestGlobalFileContextLookupFile(t *testing.T) {
 		var out fuse.Attr
 		f := globalFileContext.LookupFile(helloDigest, false, &out)
 		require.Equal(t, fuse.Attr{
-			Mode:  fuse.S_IFREG | 0444,
+			Mode:  fuse.S_IFREG | 0o444,
 			Ino:   globalFileContext.GetFileInodeNumber(helloDigest, false),
 			Size:  11,
 			Nlink: re_fuse.StatelessLeafLinkCount,
@@ -49,7 +49,7 @@ func TestGlobalFileContextLookupFile(t *testing.T) {
 		var out fuse.Attr
 		f := globalFileContext.LookupFile(helloDigest, true, &out)
 		require.Equal(t, fuse.Attr{
-			Mode:  fuse.S_IFREG | 0555,
+			Mode:  fuse.S_IFREG | 0o555,
 			Ino:   globalFileContext.GetFileInodeNumber(helloDigest, true),
 			Size:  11,
 			Nlink: re_fuse.StatelessLeafLinkCount,
