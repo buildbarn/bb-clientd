@@ -4,8 +4,8 @@ go 1.15
 
 require (
 	github.com/bazelbuild/remote-apis v0.0.0-20201209220655-9e72daff42c9
-	github.com/buildbarn/bb-remote-execution v0.0.0-20210207110010-0079051e8739
-	github.com/buildbarn/bb-storage v0.0.0-20210207101039-9507e33a5caf
+	github.com/buildbarn/bb-remote-execution v0.0.0-20210220174437-530c1472d775
+	github.com/buildbarn/bb-storage v0.0.0-20210220154226-9835bf1344b9
 	github.com/golang/protobuf v1.4.3
 	github.com/hanwen/go-fuse/v2 v2.0.3
 	google.golang.org/genproto v0.0.0-20210207032614-bba0dbe2a9ea

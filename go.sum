@@ -64,8 +64,12 @@ github.com/beorn7/perks v1.0.1/go.mod h1:G2ZrVWU2WbWT9wwq4/hrbKbnv/1ERSJQ0ibhJ6r
 github.com/bgentry/speakeasy v0.1.0/go.mod h1:+zsyZBPWlz7T6j88CTgSN5bM796AkVf0kBD4zp0CCIs=
 github.com/buildbarn/bb-remote-execution v0.0.0-20210207110010-0079051e8739 h1:82J71ARGjo1hddxbm1f0FpsFo2pFWDqTZpll/SEMsY8=
 github.com/buildbarn/bb-remote-execution v0.0.0-20210207110010-0079051e8739/go.mod h1:ZFlyBDmunySQl2HSBdlBWKRdY43+RpXzm2hud+67M9s=
+github.com/buildbarn/bb-remote-execution v0.0.0-20210220174437-530c1472d775 h1:hoC88t1gDv7DQOs9hwYwrerr7A4P3CajfEm9lydaJtw=
+github.com/buildbarn/bb-remote-execution v0.0.0-20210220174437-530c1472d775/go.mod h1:uucBB32GjTK/Hw5+AdcUF5rvtQvsvIeCqa6maMo2dxo=
 github.com/buildbarn/bb-storage v0.0.0-20210207101039-9507e33a5caf h1:jKsBURVQlxY7wh4GFqIrSaHdT/rMhaf+wZi5JnEP+Kg=
 github.com/buildbarn/bb-storage v0.0.0-20210207101039-9507e33a5caf/go.mod h1:ZENQ/+hUD3gUeJoNkHqVQTaMBsdr4rr9KVfvpBmTKao=
+github.com/buildbarn/bb-storage v0.0.0-20210220154226-9835bf1344b9 h1:Xtjle5BR7Sqg4cGIO9ZyfVJkTVHBXCogX5cGzVN2N8g=
+github.com/buildbarn/bb-storage v0.0.0-20210220154226-9835bf1344b9/go.mod h1:ZENQ/+hUD3gUeJoNkHqVQTaMBsdr4rr9KVfvpBmTKao=
 github.com/casbin/casbin/v2 v2.1.2/go.mod h1:YcPU1XXisHhLzuxH9coDNf2FbKpjGlbCg3n9yuLkIJQ=
 github.com/cenkalti/backoff v2.2.1+incompatible/go.mod h1:90ReRw6GdpyfrHakVjL/QHaoyV4aDUVVkXQJJJ3NXXM=
 github.com/census-instrumentation/opencensus-proto v0.2.1 h1:glEXhBS5PSLLv4IXzLA5yPRVX4bilULVyxxbrfOtDAk=

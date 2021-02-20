@@ -140,6 +140,12 @@ local cacheDirectory = homeDirectory + '/.cache/bb_clientd';
     // Optional: create a HTTP server that exposes Prometheus metrics
     // and allows debugging using pprof. Make sure to only enable it
     // when you need it, or at least make sure that access is limited.
-    // diagnosticsHttpListenAddress: '127.0.0.1:12345',
+    /*
+    diagnosticsHttpServer: {
+      listenAddress: '127.0.0.1:12345',
+      enablePrometheus: true,
+      enablePprof: true,
+    },
+    */
   },
 }
