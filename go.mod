@@ -3,13 +3,13 @@ module github.com/buildbarn/bb-clientd
 go 1.15
 
 require (
-	github.com/bazelbuild/remote-apis v0.0.0-20201209220655-9e72daff42c9
-	github.com/buildbarn/bb-remote-execution v0.0.0-20210220174437-530c1472d775
-	github.com/buildbarn/bb-storage v0.0.0-20210220154226-9835bf1344b9
-	github.com/golang/protobuf v1.4.3
-	github.com/hanwen/go-fuse/v2 v2.0.3
-	google.golang.org/genproto v0.0.0-20210207032614-bba0dbe2a9ea
-	google.golang.org/grpc v1.35.0
+	github.com/bazelbuild/remote-apis v0.0.0-20210309154856-0943dc4e70e1
+	github.com/buildbarn/bb-remote-execution v0.0.0-20210316054813-6d277d69cc88
+	github.com/buildbarn/bb-storage v0.0.0-20210320151132-97a3adf543a9
+	github.com/golang/protobuf v1.5.1
+	github.com/hanwen/go-fuse/v2 v2.1.0
+	google.golang.org/genproto v0.0.0-20210310155132-4ce2db91004e
+	google.golang.org/grpc v1.36.0
 )
 
 replace github.com/golang/mock => github.com/golang/mock v1.4.4-0.20201026142858-99aa9272d551
