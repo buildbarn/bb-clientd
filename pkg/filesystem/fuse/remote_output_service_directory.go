@@ -13,11 +13,11 @@ import (
 	"github.com/buildbarn/bb-storage/pkg/filesystem/path"
 	"github.com/buildbarn/bb-storage/pkg/random"
 	"github.com/buildbarn/bb-storage/pkg/util"
-	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/hanwen/go-fuse/v2/fuse"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 // OutputPathFactory is a callback that is invoked by
@@ -99,7 +99,7 @@ func NewRemoteOutputServiceDirectory(inodeNumber uint64, inodeNumberGenerator ra
 }
 
 // Clean all build outputs associated with a single output base.
-func (d *RemoteOutputServiceDirectory) Clean(ctx context.Context, request *remoteoutputservice.CleanRequest) (*empty.Empty, error) {
+func (d *RemoteOutputServiceDirectory) Clean(ctx context.Context, request *remoteoutputservice.CleanRequest) (*emptypb.Empty, error) {
 	outputBaseID, ok := path.NewComponent(request.OutputBaseId)
 	if !ok {
 		return nil, status.Error(codes.InvalidArgument, "Output base ID is not a valid filename")
@@ -129,7 +129,7 @@ func (d *RemoteOutputServiceDirectory) Clean(ctx context.Context, request *remot
 
 		d.entryNotifier(d.inodeNumber, outputBaseID)
 	}
-	return &empty.Empty{}, nil
+	return &emptypb.Empty{}, nil
 }
 
 // findMissingAndRemove is called during StartBuild() to remove a single
@@ -446,7 +446,7 @@ func (cw *parentDirectoryCreatingComponentWalker) OnUp() (path.ComponentWalker, 
 // and OutputDirectory messages, this implementation is capable of
 // creating files and directories whose contents get loaded from the
 // Content Addressable Storage lazily.
-func (d *RemoteOutputServiceDirectory) BatchCreate(ctx context.Context, request *remoteoutputservice.BatchCreateRequest) (*empty.Empty, error) {
+func (d *RemoteOutputServiceDirectory) BatchCreate(ctx context.Context, request *remoteoutputservice.BatchCreateRequest) (*emptypb.Empty, error) {
 	outputPathState, buildState, err := d.getOutputPathAndBuildState(request.BuildId)
 	if err != nil {
 		return nil, err
@@ -506,7 +506,7 @@ func (d *RemoteOutputServiceDirectory) BatchCreate(ctx context.Context, request 
 		}
 	}
 
-	return &empty.Empty{}, nil
+	return &emptypb.Empty{}, nil
 }
 
 // statWalker is an implementation of ScopeWalker and ComponentWalker
@@ -528,7 +528,7 @@ func (cw *statWalker) OnScope(absolute bool) (path.ComponentWalker, error) {
 	// Currently in a known directory.
 	cw.fileStatus = &remoteoutputservice.FileStatus{
 		FileType: &remoteoutputservice.FileStatus_Directory{
-			Directory: &empty.Empty{},
+			Directory: &emptypb.Empty{},
 		},
 	}
 	return cw, nil
@@ -671,7 +671,7 @@ func (d *RemoteOutputServiceDirectory) BatchStat(ctx context.Context, request *r
 // FinalizeBuild can be called by a build client to indicate the current
 // build has completed. This prevents successive BatchCreate() and
 // BatchStat() calls from being processed.
-func (d *RemoteOutputServiceDirectory) FinalizeBuild(ctx context.Context, request *remoteoutputservice.FinalizeBuildRequest) (*empty.Empty, error) {
+func (d *RemoteOutputServiceDirectory) FinalizeBuild(ctx context.Context, request *remoteoutputservice.FinalizeBuildRequest) (*emptypb.Empty, error) {
 	d.lock.Lock()
 	defer d.lock.Unlock()
 
@@ -682,7 +682,7 @@ func (d *RemoteOutputServiceDirectory) FinalizeBuild(ctx context.Context, reques
 		delete(d.buildIDs, buildState.id)
 		outputPathState.buildState = nil
 	}
-	return &empty.Empty{}, nil
+	return &emptypb.Empty{}, nil
 }
 
 // FUSEAccess checks the access rights of the root directory of the

@@ -14,12 +14,12 @@ import (
 	"github.com/buildbarn/bb-storage/pkg/filesystem/path"
 	"github.com/buildbarn/bb-storage/pkg/testutil"
 	"github.com/golang/mock/gomock"
-	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/hanwen/go-fuse/v2/fuse"
 	"github.com/stretchr/testify/require"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 func TestRemoteOutputServiceDirectoryClean(t *testing.T) {
@@ -857,7 +857,7 @@ func TestRemoteOutputServiceDirectoryBatchStat(t *testing.T) {
 				{
 					FileStatus: &remoteoutputservice.FileStatus{
 						FileType: &remoteoutputservice.FileStatus_Directory{
-							Directory: &empty.Empty{},
+							Directory: &emptypb.Empty{},
 						},
 					},
 				},
@@ -878,7 +878,7 @@ func TestRemoteOutputServiceDirectoryBatchStat(t *testing.T) {
 				{
 					FileStatus: &remoteoutputservice.FileStatus{
 						FileType: &remoteoutputservice.FileStatus_Directory{
-							Directory: &empty.Empty{},
+							Directory: &emptypb.Empty{},
 						},
 					},
 				},
@@ -886,7 +886,7 @@ func TestRemoteOutputServiceDirectoryBatchStat(t *testing.T) {
 				{
 					FileStatus: &remoteoutputservice.FileStatus{
 						FileType: &remoteoutputservice.FileStatus_Directory{
-							Directory: &empty.Empty{},
+							Directory: &emptypb.Empty{},
 						},
 					},
 				},
@@ -894,7 +894,7 @@ func TestRemoteOutputServiceDirectoryBatchStat(t *testing.T) {
 				{
 					FileStatus: &remoteoutputservice.FileStatus{
 						FileType: &remoteoutputservice.FileStatus_Directory{
-							Directory: &empty.Empty{},
+							Directory: &emptypb.Empty{},
 						},
 					},
 				},
@@ -934,7 +934,7 @@ func TestRemoteOutputServiceDirectoryBatchStat(t *testing.T) {
 				{
 					FileStatus: &remoteoutputservice.FileStatus{
 						FileType: &remoteoutputservice.FileStatus_Directory{
-							Directory: &empty.Empty{},
+							Directory: &emptypb.Empty{},
 						},
 					},
 				},
