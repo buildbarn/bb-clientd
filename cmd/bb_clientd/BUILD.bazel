@@ -15,6 +15,7 @@ go_library(
     deps = [
         "//pkg/cas",
         "//pkg/filesystem/fuse",
+        "//pkg/outputpathpersistency",
         "//pkg/proto/configuration/bb_clientd",
         "@com_github_bazelbuild_remote_apis//build/bazel/remote/execution/v2:execution",
         "@com_github_buildbarn_bb_remote_execution//pkg/cas",
@@ -25,7 +26,9 @@ go_library(
         "@com_github_buildbarn_bb_storage//pkg/blobstore/configuration",
         "@com_github_buildbarn_bb_storage//pkg/blobstore/grpcservers",
         "@com_github_buildbarn_bb_storage//pkg/builder",
+        "@com_github_buildbarn_bb_storage//pkg/clock",
         "@com_github_buildbarn_bb_storage//pkg/digest",
+        "@com_github_buildbarn_bb_storage//pkg/filesystem",
         "@com_github_buildbarn_bb_storage//pkg/filesystem/path",
         "@com_github_buildbarn_bb_storage//pkg/global",
         "@com_github_buildbarn_bb_storage//pkg/grpc",

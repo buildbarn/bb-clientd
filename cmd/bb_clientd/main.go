@@ -8,6 +8,7 @@ import (
 	remoteexecution "github.com/bazelbuild/remote-apis/build/bazel/remote/execution/v2"
 	cd_cas "github.com/buildbarn/bb-clientd/pkg/cas"
 	cd_fuse "github.com/buildbarn/bb-clientd/pkg/filesystem/fuse"
+	"github.com/buildbarn/bb-clientd/pkg/outputpathpersistency"
 	"github.com/buildbarn/bb-clientd/pkg/proto/configuration/bb_clientd"
 	re_cas "github.com/buildbarn/bb-remote-execution/pkg/cas"
 	re_filesystem "github.com/buildbarn/bb-remote-execution/pkg/filesystem"
@@ -16,7 +17,9 @@ import (
 	blobstore_configuration "github.com/buildbarn/bb-storage/pkg/blobstore/configuration"
 	"github.com/buildbarn/bb-storage/pkg/blobstore/grpcservers"
 	"github.com/buildbarn/bb-storage/pkg/builder"
+	"github.com/buildbarn/bb-storage/pkg/clock"
 	"github.com/buildbarn/bb-storage/pkg/digest"
+	"github.com/buildbarn/bb-storage/pkg/filesystem"
 	"github.com/buildbarn/bb-storage/pkg/filesystem/path"
 	"github.com/buildbarn/bb-storage/pkg/global"
 	bb_grpc "github.com/buildbarn/bb-storage/pkg/grpc"
@@ -146,22 +149,35 @@ func main() {
 	// directories on a FUSE file system, thereby allowing data to
 	// be loaded lazily.
 	var serverCallbacks re_fuse.SimpleRawFileSystemServerCallbacks
+	outputPathFactory := cd_fuse.NewInMemoryOutputPathFactory(filePool, serverCallbacks.EntryNotify)
+	if persistencyConfiguration := configuration.OutputPathPersistency; persistencyConfiguration != nil {
+		// Enable persistent storage of bazel-out/ directories.
+		stateDirectory, err := filesystem.NewLocalDirectory(persistencyConfiguration.StateDirectoryPath)
+		if err != nil {
+			log.Fatalf("Failed to open persistent output path state directory %#v: %s", persistencyConfiguration.StateDirectoryPath, err)
+		}
+		maximumStateFileAge := persistencyConfiguration.MaximumStateFileAge
+		if err := maximumStateFileAge.CheckValid(); err != nil {
+			log.Fatal("Invalid maximum state file age: ", err)
+		}
+		outputPathFactory = cd_fuse.NewPersistentOutputPathFactory(
+			outputPathFactory,
+			outputpathpersistency.NewMaximumAgeStore(
+				outputpathpersistency.NewDirectoryBackedStore(
+					stateDirectory,
+					persistencyConfiguration.MaximumStateFileSizeBytes),
+				clock.SystemClock,
+				maximumStateFileAge.AsDuration()),
+			clock.SystemClock,
+			util.DefaultErrorLogger)
+	}
+
 	outputsInodeNumber := random.FastThreadSafeGenerator.Uint64()
 	outputsDirectory := cd_fuse.NewRemoteOutputServiceDirectory(
 		outputsInodeNumber,
 		random.NewFastSingleThreadedGenerator(),
 		serverCallbacks.EntryNotify,
-		func(errorLogger util.ErrorLogger, inodeNumber uint64) re_fuse.PrepopulatedDirectory {
-			return re_fuse.NewInMemoryPrepopulatedDirectory(
-				re_fuse.NewPoolBackedFileAllocator(
-					filePool,
-					errorLogger,
-					random.FastThreadSafeGenerator),
-				errorLogger,
-				inodeNumber,
-				random.FastThreadSafeGenerator,
-				serverCallbacks.EntryNotify)
-		},
+		outputPathFactory,
 		contentAddressableStorage,
 		indexedTreeFetcher)
 
