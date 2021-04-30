@@ -37,7 +37,7 @@ bb\_clientd:
 
 ```sh
 umount ~/bb_clientd; fusermount -u ~/bb_clientd
-mkdir -p ~/.cache/bb_clientd/cas/persistent_state ~/bb_clientd
+mkdir -p ~/.cache/bb_clientd/cas/persistent_state ~/.cache/bb_clientd/outputs ~/bb_clientd
 bazel run //cmd/bb_clientd $(bazel info workspace)/configs/bb_clientd.jsonnet
 ```
 

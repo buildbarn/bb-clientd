@@ -128,13 +128,23 @@ local cacheDirectory = homeDirectory + '/.cache/bb_clientd';
     // allowOther: true,
   },
 
-  // The location where files created in the "scratch" directory of the
-  // FUSE file system are stored. These files are not necessarily backed
-  // by remote storage.
+  // The location where locally created files in the "scratch" and
+  // "outputs" directories of the FUSE file system are stored. These
+  // files are not necessarily backed by remote storage.
   filePool: { blockDevice: { file: {
     path: cacheDirectory + '/filepool',
     sizeBytes: 100 * 1024 * 1024 * 1024,
   } } },
+
+  // The location where contents of the "outputs" are stored, so that
+  // they may be restored after restarts of bb_clientd. Because data is
+  // stored densely, and only the metadata of files is stored (i.e.,
+  // REv2 digests), these files tend to be small.
+  outputPathPersistency: {
+    stateDirectoryPath: cacheDirectory + '/outputs',
+    maximumStateFileSizeBytes: 1024 * 1024 * 1024,
+    maximumStateFileAge: '604800s',
+  },
 
   global: {
     // Optional: create a HTTP server that exposes Prometheus metrics
