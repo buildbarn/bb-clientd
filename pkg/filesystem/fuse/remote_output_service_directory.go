@@ -20,13 +20,6 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
-// OutputPathFactory is a callback that is invoked by
-// RemoteOutputServiceDirectory to create individual directories where
-// build results may be stored. Simple implementations may store these
-// results in memory, while more complex ones use local or networked
-// storage.
-type OutputPathFactory func(errorLogger util.ErrorLogger, inodeNumber uint64) re_fuse.PrepopulatedDirectory
-
 type buildState struct {
 	id                 string
 	digestFunction     digest.Function
@@ -35,7 +28,7 @@ type buildState struct {
 
 type outputPathState struct {
 	buildState               *buildState
-	rootDirectory            re_fuse.PrepopulatedDirectory
+	rootDirectory            OutputPath
 	rootDirectoryInodeNumber uint64
 	casFileFactory           re_fuse.CASFileFactory
 }
@@ -128,6 +121,12 @@ func (d *RemoteOutputServiceDirectory) Clean(ctx context.Context, request *remot
 		d.lock.Unlock()
 
 		d.entryNotifier(d.inodeNumber, outputBaseID)
+	} else if err := d.outputPathFactory.Clean(outputBaseID); err != nil {
+		// This output path hasn't been accessed since startup.
+		// It may be the case that there is persistent state
+		// associated with this output path, so make sure that
+		// is removed as well.
+		return nil, err
 	}
 	return &emptypb.Empty{}, nil
 }
@@ -265,15 +264,11 @@ func (d *RemoteOutputServiceDirectory) StartBuild(ctx context.Context, request *
 		return nil, err
 	}
 
-	var existingRootDirectory re_fuse.PrepopulatedDirectory
 	d.lock.Lock()
-	if state, ok := d.buildIDs[request.BuildId]; ok {
-		// StartBuild() call that was retried.
-		existingRootDirectory = state.rootDirectory
-	} else {
-		state, ok := d.outputBaseIDs[outputBaseID]
+	state, ok := d.buildIDs[request.BuildId]
+	if !ok {
+		state, ok = d.outputBaseIDs[outputBaseID]
 		if ok {
-			existingRootDirectory = state.rootDirectory
 			if buildState := state.buildState; buildState != nil {
 				// A previous build is running that wasn't
 				// finalized properly. Forcefully finalize it.
@@ -292,13 +287,14 @@ func (d *RemoteOutputServiceDirectory) StartBuild(ctx context.Context, request *
 			// don't need to check logs.
 			errorLogger := util.DefaultErrorLogger
 			inodeNumber := d.inodeNumberGenerator.Uint64()
+			casFileFactory := re_fuse.NewBlobAccessCASFileFactory(
+				context.Background(),
+				d.contentAddressableStorage,
+				errorLogger)
 			state = &outputPathState{
-				rootDirectory:            d.outputPathFactory(errorLogger, inodeNumber),
+				rootDirectory:            d.outputPathFactory.StartInitialBuild(outputBaseID, casFileFactory, instanceName, errorLogger, inodeNumber),
 				rootDirectoryInodeNumber: inodeNumber,
-				casFileFactory: re_fuse.NewBlobAccessCASFileFactory(
-					context.Background(),
-					d.contentAddressableStorage,
-					errorLogger),
+				casFileFactory:           casFileFactory,
 			}
 			d.outputBaseIDs[outputBaseID] = state
 		}
@@ -314,17 +310,14 @@ func (d *RemoteOutputServiceDirectory) StartBuild(ctx context.Context, request *
 	}
 	d.lock.Unlock()
 
-	if existingRootDirectory != nil {
-		// We're going to reuse an existing output path.  Call
-		// ContentAddressableStorage.FindMissingBlobs() on all
-		// of the files and tree objects contained within the
-		// output path, so that we have the certainty that they
-		// don't disappear during the build. Remove all of the
-		// files and directories that are missing, so that the
-		// client can detect their absence and rebuild them.
-		if err := d.filterMissingChildren(ctx, existingRootDirectory, digestFunction); err != nil {
-			return nil, util.StatusWrap(err, "Failed to filter contents of the output path")
-		}
+	// Call ContentAddressableStorage.FindMissingBlobs() on all of
+	// the files and tree objects contained within the output path,
+	// so that we have the certainty that they don't disappear
+	// during the build. Remove all of the files and directories
+	// that are missing, so that the client can detect their absence
+	// and rebuild them.
+	if err := d.filterMissingChildren(ctx, state.rootDirectory, digestFunction); err != nil {
+		return nil, util.StatusWrap(err, "Failed to filter contents of the output path")
 	}
 
 	return &remoteoutputservice.StartBuildResponse{
@@ -678,6 +671,7 @@ func (d *RemoteOutputServiceDirectory) FinalizeBuild(ctx context.Context, reques
 	// Silently ignore requests for unknown build IDs. This ensures
 	// that FinalizeBuild() remains idempotent.
 	if outputPathState, ok := d.buildIDs[request.BuildId]; ok {
+		outputPathState.rootDirectory.FinalizeBuild()
 		buildState := outputPathState.buildState
 		delete(d.buildIDs, buildState.id)
 		outputPathState.buildState = nil

@@ -34,7 +34,7 @@ func TestRemoteOutputServiceDirectoryClean(t *testing.T) {
 		100,
 		inodeNumberGenerator,
 		entryNotifier.Call,
-		outputPathFactory.Call,
+		outputPathFactory,
 		contentAddressableStorage,
 		indexedTreeFetcher)
 
@@ -47,8 +47,13 @@ func TestRemoteOutputServiceDirectoryClean(t *testing.T) {
 	})
 
 	t.Run("NonexistentOutputPath", func(t *testing.T) {
-		// Idempotence: attempting to clean data associated with
-		// a nonexistent output base ID should be permitted.
+		// The output base ID hasn't been used since startup,
+		// but there may be persistent data associated with it.
+		// Ensure this persistent data is removed, to ensure
+		// that the next call to StartBuild() yields an empty
+		// output path.
+		outputPathFactory.EXPECT().Clean(path.MustNewComponent("9e6defb5a0a8a7af63077e0623279b78"))
+
 		_, err := d.Clean(ctx, &remoteoutputservice.CleanRequest{
 			OutputBaseId: "9e6defb5a0a8a7af63077e0623279b78",
 		})
@@ -58,8 +63,9 @@ func TestRemoteOutputServiceDirectoryClean(t *testing.T) {
 	t.Run("ExistentOutputPath", func(t *testing.T) {
 		// Create an output path.
 		inodeNumberGenerator.EXPECT().Uint64().Return(uint64(101))
-		outputPath := mock.NewMockPrepopulatedDirectory(ctrl)
-		outputPathFactory.EXPECT().Call(gomock.Any(), uint64(101)).Return(outputPath)
+		outputPath := mock.NewMockOutputPath(ctrl)
+		outputPathFactory.EXPECT().StartInitialBuild(path.MustNewComponent("a448da900e7bd4b025ab91da2aba6244"), gomock.Any(), digest.EmptyInstanceName, gomock.Any(), uint64(101)).Return(outputPath)
+		outputPath.EXPECT().FilterChildren(gomock.Any())
 
 		response, err := d.StartBuild(ctx, &remoteoutputservice.StartBuildRequest{
 			OutputBaseId:     "a448da900e7bd4b025ab91da2aba6244",
@@ -92,7 +98,9 @@ func TestRemoteOutputServiceDirectoryClean(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		// Successive attempts should have no effect.
+		// Successive attempts should request the removal of
+		// persistent state.
+		outputPathFactory.EXPECT().Clean(path.MustNewComponent("a448da900e7bd4b025ab91da2aba6244"))
 		_, err = d.Clean(ctx, &remoteoutputservice.CleanRequest{
 			OutputBaseId: "a448da900e7bd4b025ab91da2aba6244",
 		})
@@ -112,7 +120,7 @@ func TestRemoteOutputServiceDirectoryStartBuild(t *testing.T) {
 		100,
 		inodeNumberGenerator,
 		entryNotifier.Call,
-		outputPathFactory.Call,
+		outputPathFactory,
 		contentAddressableStorage,
 		indexedTreeFetcher)
 
@@ -176,8 +184,9 @@ func TestRemoteOutputServiceDirectoryStartBuild(t *testing.T) {
 		// An initial successful call should create the output
 		// path directory.
 		inodeNumberGenerator.EXPECT().Uint64().Return(uint64(101))
-		outputPath := mock.NewMockPrepopulatedDirectory(ctrl)
-		outputPathFactory.EXPECT().Call(gomock.Any(), uint64(101)).Return(outputPath)
+		outputPath := mock.NewMockOutputPath(ctrl)
+		outputPathFactory.EXPECT().StartInitialBuild(path.MustNewComponent("9da951b8cb759233037166e28f7ea186"), gomock.Any(), digest.MustNewInstanceName("my-cluster"), gomock.Any(), uint64(101)).Return(outputPath)
+		outputPath.EXPECT().FilterChildren(gomock.Any())
 
 		response, err := d.StartBuild(ctx, &remoteoutputservice.StartBuildRequest{
 			OutputBaseId:     "9da951b8cb759233037166e28f7ea186",
@@ -471,7 +480,7 @@ func TestRemoteOutputServiceDirectoryBatchCreate(t *testing.T) {
 		100,
 		inodeNumberGenerator,
 		entryNotifier.Call,
-		outputPathFactory.Call,
+		outputPathFactory,
 		contentAddressableStorage,
 		indexedTreeFetcher)
 
@@ -494,8 +503,9 @@ func TestRemoteOutputServiceDirectoryBatchCreate(t *testing.T) {
 
 	// Let the remainder of the tests assume that a build is running.
 	inodeNumberGenerator.EXPECT().Uint64().Return(uint64(101))
-	outputPath := mock.NewMockPrepopulatedDirectory(ctrl)
-	outputPathFactory.EXPECT().Call(gomock.Any(), uint64(101)).Return(outputPath)
+	outputPath := mock.NewMockOutputPath(ctrl)
+	outputPathFactory.EXPECT().StartInitialBuild(path.MustNewComponent("c6adef0d5ca1888a4aa847fb51229a8c"), gomock.Any(), digest.MustNewInstanceName("my-cluster"), gomock.Any(), uint64(101)).Return(outputPath)
+	outputPath.EXPECT().FilterChildren(gomock.Any())
 
 	response, err := d.StartBuild(ctx, &remoteoutputservice.StartBuildRequest{
 		OutputBaseId:     "c6adef0d5ca1888a4aa847fb51229a8c",
@@ -637,7 +647,7 @@ func TestRemoteOutputServiceDirectoryBatchStat(t *testing.T) {
 		100,
 		inodeNumberGenerator,
 		entryNotifier.Call,
-		outputPathFactory.Call,
+		outputPathFactory,
 		contentAddressableStorage,
 		indexedTreeFetcher)
 
@@ -652,8 +662,9 @@ func TestRemoteOutputServiceDirectoryBatchStat(t *testing.T) {
 
 	// Let the remainder of the tests assume that a build is running.
 	inodeNumberGenerator.EXPECT().Uint64().Return(uint64(101))
-	outputPath := mock.NewMockPrepopulatedDirectory(ctrl)
-	outputPathFactory.EXPECT().Call(gomock.Any(), uint64(101)).Return(outputPath)
+	outputPath := mock.NewMockOutputPath(ctrl)
+	outputPathFactory.EXPECT().StartInitialBuild(path.MustNewComponent("9da951b8cb759233037166e28f7ea186"), gomock.Any(), digest.MustNewInstanceName("my-cluster"), gomock.Any(), uint64(101)).Return(outputPath)
+	outputPath.EXPECT().FilterChildren(gomock.Any())
 
 	response, err := d.StartBuild(ctx, &remoteoutputservice.StartBuildRequest{
 		OutputBaseId:     "9da951b8cb759233037166e28f7ea186",
@@ -955,7 +966,7 @@ func TestRemoteOutputServiceDirectoryFUSELookup(t *testing.T) {
 		100,
 		inodeNumberGenerator,
 		entryNotifier.Call,
-		outputPathFactory.Call,
+		outputPathFactory,
 		contentAddressableStorage,
 		indexedTreeFetcher)
 
@@ -966,8 +977,9 @@ func TestRemoteOutputServiceDirectoryFUSELookup(t *testing.T) {
 
 	// Create an output path.
 	inodeNumberGenerator.EXPECT().Uint64().Return(uint64(101))
-	outputPath := mock.NewMockPrepopulatedDirectory(ctrl)
-	outputPathFactory.EXPECT().Call(gomock.Any(), uint64(101)).Return(outputPath)
+	outputPath := mock.NewMockOutputPath(ctrl)
+	outputPathFactory.EXPECT().StartInitialBuild(path.MustNewComponent("eaf1d65b7ab802934e6b57d0e14b3f30"), gomock.Any(), digest.EmptyInstanceName, gomock.Any(), uint64(101)).Return(outputPath)
+	outputPath.EXPECT().FilterChildren(gomock.Any())
 
 	response, err := d.StartBuild(ctx, &remoteoutputservice.StartBuildRequest{
 		OutputBaseId:     "eaf1d65b7ab802934e6b57d0e14b3f30",
@@ -1028,7 +1040,7 @@ func TestRemoteOutputServiceDirectoryFUSEReadDir(t *testing.T) {
 		100,
 		inodeNumberGenerator,
 		entryNotifier.Call,
-		outputPathFactory.Call,
+		outputPathFactory,
 		contentAddressableStorage,
 		indexedTreeFetcher)
 
@@ -1039,8 +1051,9 @@ func TestRemoteOutputServiceDirectoryFUSEReadDir(t *testing.T) {
 
 	// Create two output paths.
 	inodeNumberGenerator.EXPECT().Uint64().Return(uint64(101))
-	outputPath1 := mock.NewMockPrepopulatedDirectory(ctrl)
-	outputPathFactory.EXPECT().Call(gomock.Any(), uint64(101)).Return(outputPath1)
+	outputPath1 := mock.NewMockOutputPath(ctrl)
+	outputPathFactory.EXPECT().StartInitialBuild(path.MustNewComponent("83f3e6ff93a5403cbfb14682d8165968"), gomock.Any(), digest.EmptyInstanceName, gomock.Any(), uint64(101)).Return(outputPath1)
+	outputPath1.EXPECT().FilterChildren(gomock.Any())
 
 	response, err := d.StartBuild(ctx, &remoteoutputservice.StartBuildRequest{
 		OutputBaseId:     "83f3e6ff93a5403cbfb14682d8165968",
@@ -1057,8 +1070,9 @@ func TestRemoteOutputServiceDirectoryFUSEReadDir(t *testing.T) {
 	}, response)
 
 	inodeNumberGenerator.EXPECT().Uint64().Return(uint64(102))
-	outputPath2 := mock.NewMockPrepopulatedDirectory(ctrl)
-	outputPathFactory.EXPECT().Call(gomock.Any(), uint64(102)).Return(outputPath2)
+	outputPath2 := mock.NewMockOutputPath(ctrl)
+	outputPathFactory.EXPECT().StartInitialBuild(path.MustNewComponent("d4b145a6191c6d8d037d13986274d08d"), gomock.Any(), digest.EmptyInstanceName, gomock.Any(), uint64(102)).Return(outputPath2)
+	outputPath2.EXPECT().FilterChildren(gomock.Any())
 
 	response, err = d.StartBuild(ctx, &remoteoutputservice.StartBuildRequest{
 		OutputBaseId:     "d4b145a6191c6d8d037d13986274d08d",
