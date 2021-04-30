@@ -70,8 +70,8 @@ def go_dependencies():
     go_repository(
         name = "com_github_aws_aws_sdk_go",
         importpath = "github.com/aws/aws-sdk-go",
-        sum = "h1:jLrt4u2Qw93jwiTiBGTrek8ATueIVWxcHy2CEI0vLSI=",
-        version = "v1.37.28",
+        sum = "h1:qUXZReQck3SdPwMN3HnNk1Mgq2jJJ2T7V+790HthW4g=",
+        version = "v1.38.2",
     )
     go_repository(
         name = "com_github_aws_aws_sdk_go_v2",
@@ -101,15 +101,15 @@ def go_dependencies():
     go_repository(
         name = "com_github_buildbarn_bb_remote_execution",
         importpath = "github.com/buildbarn/bb-remote-execution",
-        sum = "h1:+myTQw5wXyYxLzVRndkXs7mFam8DXQdL9HgkKU9+mjE=",
-        version = "v0.0.0-20210316054813-6d277d69cc88",
+        sum = "h1:tPyVENrpS56cYVm6Ugk9cs7HQCoswd1a54OtIGWDPXE=",
+        version = "v0.0.0-20210430150052-ed1e2f4f8ecf",
     )
     go_repository(
         name = "com_github_buildbarn_bb_storage",
         importpath = "github.com/buildbarn/bb-storage",
         patches = ["//:patches/com_github_buildbarn_bb_storage/no-incompatible-platforms.diff"],
-        sum = "h1:9rFx9GfzkhSzR7/DEYp0tfs3a8F9UJYheGnsCIerQ2o=",
-        version = "v0.0.0-20210320151132-97a3adf543a9",
+        sum = "h1:d4JEA2JZLLIyCls1bSHoVSDdpi8ZAhYswhIGXsyD37E=",
+        version = "v0.0.0-20210430141345-6b1bb480c012",
     )
     go_repository(
         name = "com_github_burntsushi_toml",
@@ -1045,8 +1045,8 @@ def go_dependencies():
     go_repository(
         name = "com_github_prometheus_client_golang",
         importpath = "github.com/prometheus/client_golang",
-        sum = "h1:Rrch9mh17XcxvEu9D9DEpb4isxjGBtcevQjKvxPRQIU=",
-        version = "v1.9.0",
+        sum = "h1:/o0BDeWzLWXNZ+4q5gXltUvaMpJqckTa+jTNoB+z4cg=",
+        version = "v1.10.0",
     )
     go_repository(
         name = "com_github_prometheus_client_model",
@@ -1057,14 +1057,14 @@ def go_dependencies():
     go_repository(
         name = "com_github_prometheus_common",
         importpath = "github.com/prometheus/common",
-        sum = "h1:4fgOnadei3EZvgRwxJ7RMpG1k1pOZth5Pc13tyspaKM=",
-        version = "v0.15.0",
+        sum = "h1:WCVKW7aL6LEe1uryfI9dnEc2ZqNB1Fn0ok930v0iL1Y=",
+        version = "v0.18.0",
     )
     go_repository(
         name = "com_github_prometheus_procfs",
         importpath = "github.com/prometheus/procfs",
-        sum = "h1:wH4vA7pcjKuZzjF7lM8awk4fnuJO6idemZXoKnULUx4=",
-        version = "v0.2.0",
+        sum = "h1:mxy4L2jP6qMonqmq+aTtOx1ifVWUgG/TAmntgbh3xv4=",
+        version = "v0.6.0",
     )
     go_repository(
         name = "com_github_prometheus_statsd_exporter",
@@ -1515,8 +1515,8 @@ def go_dependencies():
     go_repository(
         name = "org_golang_x_sys",
         importpath = "golang.org/x/sys",
-        sum = "h1:46ULzRKLh1CwgRq2dC5SlBzEqqNCi8rreOZnNrbqcIY=",
-        version = "v0.0.0-20210309074719-68d13333faf2",
+        sum = "h1:EZ2mChiOa8udjfp6rRmswTbtZN/QzUQp4ptM4rnjHvc=",
+        version = "v0.0.0-20210320140829-1e4c9ba3b0c4",
     )
     go_repository(
         name = "org_golang_x_term",
