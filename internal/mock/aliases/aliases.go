@@ -1,6 +1,9 @@
 package aliases
 
 import (
+	"io"
+
+	"github.com/buildbarn/bb-clientd/pkg/outputpathpersistency"
 	"github.com/buildbarn/bb-remote-execution/pkg/filesystem/fuse"
 )
 
@@ -20,3 +23,16 @@ type FUSEDirectory = fuse.Directory
 
 // FUSELeaf is an alias of fuse.Leaf.
 type FUSELeaf = fuse.Leaf
+
+// OutputPathPersistencyReadCloser is an alias of
+// outputpathpersistency.ReadCloser.
+type OutputPathPersistencyReadCloser = outputpathpersistency.ReadCloser
+
+// OutputPathPersistencyStore is an alias of outputpathpersistency.Store.
+type OutputPathPersistencyStore = outputpathpersistency.Store
+
+// ReaderAt is an alias of io.ReaderAt.
+type ReaderAt = io.ReaderAt
+
+// WriterAt is an alias of io.WriterAt.
+type WriterAt = io.WriterAt

@@ -9,6 +9,10 @@ gomock(
     interfaces = [
         "FUSEDirectory",
         "FUSELeaf",
+        "OutputPathPersistencyReadCloser",
+        "OutputPathPersistencyStore",
+        "ReaderAt",
+        "WriterAt",
     ],
     library = "//internal/mock/aliases",
     package = "mock",
@@ -28,6 +32,26 @@ gomock(
     out = "cas.go",
     interfaces = ["IndexedTreeFetcher"],
     library = "//pkg/cas",
+    package = "mock",
+)
+
+gomock(
+    name = "clock",
+    out = "clock.go",
+    interfaces = ["Clock"],
+    library = "@com_github_buildbarn_bb_storage//pkg/clock",
+    package = "mock",
+)
+
+gomock(
+    name = "filesystem",
+    out = "filesystem.go",
+    interfaces = [
+        "Directory",
+        "FileReader",
+        "FileWriter",
+    ],
+    library = "@com_github_buildbarn_bb_storage//pkg/filesystem",
     package = "mock",
 )
 
@@ -88,6 +112,8 @@ go_library(
         ":aliases.go",
         ":blobstore.go",
         ":cas.go",
+        ":clock.go",
+        ":filesystem.go",
         ":filesystem_fuse.go",
         ":random.go",
         ":re_cas.go",
@@ -98,11 +124,14 @@ go_library(
     visibility = ["//:__subpackages__"],
     deps = [
         "//pkg/cas",
+        "//pkg/outputpathpersistency",
         "@com_github_bazelbuild_remote_apis//build/bazel/remote/execution/v2:execution",
         "@com_github_buildbarn_bb_remote_execution//pkg/filesystem/fuse",
+        "@com_github_buildbarn_bb_remote_execution//pkg/proto/outputpathpersistency",
         "@com_github_buildbarn_bb_remote_execution//pkg/proto/remoteoutputservice",
         "@com_github_buildbarn_bb_storage//pkg/blobstore",
         "@com_github_buildbarn_bb_storage//pkg/blobstore/buffer",
+        "@com_github_buildbarn_bb_storage//pkg/clock",
         "@com_github_buildbarn_bb_storage//pkg/digest",
         "@com_github_buildbarn_bb_storage//pkg/filesystem",
         "@com_github_buildbarn_bb_storage//pkg/filesystem/path",

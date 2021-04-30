@@ -1,0 +1,51 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "outputpathpersistency",
+    srcs = [
+        "directory_backed_store.go",
+        "file_reader.go",
+        "file_writer.go",
+        "header.go",
+        "maximum_age_store.go",
+        "reader.go",
+        "store.go",
+        "writer.go",
+    ],
+    importpath = "github.com/buildbarn/bb-clientd/pkg/outputpathpersistency",
+    visibility = ["//visibility:public"],
+    deps = [
+        "@com_github_buildbarn_bb_remote_execution//pkg/proto/outputpathpersistency",
+        "@com_github_buildbarn_bb_storage//pkg/clock",
+        "@com_github_buildbarn_bb_storage//pkg/filesystem",
+        "@com_github_buildbarn_bb_storage//pkg/filesystem/path",
+        "@com_github_buildbarn_bb_storage//pkg/util",
+        "@org_golang_google_grpc//codes",
+        "@org_golang_google_grpc//status",
+        "@org_golang_google_protobuf//proto",
+    ],
+)
+
+go_test(
+    name = "outputpathpersistency_test",
+    srcs = [
+        "directory_backed_store_test.go",
+        "file_reader_test.go",
+        "file_writer_test.go",
+        "maximum_age_store_test.go",
+    ],
+    embed = [":outputpathpersistency"],
+    deps = [
+        "//internal/mock",
+        "@com_github_bazelbuild_remote_apis//build/bazel/remote/execution/v2:execution",
+        "@com_github_buildbarn_bb_remote_execution//pkg/proto/outputpathpersistency",
+        "@com_github_buildbarn_bb_storage//pkg/filesystem",
+        "@com_github_buildbarn_bb_storage//pkg/filesystem/path",
+        "@com_github_buildbarn_bb_storage//pkg/testutil",
+        "@com_github_golang_mock//gomock",
+        "@com_github_stretchr_testify//require",
+        "@org_golang_google_grpc//codes",
+        "@org_golang_google_grpc//status",
+        "@org_golang_google_protobuf//types/known/timestamppb",
+    ],
+)
