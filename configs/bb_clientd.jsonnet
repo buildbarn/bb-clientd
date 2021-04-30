@@ -147,6 +147,11 @@ local cacheDirectory = homeDirectory + '/.cache/bb_clientd';
   },
 
   global: {
+    // Multiplex logs into a file. That way they remain accessible, even
+    // if bb_clientd is run through a system that doesn't maintain logs
+    // for us.
+    logPaths: [cacheDirectory + '/log'],
+
     // Optional: create a HTTP server that exposes Prometheus metrics
     // and allows debugging using pprof. Make sure to only enable it
     // when you need it, or at least make sure that access is limited.
