@@ -54,7 +54,7 @@ func TestDigestParsingDirectory(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
 		// A directory or file must be looked up when the
 		// filename is a valid digest.
-		mockChildFile := mock.NewMockLeaf(ctrl)
+		mockChildFile := mock.NewMockFUSELeaf(ctrl)
 		lookupFunc.EXPECT().Call(
 			digest.MustNewDigest("hello", "8b1a9953c4611296a827abf8c47804d7", 5),
 			gomock.Any(),

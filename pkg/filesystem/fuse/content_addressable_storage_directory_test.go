@@ -123,7 +123,7 @@ func TestContentAddressableStorageDirectoryFUSELookup(t *testing.T) {
 
 	t.Run("SuccessDirectory", func(t *testing.T) {
 		// Successfully looking up a directory.
-		childDirectory := mock.NewMockDirectory(ctrl)
+		childDirectory := mock.NewMockFUSEDirectory(ctrl)
 		directoryContext.EXPECT().LookupDirectory(
 			digest.MustNewDigest("example", "47473788bad5e9991fcd8e8a2b6012745031089ebe6cc7342f78bf92570e4f52", 42),
 			gomock.Any(),

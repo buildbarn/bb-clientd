@@ -4,6 +4,18 @@ load("@bazel_gomock//:gomock.bzl", "gomock")
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 gomock(
+    name = "aliases",
+    out = "aliases.go",
+    interfaces = [
+        "FUSEDirectory",
+        "FUSELeaf",
+    ],
+    library = "//internal/mock/aliases",
+    package = "mock",
+    tags = ["manual"],
+)
+
+gomock(
     name = "blobstore",
     out = "blobstore.go",
     interfaces = ["BlobAccess"],
@@ -53,10 +65,8 @@ gomock(
     out = "re_filesystem_fuse.go",
     interfaces = [
         "ChildRemover",
-        "Directory",
         "EntryNotifier",
         "InitialContentsFetcher",
-        "Leaf",
         "NativeLeaf",
         "PrepopulatedDirectory",
     ],
@@ -75,6 +85,7 @@ gomock(
 go_library(
     name = "mock",
     srcs = [
+        ":aliases.go",
         ":blobstore.go",
         ":cas.go",
         ":filesystem_fuse.go",

@@ -26,7 +26,7 @@ func TestInstanceNameParsingDirectory(t *testing.T) {
 	t.Run("EmptyInstanceName", func(t *testing.T) {
 		// Parse the empty instance name by just traversing the
 		// path "blobs".
-		mockChildDirectory := mock.NewMockDirectory(ctrl)
+		mockChildDirectory := mock.NewMockFUSEDirectory(ctrl)
 		lookupFunc.EXPECT().Call(
 			digest.MustNewInstanceName(""),
 			gomock.Any(),
@@ -52,7 +52,7 @@ func TestInstanceNameParsingDirectory(t *testing.T) {
 	t.Run("SingleComponentInstanceName", func(t *testing.T) {
 		// Parse the instance name "hello" by traversing the
 		// path "hello/blobs".
-		mockChildFile := mock.NewMockLeaf(ctrl)
+		mockChildFile := mock.NewMockFUSELeaf(ctrl)
 		lookupFunc.EXPECT().Call(
 			digest.MustNewInstanceName("hello"),
 			gomock.Any(),
@@ -88,7 +88,7 @@ func TestInstanceNameParsingDirectory(t *testing.T) {
 	t.Run("DoubleComponentInstanceName", func(t *testing.T) {
 		// Parse the instance name "hello/world" by traversing
 		// the path "hello/world/blobs".
-		mockChildFile := mock.NewMockLeaf(ctrl)
+		mockChildFile := mock.NewMockFUSELeaf(ctrl)
 		lookupFunc.EXPECT().Call(
 			digest.MustNewInstanceName("hello/world"),
 			gomock.Any(),

@@ -15,7 +15,7 @@ import (
 func TestStaticDirectoryFUSELookup(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
-	child := mock.NewMockDirectory(ctrl)
+	child := mock.NewMockFUSEDirectory(ctrl)
 	d := cd_fuse.NewStaticDirectory(123, map[path.Component]cd_fuse.StaticDirectoryEntry{
 		path.MustNewComponent("child"): {
 			Child:       child,
@@ -51,8 +51,8 @@ func TestStaticDirectoryFUSELookup(t *testing.T) {
 func TestStaticDirectoryFUSEReadDir(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
-	childA := mock.NewMockDirectory(ctrl)
-	childB := mock.NewMockDirectory(ctrl)
+	childA := mock.NewMockFUSEDirectory(ctrl)
+	childB := mock.NewMockFUSEDirectory(ctrl)
 	d := cd_fuse.NewStaticDirectory(123, map[path.Component]cd_fuse.StaticDirectoryEntry{
 		path.MustNewComponent("a"): {
 			Child:       childA,
@@ -86,8 +86,8 @@ func TestStaticDirectoryFUSEReadDir(t *testing.T) {
 func TestStaticDirectoryFUSEReadDirPlus(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
-	childA := mock.NewMockDirectory(ctrl)
-	childB := mock.NewMockDirectory(ctrl)
+	childA := mock.NewMockFUSEDirectory(ctrl)
+	childB := mock.NewMockFUSEDirectory(ctrl)
 	d := cd_fuse.NewStaticDirectory(123, map[path.Component]cd_fuse.StaticDirectoryEntry{
 		path.MustNewComponent("a"): {
 			Child:       childA,
