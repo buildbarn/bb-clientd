@@ -4,8 +4,10 @@ import (
 	"context"
 	"log"
 	"os"
+	"time"
 
 	remoteexecution "github.com/bazelbuild/remote-apis/build/bazel/remote/execution/v2"
+	cd_blobstore "github.com/buildbarn/bb-clientd/pkg/blobstore"
 	cd_cas "github.com/buildbarn/bb-clientd/pkg/cas"
 	cd_fuse "github.com/buildbarn/bb-clientd/pkg/filesystem/fuse"
 	"github.com/buildbarn/bb-clientd/pkg/outputpathpersistency"
@@ -45,7 +47,7 @@ func main() {
 	}
 
 	// Storage access.
-	contentAddressableStorage, actionCache, err := blobstore_configuration.NewCASAndACBlobAccessFromConfiguration(
+	bareContentAddressableStorage, actionCache, err := blobstore_configuration.NewCASAndACBlobAccessFromConfiguration(
 		configuration.Blobstore,
 		bb_grpc.DefaultClientFactory,
 		int(configuration.MaximumMessageSizeBytes))
@@ -69,6 +71,25 @@ func main() {
 		log.Fatal("Failed to create file pool: ", err)
 	}
 
+	// Separate BlobAccess that does retries in case of read errors.
+	// This is necessary, because it isn't always possible to
+	// directly propagate I/O errors returned by the FUSE file
+	// system to clients.
+	retryingContentAddressableStorage := bareContentAddressableStorage
+	if maximumDelay := configuration.MaximumFuseRetryDelay; maximumDelay != nil {
+		if err := maximumDelay.CheckValid(); err != nil {
+			log.Fatal("Invalid maximum FUSE retry delay: ", err)
+		}
+		retryingContentAddressableStorage = cd_blobstore.NewErrorRetryingBlobAccess(
+			bareContentAddressableStorage,
+			clock.SystemClock,
+			random.FastThreadSafeGenerator,
+			util.DefaultErrorLogger,
+			time.Second,
+			30*time.Second,
+			maximumDelay.AsDuration())
+	}
+
 	// Factories for FUSE nodes corresponding to plain files,
 	// executable files, directories and trees.
 	//
@@ -78,16 +99,16 @@ func main() {
 	// time being, as we mainly care about accessing individual
 	// files.
 	indexedTreeFetcher := cd_cas.NewBlobAccessIndexedTreeFetcher(
-		contentAddressableStorage,
+		retryingContentAddressableStorage,
 		int(configuration.MaximumMessageSizeBytes))
 	globalFileContext := NewGlobalFileContext(
 		context.Background(),
-		contentAddressableStorage,
+		retryingContentAddressableStorage,
 		util.DefaultErrorLogger)
 	globalDirectoryContext := NewGlobalDirectoryContext(
 		globalFileContext,
 		re_cas.NewBlobAccessDirectoryFetcher(
-			contentAddressableStorage,
+			retryingContentAddressableStorage,
 			int(configuration.MaximumMessageSizeBytes)))
 	globalTreeContext := NewGlobalTreeContext(globalFileContext, indexedTreeFetcher)
 
@@ -178,7 +199,8 @@ func main() {
 		random.NewFastSingleThreadedGenerator(),
 		serverCallbacks.EntryNotify,
 		outputPathFactory,
-		contentAddressableStorage,
+		bareContentAddressableStorage,
+		retryingContentAddressableStorage,
 		indexedTreeFetcher)
 
 	// Construct the top-level directory of the FUSE mount. It contains
@@ -244,12 +266,12 @@ func main() {
 					remoteexecution.RegisterContentAddressableStorageServer(
 						s,
 						grpcservers.NewContentAddressableStorageServer(
-							contentAddressableStorage,
+							bareContentAddressableStorage,
 							configuration.MaximumMessageSizeBytes))
 					bytestream.RegisterByteStreamServer(
 						s,
 						grpcservers.NewByteStreamServer(
-							contentAddressableStorage,
+							bareContentAddressableStorage,
 							1<<16))
 					remoteexecution.RegisterCapabilitiesServer(s, buildQueue)
 					remoteexecution.RegisterExecutionServer(s, buildQueue)

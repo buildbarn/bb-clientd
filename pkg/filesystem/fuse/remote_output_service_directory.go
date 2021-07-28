@@ -58,12 +58,13 @@ type outputPathState struct {
 type RemoteOutputServiceDirectory struct {
 	readOnlyDirectory
 
-	inodeNumber               uint64
-	inodeNumberGenerator      random.SingleThreadedGenerator
-	entryNotifier             re_fuse.EntryNotifier
-	outputPathFactory         OutputPathFactory
-	contentAddressableStorage blobstore.BlobAccess
-	indexedTreeFetcher        cas.IndexedTreeFetcher
+	inodeNumber                       uint64
+	inodeNumberGenerator              random.SingleThreadedGenerator
+	entryNotifier                     re_fuse.EntryNotifier
+	outputPathFactory                 OutputPathFactory
+	bareContentAddressableStorage     blobstore.BlobAccess
+	retryingContentAddressableStorage blobstore.BlobAccess
+	indexedTreeFetcher                cas.IndexedTreeFetcher
 
 	lock          sync.Mutex
 	outputBaseIDs map[path.Component]*outputPathState
@@ -77,14 +78,15 @@ var (
 
 // NewRemoteOutputServiceDirectory creates a new instance of
 // RemoteOutputServiceDirectory.
-func NewRemoteOutputServiceDirectory(inodeNumber uint64, inodeNumberGenerator random.SingleThreadedGenerator, entryNotifier re_fuse.EntryNotifier, outputPathFactory OutputPathFactory, contentAddressableStorage blobstore.BlobAccess, indexedTreeFetcher cas.IndexedTreeFetcher) *RemoteOutputServiceDirectory {
+func NewRemoteOutputServiceDirectory(inodeNumber uint64, inodeNumberGenerator random.SingleThreadedGenerator, entryNotifier re_fuse.EntryNotifier, outputPathFactory OutputPathFactory, bareContentAddressableStorage, retryingContentAddressableStorage blobstore.BlobAccess, indexedTreeFetcher cas.IndexedTreeFetcher) *RemoteOutputServiceDirectory {
 	return &RemoteOutputServiceDirectory{
-		inodeNumber:               inodeNumber,
-		inodeNumberGenerator:      inodeNumberGenerator,
-		entryNotifier:             entryNotifier,
-		outputPathFactory:         outputPathFactory,
-		contentAddressableStorage: contentAddressableStorage,
-		indexedTreeFetcher:        indexedTreeFetcher,
+		inodeNumber:                       inodeNumber,
+		inodeNumberGenerator:              inodeNumberGenerator,
+		entryNotifier:                     entryNotifier,
+		outputPathFactory:                 outputPathFactory,
+		bareContentAddressableStorage:     bareContentAddressableStorage,
+		retryingContentAddressableStorage: retryingContentAddressableStorage,
+		indexedTreeFetcher:                indexedTreeFetcher,
 
 		outputBaseIDs: map[path.Component]*outputPathState{},
 		buildIDs:      map[string]*outputPathState{},
@@ -139,7 +141,7 @@ func (d *RemoteOutputServiceDirectory) findMissingAndRemove(ctx context.Context,
 	for digest := range queue {
 		set.Add(digest)
 	}
-	missing, err := d.contentAddressableStorage.FindMissing(ctx, set.Build())
+	missing, err := d.bareContentAddressableStorage.FindMissing(ctx, set.Build())
 	if err != nil {
 		return util.StatusWrap(err, "Failed to find missing blobs")
 	}
@@ -289,7 +291,7 @@ func (d *RemoteOutputServiceDirectory) StartBuild(ctx context.Context, request *
 			inodeNumber := d.inodeNumberGenerator.Uint64()
 			casFileFactory := re_fuse.NewBlobAccessCASFileFactory(
 				context.Background(),
-				d.contentAddressableStorage,
+				d.retryingContentAddressableStorage,
 				errorLogger)
 			state = &outputPathState{
 				rootDirectory:            d.outputPathFactory.StartInitialBuild(outputBaseID, casFileFactory, instanceName, errorLogger, inodeNumber),

@@ -28,14 +28,16 @@ func TestRemoteOutputServiceDirectoryClean(t *testing.T) {
 	inodeNumberGenerator := mock.NewMockSingleThreadedGenerator(ctrl)
 	entryNotifier := mock.NewMockEntryNotifier(ctrl)
 	outputPathFactory := mock.NewMockOutputPathFactory(ctrl)
-	contentAddressableStorage := mock.NewMockBlobAccess(ctrl)
+	bareContentAddressableStorage := mock.NewMockBlobAccess(ctrl)
+	retryingContentAddressableStorage := mock.NewMockBlobAccess(ctrl)
 	indexedTreeFetcher := mock.NewMockIndexedTreeFetcher(ctrl)
 	d := cd_fuse.NewRemoteOutputServiceDirectory(
 		100,
 		inodeNumberGenerator,
 		entryNotifier.Call,
 		outputPathFactory,
-		contentAddressableStorage,
+		bareContentAddressableStorage,
+		retryingContentAddressableStorage,
 		indexedTreeFetcher)
 
 	t.Run("InvalidOutputBaseID", func(t *testing.T) {
@@ -114,14 +116,16 @@ func TestRemoteOutputServiceDirectoryStartBuild(t *testing.T) {
 	inodeNumberGenerator := mock.NewMockSingleThreadedGenerator(ctrl)
 	entryNotifier := mock.NewMockEntryNotifier(ctrl)
 	outputPathFactory := mock.NewMockOutputPathFactory(ctrl)
-	contentAddressableStorage := mock.NewMockBlobAccess(ctrl)
+	bareContentAddressableStorage := mock.NewMockBlobAccess(ctrl)
+	retryingContentAddressableStorage := mock.NewMockBlobAccess(ctrl)
 	indexedTreeFetcher := mock.NewMockIndexedTreeFetcher(ctrl)
 	d := cd_fuse.NewRemoteOutputServiceDirectory(
 		100,
 		inodeNumberGenerator,
 		entryNotifier.Call,
 		outputPathFactory,
-		contentAddressableStorage,
+		bareContentAddressableStorage,
+		retryingContentAddressableStorage,
 		indexedTreeFetcher)
 
 	t.Run("InvalidOutputBaseID", func(t *testing.T) {
@@ -317,7 +321,7 @@ func TestRemoteOutputServiceDirectoryStartBuild(t *testing.T) {
 				require.True(t, childFilter(re_fuse.InitialNode{Leaf: child}, remover.Call))
 				return nil
 			})
-			contentAddressableStorage.EXPECT().FindMissing(ctx, digests).
+			bareContentAddressableStorage.EXPECT().FindMissing(ctx, digests).
 				Return(digest.EmptySet, status.Error(codes.Unavailable, "CAS unavailable"))
 
 			_, err = d.StartBuild(ctx, &remoteoutputservice.StartBuildRequest{
@@ -345,7 +349,7 @@ func TestRemoteOutputServiceDirectoryStartBuild(t *testing.T) {
 				require.True(t, childFilter(re_fuse.InitialNode{Leaf: child}, remover.Call))
 				return nil
 			})
-			contentAddressableStorage.EXPECT().FindMissing(ctx, digests).Return(digests, nil)
+			bareContentAddressableStorage.EXPECT().FindMissing(ctx, digests).Return(digests, nil)
 			remover.EXPECT().Call().Return(status.Error(codes.Internal, "Disk on fire"))
 
 			_, err = d.StartBuild(ctx, &remoteoutputservice.StartBuildRequest{
@@ -434,7 +438,7 @@ func TestRemoteOutputServiceDirectoryStartBuild(t *testing.T) {
 			// removed immediately. The file and directory
 			// corresponding to the ones reported as missing
 			// should be removed afterwards.
-			contentAddressableStorage.EXPECT().FindMissing(
+			bareContentAddressableStorage.EXPECT().FindMissing(
 				ctx,
 				digest.NewSetBuilder().
 					Add(digest.MustNewDigest("my-cluster", "a32ea15346cf1848ab49e0913ff07531", 3)).
@@ -474,14 +478,16 @@ func TestRemoteOutputServiceDirectoryBatchCreate(t *testing.T) {
 	inodeNumberGenerator := mock.NewMockSingleThreadedGenerator(ctrl)
 	entryNotifier := mock.NewMockEntryNotifier(ctrl)
 	outputPathFactory := mock.NewMockOutputPathFactory(ctrl)
-	contentAddressableStorage := mock.NewMockBlobAccess(ctrl)
+	bareContentAddressableStorage := mock.NewMockBlobAccess(ctrl)
+	retryingContentAddressableStorage := mock.NewMockBlobAccess(ctrl)
 	indexedTreeFetcher := mock.NewMockIndexedTreeFetcher(ctrl)
 	d := cd_fuse.NewRemoteOutputServiceDirectory(
 		100,
 		inodeNumberGenerator,
 		entryNotifier.Call,
 		outputPathFactory,
-		contentAddressableStorage,
+		bareContentAddressableStorage,
+		retryingContentAddressableStorage,
 		indexedTreeFetcher)
 
 	t.Run("InvalidBuildID", func(t *testing.T) {
@@ -641,14 +647,16 @@ func TestRemoteOutputServiceDirectoryBatchStat(t *testing.T) {
 	inodeNumberGenerator := mock.NewMockSingleThreadedGenerator(ctrl)
 	entryNotifier := mock.NewMockEntryNotifier(ctrl)
 	outputPathFactory := mock.NewMockOutputPathFactory(ctrl)
-	contentAddressableStorage := mock.NewMockBlobAccess(ctrl)
+	bareContentAddressableStorage := mock.NewMockBlobAccess(ctrl)
+	retryingContentAddressableStorage := mock.NewMockBlobAccess(ctrl)
 	indexedTreeFetcher := mock.NewMockIndexedTreeFetcher(ctrl)
 	d := cd_fuse.NewRemoteOutputServiceDirectory(
 		100,
 		inodeNumberGenerator,
 		entryNotifier.Call,
 		outputPathFactory,
-		contentAddressableStorage,
+		bareContentAddressableStorage,
+		retryingContentAddressableStorage,
 		indexedTreeFetcher)
 
 	t.Run("InvalidBuildID", func(t *testing.T) {
@@ -960,14 +968,16 @@ func TestRemoteOutputServiceDirectoryFUSELookup(t *testing.T) {
 	inodeNumberGenerator := mock.NewMockSingleThreadedGenerator(ctrl)
 	entryNotifier := mock.NewMockEntryNotifier(ctrl)
 	outputPathFactory := mock.NewMockOutputPathFactory(ctrl)
-	contentAddressableStorage := mock.NewMockBlobAccess(ctrl)
+	bareContentAddressableStorage := mock.NewMockBlobAccess(ctrl)
+	retryingContentAddressableStorage := mock.NewMockBlobAccess(ctrl)
 	indexedTreeFetcher := mock.NewMockIndexedTreeFetcher(ctrl)
 	d := cd_fuse.NewRemoteOutputServiceDirectory(
 		100,
 		inodeNumberGenerator,
 		entryNotifier.Call,
 		outputPathFactory,
-		contentAddressableStorage,
+		bareContentAddressableStorage,
+		retryingContentAddressableStorage,
 		indexedTreeFetcher)
 
 	// No output paths exist, so FUSELookup() should always fail.
@@ -1034,14 +1044,16 @@ func TestRemoteOutputServiceDirectoryFUSEReadDir(t *testing.T) {
 	inodeNumberGenerator := mock.NewMockSingleThreadedGenerator(ctrl)
 	entryNotifier := mock.NewMockEntryNotifier(ctrl)
 	outputPathFactory := mock.NewMockOutputPathFactory(ctrl)
-	contentAddressableStorage := mock.NewMockBlobAccess(ctrl)
+	bareContentAddressableStorage := mock.NewMockBlobAccess(ctrl)
+	retryingContentAddressableStorage := mock.NewMockBlobAccess(ctrl)
 	indexedTreeFetcher := mock.NewMockIndexedTreeFetcher(ctrl)
 	d := cd_fuse.NewRemoteOutputServiceDirectory(
 		100,
 		inodeNumberGenerator,
 		entryNotifier.Call,
 		outputPathFactory,
-		contentAddressableStorage,
+		bareContentAddressableStorage,
+		retryingContentAddressableStorage,
 		indexedTreeFetcher)
 
 	// The directory should initially be empty.

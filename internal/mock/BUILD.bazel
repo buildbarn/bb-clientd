@@ -34,7 +34,10 @@ gomock(
 gomock(
     name = "clock",
     out = "clock.go",
-    interfaces = ["Clock"],
+    interfaces = [
+        "Clock",
+        "Timer",
+    ],
     library = "@com_github_buildbarn_bb_storage//pkg/clock",
     package = "mock",
 )
@@ -98,7 +101,10 @@ gomock(
 gomock(
     name = "random",
     out = "random.go",
-    interfaces = ["SingleThreadedGenerator"],
+    interfaces = [
+        "SingleThreadedGenerator",
+        "ThreadSafeGenerator",
+    ],
     library = "@com_github_buildbarn_bb_storage//pkg/random",
     package = "mock",
 )

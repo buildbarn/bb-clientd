@@ -71,6 +71,11 @@ message ApplicationConfiguration {
   // directories to disk after every build. Enabling this option is
   // useful when bb_clientd is restarted frequently.
   OutputPathPersistencyConfiguration output_path_persistency = 8;
+
+  // When set, retry file system operations that failed with gRPC status
+  // codes INTERNAL, UNAVAILABLE or UNKNOWN. The duration specifies the
+  // maximum delay that may be caused by performing these retries.
+  google.protobuf.Duration maximum_fuse_retry_delay = 9;
 }
 
 message OutputPathPersistencyConfiguration {
