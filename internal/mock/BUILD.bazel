@@ -7,10 +7,6 @@ gomock(
     name = "aliases",
     out = "aliases.go",
     interfaces = [
-        "FUSEDirectory",
-        "FUSELeaf",
-        "OutputPathPersistencyReadCloser",
-        "OutputPathPersistencyStore",
         "ReaderAt",
         "WriterAt",
     ],
@@ -70,6 +66,36 @@ gomock(
 )
 
 gomock(
+    name = "filesystem_fuse_re",
+    out = "filesystem_fuse_re.go",
+    interfaces = [
+        "Directory",
+        "Leaf",
+    ],
+    library = "@com_github_buildbarn_bb_remote_execution//pkg/filesystem/fuse",
+    mock_names = {
+        "Directory": "MockFUSEDirectory",
+        "Leaf": "MockFUSELeaf",
+    },
+    package = "mock",
+)
+
+gomock(
+    name = "outputpathpersistency",
+    out = "outputpathpersistency.go",
+    interfaces = [
+        "ReadCloser",
+        "Store",
+    ],
+    library = "//pkg/outputpathpersistency",
+    mock_names = {
+        "ReadCloser": "MockOutputPathPersistencyReadCloser",
+        "Store": "MockOutputPathPersistencyStore",
+    },
+    package = "mock",
+)
+
+gomock(
     name = "random",
     out = "random.go",
     interfaces = ["SingleThreadedGenerator"],
@@ -117,6 +143,8 @@ go_library(
         ":clock.go",
         ":filesystem.go",
         ":filesystem_fuse.go",
+        ":filesystem_fuse_re.go",
+        ":outputpathpersistency.go",
         ":random.go",
         ":re_cas.go",
         ":re_filesystem_fuse.go",
