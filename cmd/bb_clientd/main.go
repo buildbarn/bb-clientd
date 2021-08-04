@@ -16,6 +16,7 @@ import (
 	re_filesystem "github.com/buildbarn/bb-remote-execution/pkg/filesystem"
 	re_fuse "github.com/buildbarn/bb-remote-execution/pkg/filesystem/fuse"
 	"github.com/buildbarn/bb-remote-execution/pkg/proto/remoteoutputservice"
+	"github.com/buildbarn/bb-storage/pkg/auth"
 	blobstore_configuration "github.com/buildbarn/bb-storage/pkg/blobstore/configuration"
 	"github.com/buildbarn/bb-storage/pkg/blobstore/grpcservers"
 	"github.com/buildbarn/bb-storage/pkg/builder"
@@ -60,7 +61,7 @@ func main() {
 	buildQueue, err := builder.NewDemultiplexingBuildQueueFromConfiguration(
 		configuration.Schedulers,
 		bb_grpc.DefaultClientFactory,
-		func(instanceName digest.InstanceName) bool { return false })
+		auth.NewStaticAuthorizer(func(instanceName digest.InstanceName) bool { return false }))
 	if err != nil {
 		log.Fatal(err)
 	}

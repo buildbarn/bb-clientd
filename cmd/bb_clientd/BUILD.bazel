@@ -23,6 +23,7 @@ go_library(
         "@com_github_buildbarn_bb_remote_execution//pkg/filesystem",
         "@com_github_buildbarn_bb_remote_execution//pkg/filesystem/fuse",
         "@com_github_buildbarn_bb_remote_execution//pkg/proto/remoteoutputservice",
+        "@com_github_buildbarn_bb_storage//pkg/auth",
         "@com_github_buildbarn_bb_storage//pkg/blobstore",
         "@com_github_buildbarn_bb_storage//pkg/blobstore/configuration",
         "@com_github_buildbarn_bb_storage//pkg/blobstore/grpcservers",

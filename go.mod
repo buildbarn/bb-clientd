@@ -6,8 +6,8 @@ replace github.com/gordonklaus/ineffassign => github.com/gordonklaus/ineffassign
 
 require (
 	github.com/bazelbuild/remote-apis v0.0.0-20210718193713-0ecef08215cf
-	github.com/buildbarn/bb-remote-execution v0.0.0-20210804080527-465570d18854
-	github.com/buildbarn/bb-storage v0.0.0-20210804073654-6536dcb16de6
+	github.com/buildbarn/bb-remote-execution v0.0.0-20210804170224-1659f80f7d2a
+	github.com/buildbarn/bb-storage v0.0.0-20210804150025-5b6c01e8a7fc
 	github.com/golang/protobuf v1.5.2
 	github.com/hanwen/go-fuse/v2 v2.1.0
 	google.golang.org/genproto v0.0.0-20210803142424-70bd63adacf2
