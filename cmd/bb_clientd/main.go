@@ -42,7 +42,7 @@ func main() {
 	if err := util.UnmarshalConfigurationFromFile(os.Args[1], &configuration); err != nil {
 		log.Fatalf("Failed to read configuration from %s: %s", os.Args[1], err)
 	}
-	lifecycleState, err := global.ApplyConfiguration(configuration.Global)
+	lifecycleState, grpcClientFactory, err := global.ApplyConfiguration(configuration.Global)
 	if err != nil {
 		log.Fatal("Failed to apply global configuration options: ", err)
 	}
@@ -50,7 +50,7 @@ func main() {
 	// Storage access.
 	bareContentAddressableStorage, actionCache, err := blobstore_configuration.NewCASAndACBlobAccessFromConfiguration(
 		configuration.Blobstore,
-		bb_grpc.DefaultClientFactory,
+		grpcClientFactory,
 		int(configuration.MaximumMessageSizeBytes))
 	if err != nil {
 		log.Fatal(err)
@@ -60,7 +60,7 @@ func main() {
 	// one or more schedulers specified in the configuration file.
 	buildQueue, err := builder.NewDemultiplexingBuildQueueFromConfiguration(
 		configuration.Schedulers,
-		bb_grpc.DefaultClientFactory,
+		grpcClientFactory,
 		auth.NewStaticAuthorizer(func(instanceName digest.InstanceName) bool { return false }))
 	if err != nil {
 		log.Fatal(err)

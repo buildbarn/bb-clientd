@@ -20,8 +20,8 @@ go_library(
 go_test(
     name = "blobstore_test",
     srcs = ["error_retrying_blob_access_test.go"],
-    embed = [":blobstore"],
     deps = [
+        ":blobstore",
         "//internal/mock",
         "@com_github_buildbarn_bb_storage//pkg/blobstore/buffer",
         "@com_github_buildbarn_bb_storage//pkg/digest",

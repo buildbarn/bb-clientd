@@ -27,8 +27,8 @@ go_test(
         "blob_access_indexed_tree_fetcher_test.go",
         "tree_directory_walker_test.go",
     ],
-    embed = [":cas"],
     deps = [
+        ":cas",
         "//internal/mock",
         "@com_github_bazelbuild_remote_apis//build/bazel/remote/execution/v2:execution",
         "@com_github_buildbarn_bb_storage//pkg/blobstore/buffer",

@@ -57,8 +57,8 @@ go_test(
         "global_file_context_test.go",
         "global_tree_context_test.go",
     ],
-    embed = [":bb_clientd_lib"],
     deps = [
+        ":bb_clientd_lib",
         "//internal/mock",
         "//pkg/cas",
         "@com_github_bazelbuild_remote_apis//build/bazel/remote/execution/v2:execution",

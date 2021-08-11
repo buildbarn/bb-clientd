@@ -48,8 +48,8 @@ go_test(
         "remote_output_service_directory_test.go",
         "static_directory_test.go",
     ],
-    embed = [":fuse"],
     deps = [
+        ":fuse",
         "//internal/mock",
         "@com_github_bazelbuild_remote_apis//build/bazel/remote/execution/v2:execution",
         "@com_github_buildbarn_bb_remote_execution//pkg/filesystem/fuse",
