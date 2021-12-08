@@ -99,7 +99,19 @@ local cacheDirectory = homeDirectory + '/.cache/bb_clientd';
             },
           },
         },
-        replicator: { deduplicating: { 'local': {} } },
+        replicator: {
+          deduplicating: {
+            // Bazel's -j flag not only affects the number of actions
+            // executed concurrently. It also influences the concurrency
+            // of ByteStream requests. Prevent starvation by limiting
+            // the number of requests that are forwarded when cache
+            // misses occur.
+            concurrencyLimiting: {
+              base: { 'local': {} },
+              maximumConcurrency: 100,
+            },
+          },
+        },
       },
     },
   },
