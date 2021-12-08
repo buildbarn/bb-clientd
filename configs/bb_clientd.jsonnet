@@ -34,6 +34,11 @@ local homeDirectory = std.extVar('HOME');
 local cacheDirectory = homeDirectory + '/.cache/bb_clientd';
 
 {
+  // Options that users can override.
+  casKeyLocationMapSizeBytes:: 512 * 1024 * 1024,
+  casBlocksSizeBytes:: 100 * 1024 * 1024 * 1024,
+  filePoolSizeBytes:: 100 * 1024 * 1024 * 1024,
+
   // Maximum supported Protobuf message size.
   maximumMessageSizeBytes: 16 * 1024 * 1024,
 
@@ -66,7 +71,7 @@ local cacheDirectory = homeDirectory + '/.cache/bb_clientd';
             keyLocationMapOnBlockDevice: {
               file: {
                 path: cacheDirectory + '/cas/key_location_map',
-                sizeBytes: 64 * 1024 * 1024,
+                sizeBytes: $.casKeyLocationMapSizeBytes,
               },
             },
             keyLocationMapMaximumGetAttempts: 8,
@@ -78,7 +83,7 @@ local cacheDirectory = homeDirectory + '/.cache/bb_clientd';
               source: {
                 file: {
                   path: cacheDirectory + '/cas/blocks',
-                  sizeBytes: 100 * 1024 * 1024 * 1024,
+                  sizeBytes: $.casBlocksSizeBytes,
                 },
               },
               spareBlocks: 1,
@@ -133,7 +138,7 @@ local cacheDirectory = homeDirectory + '/.cache/bb_clientd';
   // files are not necessarily backed by remote storage.
   filePool: { blockDevice: { file: {
     path: cacheDirectory + '/filepool',
-    sizeBytes: 100 * 1024 * 1024 * 1024,
+    sizeBytes: $.filePoolSizeBytes,
   } } },
 
   // The location where contents of the "outputs" are stored, so that
