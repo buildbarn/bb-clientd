@@ -177,6 +177,7 @@ local cacheDirectory = homeDirectory + '/.cache/bb_clientd';
       listenAddress: '127.0.0.1:12345',
       enablePrometheus: true,
       enablePprof: true,
+      enableActiveSpans: true,
     },
     */
   },
