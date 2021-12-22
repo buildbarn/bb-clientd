@@ -27,6 +27,9 @@ message ApplicationConfiguration {
   // Storage (CAS) are exposed for reading. The following pathname
   // schemes are supported:
   //
+  // - cas/${instance_name}/blobs/command/${hash}-${size_bytes}:
+  //   An executable Bourne shell script that can be used to run the
+  //   command locally.
   // - cas/${instance_name}/blobs/directory/${hash}-${size_bytes}/:
   //   View the contents of a Directory object.
   // - cas/${instance_name}/blobs/executable/${hash}-${size_bytes}:

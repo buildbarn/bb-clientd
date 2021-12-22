@@ -147,19 +147,31 @@ The FUSE file system also provides a "scratch" directory that you can
 resides on the same file system as the "cas" directory shown above, it
 is possible to create hard links to files that are backed by the Content
 Addressable Storage. This may be useful when trying to reproduce
-problems locally, without needing to download all of the files locally.
+problems locally, without needing to download all of the files up front.
 
 ```
-$ ln ~/bb_clientd/cas/mycluster-prod.example.com/hello/blobs/file/22184d8f153d9e28ae827297dbe0c3459554abb384d7b5c9dc292e6c8f596882-799796 ~/bb_clientd/scratch/foo.cpp
-$ ls -l ~/bb_clientd/scratch/foo.cpp
--r--r--r-- 9999 root root 799796 Jan  1  2000 ~/bb_clientd/scratch/foo.cpp
+$ cp -lr ~/bb_clientd/cas/mycluster-prod.example.com/hello/blobs/directory/9b6841c638336162fdad886ac3294425a6e73bb38a227562e7feb6a950c5e5fb-165 ~/bb_clientd/scratch/my-broken-test
+$ cd ~/bb_clientd/scratch/my-broken-test
+$ ls -l
+total 0
+drwxrwxrwx  1 root  wheel  0 Jan  1  2000 bazel-out
+drwxrwxrwx  1 root  wheel  0 Jan  1  2000 external
+$ ~/bb_clientd/cas/mycluster-prod.example.com/hello/blobs/command/85c0c6b2464de5e738b650ea8f674961885b12e287ff360695459ef107801166-6426
+exec ${PAGER:-/usr/bin/less} "$0" || exit 1
+Executing tests from //:hello_world
+-----------------------------------------------------------------------------
+Segmentation fault
 ```
 
-It is also possible to directly write data into the file system. The
-backing store for this is configured through the "filePool" option in
-the bb\_clientd configuration file. Keep in mind that none of the data
-written into the "scratch" directory is persisted across restarts of
-bb\_clientd!
+Note that if your implementation of `cp` does not support the `-l` flag,
+you may need to install GNU Coreutils or use `rsync` with the
+`--link-dest` flag.
+
+Actions executing this way may directly write data into the file system.
+The backing store for this is configured through the "filePool" option
+in the bb\_clientd configuration file. Keep in mind that none of the
+data written into the "scratch" directory is persisted across restarts
+of bb\_clientd!
 
 ### ... to perform Remote Builds without the Bytes
 

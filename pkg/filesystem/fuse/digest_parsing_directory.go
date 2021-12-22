@@ -13,7 +13,7 @@ import (
 // DigestLookupFunc is called by directories created using
 // NewDigestParsingDirectory to complete the parsing of a digest. The
 // callback can yield a directory or file corresponding with the digest.
-type DigestLookupFunc func(digest digest.Digest, out *fuse.Attr) (re_fuse.Directory, re_fuse.Leaf)
+type DigestLookupFunc func(digest digest.Digest, out *fuse.Attr) (re_fuse.Directory, re_fuse.Leaf, fuse.Status)
 
 type digestParsingDirectory struct {
 	nonIterableDirectory
@@ -62,6 +62,5 @@ func (d *digestParsingDirectory) FUSELookup(name path.Component, out *fuse.Attr)
 	}
 
 	// Look up the resulting directory or file.
-	directory, leaf := d.lookupFunc(digest, out)
-	return directory, leaf, fuse.OK
+	return d.lookupFunc(digest, out)
 }

@@ -58,11 +58,11 @@ func TestDigestParsingDirectory(t *testing.T) {
 		lookupFunc.EXPECT().Call(
 			digest.MustNewDigest("hello", "8b1a9953c4611296a827abf8c47804d7", 5),
 			gomock.Any(),
-		).DoAndReturn(func(digest digest.Digest, out *fuse.Attr) (re_fuse.Directory, re_fuse.Leaf) {
+		).DoAndReturn(func(digest digest.Digest, out *fuse.Attr) (re_fuse.Directory, re_fuse.Leaf, fuse.Status) {
 			out.Ino = 123
 			out.Mode = fuse.S_IFREG | 0o777
 			out.Nlink = 456
-			return nil, mockChildFile
+			return nil, mockChildFile, fuse.OK
 		})
 
 		var out fuse.Attr

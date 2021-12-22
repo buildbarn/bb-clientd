@@ -116,21 +116,37 @@ func main() {
 	// Factory function for per instance name "blobs" directories
 	// that give access to arbitrary files, directories and trees.
 	blobsDirectoryInodeNumberTree := re_fuse.NewRandomInodeNumberTree()
+	commandFileFactory := cd_fuse.NewCommandFileFactory(
+		context.Background(),
+		retryingContentAddressableStorage,
+		int(configuration.MaximumMessageSizeBytes),
+		util.DefaultErrorLogger)
 	blobsDirectoryLookupFunc := func(instanceName digest.InstanceName, out *fuse.Attr) (re_fuse.Directory, re_fuse.Leaf) {
 		inodeNumberTree := blobsDirectoryInodeNumberTree.AddString(instanceName.String())
-		directoryInodeNumber := inodeNumberTree.AddUint64(0).Get()
-		executableInodeNumber := inodeNumberTree.AddUint64(1).Get()
-		fileInodeNumber := inodeNumberTree.AddUint64(2).Get()
-		treeInodeNumber := inodeNumberTree.AddUint64(3).Get()
+		commandInodeNumber := inodeNumberTree.AddUint64(0).Get()
+		directoryInodeNumber := inodeNumberTree.AddUint64(1).Get()
+		executableInodeNumber := inodeNumberTree.AddUint64(2).Get()
+		fileInodeNumber := inodeNumberTree.AddUint64(3).Get()
+		treeInodeNumber := inodeNumberTree.AddUint64(4).Get()
 		d := cd_fuse.NewStaticDirectory(
 			inodeNumberTree.Get(),
 			map[path.Component]cd_fuse.StaticDirectoryEntry{
+				path.MustNewComponent("command"): {
+					Child: cd_fuse.NewDigestParsingDirectory(
+						instanceName,
+						commandInodeNumber,
+						func(digest digest.Digest, out *fuse.Attr) (re_fuse.Directory, re_fuse.Leaf, fuse.Status) {
+							f, s := commandFileFactory.LookupFile(digest, out)
+							return nil, f, s
+						}),
+					InodeNumber: commandInodeNumber,
+				},
 				path.MustNewComponent("directory"): {
 					Child: cd_fuse.NewDigestParsingDirectory(
 						instanceName,
 						directoryInodeNumber,
-						func(digest digest.Digest, out *fuse.Attr) (re_fuse.Directory, re_fuse.Leaf) {
-							return globalDirectoryContext.LookupDirectory(digest, out), nil
+						func(digest digest.Digest, out *fuse.Attr) (re_fuse.Directory, re_fuse.Leaf, fuse.Status) {
+							return globalDirectoryContext.LookupDirectory(digest, out), nil, fuse.OK
 						}),
 					InodeNumber: directoryInodeNumber,
 				},
@@ -138,8 +154,8 @@ func main() {
 					Child: cd_fuse.NewDigestParsingDirectory(
 						instanceName,
 						executableInodeNumber,
-						func(digest digest.Digest, out *fuse.Attr) (re_fuse.Directory, re_fuse.Leaf) {
-							return nil, globalFileContext.LookupFile(digest, true, out)
+						func(digest digest.Digest, out *fuse.Attr) (re_fuse.Directory, re_fuse.Leaf, fuse.Status) {
+							return nil, globalFileContext.LookupFile(digest, true, out), fuse.OK
 						}),
 					InodeNumber: executableInodeNumber,
 				},
@@ -147,8 +163,8 @@ func main() {
 					Child: cd_fuse.NewDigestParsingDirectory(
 						instanceName,
 						fileInodeNumber,
-						func(digest digest.Digest, out *fuse.Attr) (re_fuse.Directory, re_fuse.Leaf) {
-							return nil, globalFileContext.LookupFile(digest, false, out)
+						func(digest digest.Digest, out *fuse.Attr) (re_fuse.Directory, re_fuse.Leaf, fuse.Status) {
+							return nil, globalFileContext.LookupFile(digest, false, out), fuse.OK
 						}),
 					InodeNumber: fileInodeNumber,
 				},
@@ -156,8 +172,8 @@ func main() {
 					Child: cd_fuse.NewDigestParsingDirectory(
 						instanceName,
 						treeInodeNumber,
-						func(digest digest.Digest, out *fuse.Attr) (re_fuse.Directory, re_fuse.Leaf) {
-							return globalTreeContext.LookupTree(digest, out), nil
+						func(digest digest.Digest, out *fuse.Attr) (re_fuse.Directory, re_fuse.Leaf, fuse.Status) {
+							return globalTreeContext.LookupTree(digest, out), nil, fuse.OK
 						}),
 					InodeNumber: treeInodeNumber,
 				},
