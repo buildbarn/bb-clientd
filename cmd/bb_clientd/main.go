@@ -4,6 +4,8 @@ import (
 	"context"
 	"log"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	remoteexecution "github.com/bazelbuild/remote-apis/build/bazel/remote/execution/v2"
@@ -259,14 +261,22 @@ func main() {
 		})
 
 	// Expose the FUSE file system.
-	if err := re_fuse.NewMountFromConfiguration(
+	server, err := re_fuse.NewMountFromConfiguration(
 		configuration.Fuse,
 		rootDirectory,
 		rootInodeNumber,
 		&serverCallbacks,
-		"bb_clientd"); err != nil {
+		"bb_clientd")
+	if err != nil {
 		log.Fatal("Failed to mount FUSE file system: ", err)
 	}
+	defer func() {
+		log.Print("Unmounting...")
+		err := server.Unmount()
+		if err != nil {
+			log.Print("Unmount failed: ", err)
+		}
+	}()
 
 	// Create a gRPC server that forwards requests to backend clusters.
 	go func() {
@@ -297,5 +307,11 @@ func main() {
 				}))
 	}()
 
-	lifecycleState.MarkReadyAndWait()
+	go lifecycleState.MarkReadyAndWait()
+
+	// Catch signals and exit gracefully, so that the FUSE mount can be cleanly
+	// unmounted by the deferred function above.
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
+	log.Printf("Caught %v", <-sigs)
 }
