@@ -10,9 +10,6 @@ import (
 	"github.com/buildbarn/bb-storage/pkg/digest"
 	"github.com/buildbarn/bb-storage/pkg/random"
 	"github.com/buildbarn/bb-storage/pkg/util"
-
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 type errorRetryingBlobAccess struct {
@@ -72,7 +69,7 @@ func (ba *errorRetryingBlobAccess) getRetryState(ctx context.Context) retryState
 // sleeps for a random amount of time. When this function returns true,
 // the caller should stop doing retries.
 func (ba *errorRetryingBlobAccess) maybeSleep(ctx context.Context, retryState *retryState, err error) bool {
-	if code := status.Code(err); (code != codes.Internal && code != codes.Unavailable && code != codes.Unknown) || ba.clock.Now().After(retryState.endTime) {
+	if !util.IsInfrastructureError(err) || ba.clock.Now().After(retryState.endTime) {
 		// The error is not retriable, or we've exhausted the
 		// maximum retry duration.
 		return true

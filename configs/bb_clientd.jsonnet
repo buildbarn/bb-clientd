@@ -9,7 +9,6 @@ local grpcClient(cluster) = {
   address: cluster + ':443',
   tls: {},
   forwardMetadata: ['build.bazel.remote.execution.v2.requestmetadata-bin'],
-  forwardAndReuseMetadata: ['authorization'],
   // Enable gRPC keepalives. Make sure to tune these settings based on
   // what your cluster permits.
   keepalive: {
@@ -168,6 +167,9 @@ local cacheDirectory = homeDirectory + '/.cache/bb_clientd';
     // if bb_clientd is run through a system that doesn't maintain logs
     // for us.
     logPaths: [cacheDirectory + '/log'],
+
+    // Attach credentials provided by Bazel to all outgoing gRPC calls.
+    grpcForwardAndReuseMetadata: ['authorization'],
 
     // Optional: create a HTTP server that exposes Prometheus metrics
     // and allows debugging using pprof. Make sure to only enable it

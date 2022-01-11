@@ -156,8 +156,8 @@ def go_dependencies():
         name = "com_github_buildbarn_bb_storage",
         importpath = "github.com/buildbarn/bb-storage",
         patches = ["//:patches/com_github_buildbarn_bb_storage/no-incompatible-platforms.diff"],
-        sum = "h1:D+yFiiu5RmEMQKUCmFfk8ousoMGHOXWF7UI53NFrof0=",
-        version = "v0.0.0-20211205205823-634fb8ef62e0",
+        sum = "h1:0VwiWjTx/D0mOZNoxaD6jsawdTTbiI7S70vV0kw2lSs=",
+        version = "v0.0.0-20220110215627-b01d6cf6af02",
     )
     go_repository(
         name = "com_github_burntsushi_toml",
@@ -789,8 +789,8 @@ def go_dependencies():
     go_repository(
         name = "org_golang_google_genproto",
         importpath = "google.golang.org/genproto",
-        sum = "h1:v7aOwCaINsgis88/5e6DEZ6TlP7vXueAw/Ftqd5rm+w=",
-        version = "v0.0.0-20211221231510-d629cc9a93d5",
+        sum = "h1:Et6SkiuvnBn+SgrSYXs/BrUpGB4mbdwt4R3vaPIlicA=",
+        version = "v0.0.0-20220107163113-42d7afdf6368",
     )
     go_repository(
         name = "org_golang_google_grpc",
@@ -850,8 +850,8 @@ def go_dependencies():
     go_repository(
         name = "org_golang_x_sys",
         importpath = "golang.org/x/sys",
-        sum = "h1:fLOSk5Q00efkSvAm+4xcoXD+RRmLmmulPn5I3Y9F2EM=",
-        version = "v0.0.0-20211216021012-1d35b9e2eb4e",
+        sum = "h1:W8vbETX/n8S6EmY0Pu4Ix7VvpsJUESTwl0oCK8MJOgk=",
+        version = "v0.0.0-20220110181412-a018aaa089fe",
     )
     go_repository(
         name = "org_golang_x_term",
