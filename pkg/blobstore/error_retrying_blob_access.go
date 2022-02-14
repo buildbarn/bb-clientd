@@ -14,12 +14,12 @@ import (
 
 type errorRetryingBlobAccess struct {
 	blobstore.BlobAccess
-	clock                      clock.Clock
-	randomNumberGenerator      random.ThreadSafeGenerator
-	errorLogger                util.ErrorLogger
-	initialIntervalNanoseconds int64
-	maximumIntervalNanoseconds int64
-	maximumDelay               time.Duration
+	clock                 clock.Clock
+	randomNumberGenerator random.ThreadSafeGenerator
+	errorLogger           util.ErrorLogger
+	initialInterval       time.Duration
+	maximumInterval       time.Duration
+	maximumDelay          time.Duration
 }
 
 // NewErrorRetryingBlobAccess creates a decorator for BlobAccess that
@@ -40,13 +40,13 @@ type errorRetryingBlobAccess struct {
 // retrying of FUSE file system operations.
 func NewErrorRetryingBlobAccess(base blobstore.BlobAccess, clock clock.Clock, randomNumberGenerator random.ThreadSafeGenerator, errorLogger util.ErrorLogger, initialInterval, maximumInterval, maximumDelay time.Duration) blobstore.BlobAccess {
 	return &errorRetryingBlobAccess{
-		BlobAccess:                 base,
-		clock:                      clock,
-		randomNumberGenerator:      randomNumberGenerator,
-		errorLogger:                errorLogger,
-		initialIntervalNanoseconds: initialInterval.Nanoseconds(),
-		maximumIntervalNanoseconds: maximumInterval.Nanoseconds(),
-		maximumDelay:               maximumDelay,
+		BlobAccess:            base,
+		clock:                 clock,
+		randomNumberGenerator: randomNumberGenerator,
+		errorLogger:           errorLogger,
+		initialInterval:       initialInterval,
+		maximumInterval:       maximumInterval,
+		maximumDelay:          maximumDelay,
 	}
 }
 
@@ -54,14 +54,14 @@ func NewErrorRetryingBlobAccess(base blobstore.BlobAccess, clock clock.Clock, ra
 // operation, storing for how long retries are permitted to continue and
 // the interval of the next retry.
 type retryState struct {
-	endTime             time.Time
-	intervalNanoseconds int64
+	endTime  time.Time
+	interval time.Duration
 }
 
 func (ba *errorRetryingBlobAccess) getRetryState(ctx context.Context) retryState {
 	return retryState{
-		endTime:             ba.clock.Now().Add(ba.maximumDelay),
-		intervalNanoseconds: ba.initialIntervalNanoseconds,
+		endTime:  ba.clock.Now().Add(ba.maximumDelay),
+		interval: ba.initialInterval,
 	}
 }
 
@@ -76,16 +76,16 @@ func (ba *errorRetryingBlobAccess) maybeSleep(ctx context.Context, retryState *r
 	}
 
 	// Wait for a random amount of time, up to the current interval.
-	randomInterval := time.Duration(ba.randomNumberGenerator.Int63n(retryState.intervalNanoseconds)) * time.Nanosecond
+	randomInterval := random.Duration(ba.randomNumberGenerator, retryState.interval)
 	ba.errorLogger.Log(util.StatusWrapf(err, "Retrying failed operation after %s", randomInterval))
 	timer, ch := ba.clock.NewTimer(randomInterval)
 	select {
 	case <-ch:
 		// Sleeping succeeded. Retry, using a larger interval
 		// the next time.
-		retryState.intervalNanoseconds *= 2
-		if retryState.intervalNanoseconds > ba.maximumIntervalNanoseconds {
-			retryState.intervalNanoseconds = ba.maximumIntervalNanoseconds
+		retryState.interval *= 2
+		if retryState.interval > ba.maximumInterval {
+			retryState.interval = ba.maximumInterval
 		}
 		return false
 	case <-ctx.Done():
