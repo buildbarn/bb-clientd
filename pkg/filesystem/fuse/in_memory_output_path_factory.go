@@ -1,6 +1,8 @@
 package fuse
 
 import (
+	"context"
+
 	"github.com/buildbarn/bb-remote-execution/pkg/filesystem"
 	"github.com/buildbarn/bb-remote-execution/pkg/filesystem/fuse"
 	"github.com/buildbarn/bb-storage/pkg/digest"
@@ -46,4 +48,4 @@ type inMemoryOutputPath struct {
 	fuse.PrepopulatedDirectory
 }
 
-func (op inMemoryOutputPath) FinalizeBuild() {}
+func (op inMemoryOutputPath) FinalizeBuild(ctx context.Context, digestFunction digest.Function) {}

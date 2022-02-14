@@ -673,8 +673,8 @@ func (d *RemoteOutputServiceDirectory) FinalizeBuild(ctx context.Context, reques
 	// Silently ignore requests for unknown build IDs. This ensures
 	// that FinalizeBuild() remains idempotent.
 	if outputPathState, ok := d.buildIDs[request.BuildId]; ok {
-		outputPathState.rootDirectory.FinalizeBuild()
 		buildState := outputPathState.buildState
+		outputPathState.rootDirectory.FinalizeBuild(ctx, buildState.digestFunction)
 		delete(d.buildIDs, buildState.id)
 		outputPathState.buildState = nil
 	}

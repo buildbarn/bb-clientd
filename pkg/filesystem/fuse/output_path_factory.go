@@ -1,6 +1,8 @@
 package fuse
 
 import (
+	"context"
+
 	"github.com/buildbarn/bb-remote-execution/pkg/filesystem/fuse"
 	"github.com/buildbarn/bb-storage/pkg/digest"
 	"github.com/buildbarn/bb-storage/pkg/filesystem/path"
@@ -16,7 +18,7 @@ type OutputPath interface {
 	// FinalizeBuild() is called at the end of every build.
 	// Implementations of OutputPath may use this method to persist
 	// state.
-	FinalizeBuild()
+	FinalizeBuild(ctx context.Context, digestFunction digest.Function)
 }
 
 // OutputPathFactory is an interface that is invoked by

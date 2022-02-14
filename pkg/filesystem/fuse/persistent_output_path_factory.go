@@ -1,6 +1,8 @@
 package fuse
 
 import (
+	"context"
+
 	"github.com/buildbarn/bb-clientd/pkg/outputpathpersistency"
 	re_fuse "github.com/buildbarn/bb-remote-execution/pkg/filesystem/fuse"
 	outputpathpersistency_pb "github.com/buildbarn/bb-remote-execution/pkg/proto/outputpathpersistency"
@@ -145,8 +147,8 @@ type persistentOutputPath struct {
 	initialCreationTime *timestamppb.Timestamp
 }
 
-func (op *persistentOutputPath) FinalizeBuild() {
-	op.OutputPath.FinalizeBuild()
+func (op *persistentOutputPath) FinalizeBuild(ctx context.Context, digestFunction digest.Function) {
+	op.OutputPath.FinalizeBuild(ctx, digestFunction)
 
 	if err := op.saveOutputPath(); err != nil {
 		op.factory.errorLogger.Log(util.StatusWrapf(err, "Failed to save the contents of output path %#v", op.outputBaseID.String()))

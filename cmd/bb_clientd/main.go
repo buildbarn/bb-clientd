@@ -30,6 +30,7 @@ import (
 	"github.com/buildbarn/bb-storage/pkg/util"
 	"github.com/hanwen/go-fuse/v2/fuse"
 
+	"golang.org/x/sync/semaphore"
 	"google.golang.org/genproto/googleapis/bytestream"
 	"google.golang.org/grpc"
 )
@@ -189,6 +190,18 @@ func main() {
 	var serverCallbacks re_fuse.SimpleRawFileSystemServerCallbacks
 	outputPathFactory := cd_fuse.NewInMemoryOutputPathFactory(filePool, serverCallbacks.EntryNotify)
 	if persistencyConfiguration := configuration.OutputPathPersistency; persistencyConfiguration != nil {
+		// Upload local files at the end of every build. This
+		// decorator needs to be added before
+		// PersistentOutputPathFactory, as it also ensures that
+		// local files have a digest.
+		if concurrency := persistencyConfiguration.LocalFileUploadConcurrency; concurrency > 0 {
+			outputPathFactory = cd_fuse.NewLocalFileUploadingOutputPathFactory(
+				outputPathFactory,
+				bareContentAddressableStorage,
+				util.DefaultErrorLogger,
+				semaphore.NewWeighted(concurrency))
+		}
+
 		// Enable persistent storage of bazel-out/ directories.
 		stateDirectory, err := filesystem.NewLocalDirectory(persistencyConfiguration.StateDirectoryPath)
 		if err != nil {
