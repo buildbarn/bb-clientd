@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	remoteexecution "github.com/bazelbuild/remote-apis/build/bazel/remote/execution/v2"
 	"github.com/buildbarn/bb-storage/pkg/blobstore"
 	"github.com/buildbarn/bb-storage/pkg/blobstore/buffer"
 	"github.com/buildbarn/bb-storage/pkg/clock"
@@ -116,6 +117,19 @@ func (ba *errorRetryingBlobAccess) FindMissing(ctx context.Context, digests dige
 		}
 		if ba.maybeSleep(ctx, &retryState, err) {
 			return digest.EmptySet, err
+		}
+	}
+}
+
+func (ba *errorRetryingBlobAccess) GetCapabilities(ctx context.Context, instanceName digest.InstanceName) (*remoteexecution.ServerCapabilities, error) {
+	retryState := ba.getRetryState(ctx)
+	for {
+		capabilities, err := ba.BlobAccess.GetCapabilities(ctx, instanceName)
+		if err == nil {
+			return capabilities, nil
+		}
+		if ba.maybeSleep(ctx, &retryState, err) {
+			return nil, err
 		}
 	}
 }

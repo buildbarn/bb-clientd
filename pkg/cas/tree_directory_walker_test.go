@@ -46,9 +46,14 @@ func TestTreeDirectoryWalker(t *testing.T) {
 		},
 	}
 	exampleIndexedTree := &cas.IndexedTree{
-		Root: exampleRootDirectory,
-		Children: map[string]*remoteexecution.Directory{
-			"4df5f448a5e6b3c41e6aae7a8a9832aa-456": exampleChildDirectory,
+		Tree: &remoteexecution.Tree{
+			Root: exampleRootDirectory,
+			Children: []*remoteexecution.Directory{
+				exampleChildDirectory,
+			},
+		},
+		Index: map[string]int{
+			"4df5f448a5e6b3c41e6aae7a8a9832aa-456": 0,
 		},
 	}
 
@@ -71,8 +76,9 @@ func TestTreeDirectoryWalker(t *testing.T) {
 	})
 
 	t.Run("RootGetDirectoryMissing", func(t *testing.T) {
-		indexedTreeFetcher.EXPECT().GetIndexedTree(ctx, treeDigest).
-			Return(&cas.IndexedTree{}, nil)
+		indexedTreeFetcher.EXPECT().GetIndexedTree(ctx, treeDigest).Return(&cas.IndexedTree{
+			Tree: &remoteexecution.Tree{},
+		}, nil)
 		_, err := rootDirectoryWalker.GetDirectory(ctx)
 		require.Equal(t, status.Error(codes.InvalidArgument, "Tree does not contain a root directory"), err)
 	})

@@ -1,10 +1,10 @@
-package fuse
+package virtual
 
 import (
 	"context"
 
 	re_blobstore "github.com/buildbarn/bb-remote-execution/pkg/blobstore"
-	re_fuse "github.com/buildbarn/bb-remote-execution/pkg/filesystem/fuse"
+	"github.com/buildbarn/bb-remote-execution/pkg/filesystem/virtual"
 	"github.com/buildbarn/bb-storage/pkg/blobstore"
 	"github.com/buildbarn/bb-storage/pkg/digest"
 	"github.com/buildbarn/bb-storage/pkg/filesystem/path"
@@ -39,9 +39,9 @@ func NewLocalFileUploadingOutputPathFactory(base OutputPathFactory, contentAddre
 	}
 }
 
-func (opf *localFileUploadingOutputPathFactory) StartInitialBuild(outputBaseID path.Component, casFileFactory re_fuse.CASFileFactory, instanceName digest.InstanceName, errorLogger util.ErrorLogger, inodeNumber uint64) OutputPath {
+func (opf *localFileUploadingOutputPathFactory) StartInitialBuild(outputBaseID path.Component, casFileFactory virtual.CASFileFactory, instanceName digest.InstanceName, errorLogger util.ErrorLogger) OutputPath {
 	return &localFileUploadingOutputPath{
-		OutputPath:   opf.OutputPathFactory.StartInitialBuild(outputBaseID, casFileFactory, instanceName, errorLogger, inodeNumber),
+		OutputPath:   opf.OutputPathFactory.StartInitialBuild(outputBaseID, casFileFactory, instanceName, errorLogger),
 		factory:      opf,
 		outputBaseID: outputBaseID,
 	}
@@ -83,7 +83,7 @@ type localFileUploader struct {
 	outputBaseID              path.Component
 }
 
-func (u *localFileUploader) uploadLocalFilesRecursive(d re_fuse.PrepopulatedDirectory, dPath *path.Trace) error {
+func (u *localFileUploader) uploadLocalFilesRecursive(d virtual.PrepopulatedDirectory, dPath *path.Trace) error {
 	directories, leaves, err := d.LookupAllChildren()
 	if err != nil {
 		return util.StatusWrapf(err, "Failed to look up children of directory %#v in output path %#v", dPath.String(), u.outputBaseID.String())

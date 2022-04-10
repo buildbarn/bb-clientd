@@ -7,14 +7,14 @@ import (
 	"github.com/buildbarn/bb-storage/pkg/digest"
 )
 
-// IndexedTree is equivalent to remoteexecution.Tree, except that child
-// directories are stored as a map instead of a list. The map is indexed
-// by the value returned by Digest.GetKey(KeyWithoutInstance). This
-// allows callers to efficiently traverse the directory hierarchy
-// contained inside a tree.
+// IndexedTree is equivalent to remoteexecution.Tree, except that it
+// also stores a map that acts as an index of child directories. The map
+// is indexed by the value returned by
+// Digest.GetKey(KeyWithoutInstance). This allows callers to efficiently
+// traverse the directory hierarchy contained inside a tree.
 type IndexedTree struct {
-	Root     *remoteexecution.Directory
-	Children map[string]*remoteexecution.Directory
+	Tree  *remoteexecution.Tree
+	Index map[string]int
 }
 
 // IndexedTreeFetcher is responsible for fetching Tree messages from the

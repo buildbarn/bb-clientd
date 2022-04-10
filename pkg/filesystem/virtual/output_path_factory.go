@@ -1,9 +1,9 @@
-package fuse
+package virtual
 
 import (
 	"context"
 
-	"github.com/buildbarn/bb-remote-execution/pkg/filesystem/fuse"
+	"github.com/buildbarn/bb-remote-execution/pkg/filesystem/virtual"
 	"github.com/buildbarn/bb-storage/pkg/digest"
 	"github.com/buildbarn/bb-storage/pkg/filesystem/path"
 	"github.com/buildbarn/bb-storage/pkg/util"
@@ -13,7 +13,7 @@ import (
 // implementations may store these results in memory, while more complex
 // ones use local or networked storage.
 type OutputPath interface {
-	fuse.PrepopulatedDirectory
+	virtual.PrepopulatedDirectory
 
 	// FinalizeBuild() is called at the end of every build.
 	// Implementations of OutputPath may use this method to persist
@@ -28,7 +28,7 @@ type OutputPathFactory interface {
 	// StartInitialBuild() is called when a build is started that
 	// uses an output base ID that hasn't been observed before, or
 	// was cleaned previously.
-	StartInitialBuild(outputBaseID path.Component, casFileFactory fuse.CASFileFactory, instanceName digest.InstanceName, errorLogger util.ErrorLogger, inodeNumber uint64) OutputPath
+	StartInitialBuild(outputBaseID path.Component, casFileFactory virtual.CASFileFactory, instanceName digest.InstanceName, errorLogger util.ErrorLogger) OutputPath
 
 	// Clean() is called when the RemoteOutputServiceDirectory
 	// service is instructed to clean an output path that is not yet

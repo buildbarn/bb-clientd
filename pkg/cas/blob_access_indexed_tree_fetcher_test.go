@@ -76,18 +76,19 @@ func TestBlobAccessIndexedTreeFetcher(t *testing.T) {
 				},
 			},
 		}
-		contentAddressableStorage.EXPECT().Get(ctx, treeDigest).Return(buffer.NewProtoBufferFromProto(&remoteexecution.Tree{
+		tree := &remoteexecution.Tree{
 			Root:     &root,
 			Children: []*remoteexecution.Directory{&subdir1, &subdir2},
-		}, buffer.UserProvided))
+		}
+		contentAddressableStorage.EXPECT().Get(ctx, treeDigest).Return(buffer.NewProtoBufferFromProto(tree, buffer.UserProvided))
 
 		indexedTree, err := indexedTreeFetcher.GetIndexedTree(ctx, treeDigest)
 		require.NoError(t, err)
 		require.Equal(t, &cas.IndexedTree{
-			Root: &root,
-			Children: map[string]*remoteexecution.Directory{
-				"0cf45a4d131d7833703567a271957409-45": &subdir1,
-				"d9a4684f0733e504a39f6f1860acfcf6-46": &subdir2,
+			Tree: tree,
+			Index: map[string]int{
+				"0cf45a4d131d7833703567a271957409-45": 0,
+				"d9a4684f0733e504a39f6f1860acfcf6-46": 1,
 			},
 		}, indexedTree)
 	})

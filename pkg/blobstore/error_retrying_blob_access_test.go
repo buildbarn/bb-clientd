@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	remoteexecution "github.com/bazelbuild/remote-apis/build/bazel/remote/execution/v2"
 	"github.com/buildbarn/bb-clientd/internal/mock"
 	"github.com/buildbarn/bb-clientd/pkg/blobstore"
 	"github.com/buildbarn/bb-storage/pkg/blobstore/buffer"
@@ -35,6 +36,7 @@ func TestErrorRetryingBlobAccessGet(t *testing.T) {
 
 	helloDigest := digest.MustNewDigest("instance_name", "8b1a9953c4611296a827abf8c47804d7", 5)
 	helloDigestSet := helloDigest.ToSingletonSet()
+	instanceName := digest.MustNewInstanceName("instance_name")
 
 	t.Run("GetNonRetriableError", func(t *testing.T) {
 		// Errors for codes other than INTERNAL, UNAVAILABLE and
@@ -105,9 +107,9 @@ func TestErrorRetryingBlobAccessGet(t *testing.T) {
 		require.Equal(t, []byte("Hello"), data)
 	})
 
-	// Coverage for FindMissing() is minimal, as the tests for Get()
-	// already exercise the retry logic that is shared by both
-	// methods.
+	// Coverage for FindMissing() and GetCapabilities() is minimal,
+	// as the tests for Get() already exercise the retry logic that
+	// is shared by both methods.
 
 	t.Run("FindMissingNonRetriableError", func(t *testing.T) {
 		// Errors for codes other than INTERNAL, UNAVAILABLE and
@@ -138,5 +140,40 @@ func TestErrorRetryingBlobAccessGet(t *testing.T) {
 		missing, err := blobAccess.FindMissing(ctx, helloDigestSet)
 		require.NoError(t, err)
 		require.Equal(t, helloDigestSet, missing)
+	})
+
+	t.Run("GetCapabilitiesNonRetriableError", func(t *testing.T) {
+		// Errors for codes other than INTERNAL, UNAVAILABLE and
+		// UNKNOWN should never be retried.
+		clock.EXPECT().Now().Return(time.Unix(1000, 0))
+		baseBlobAccess.EXPECT().GetCapabilities(ctx, instanceName).Return(nil, status.Error(codes.Unauthenticated, "No credentials provided"))
+
+		_, err := blobAccess.GetCapabilities(ctx, instanceName)
+		testutil.RequireEqualStatus(t, status.Error(codes.Unauthenticated, "No credentials provided"), err)
+	})
+
+	t.Run("GetCapabilitiesTooLong", func(t *testing.T) {
+		// We should stop doing retries in case more time has
+		// passed than the configured maximum delay.
+		clock.EXPECT().Now().Return(time.Unix(1000, 0))
+		baseBlobAccess.EXPECT().GetCapabilities(ctx, instanceName).Return(nil, status.Error(codes.Internal, "Server on fire"))
+		clock.EXPECT().Now().Return(time.Unix(1301, 0))
+
+		_, err := blobAccess.GetCapabilities(ctx, instanceName)
+		testutil.RequireEqualStatus(t, status.Error(codes.Internal, "Server on fire"), err)
+	})
+
+	t.Run("GetCapabilitiesInitialSuccess", func(t *testing.T) {
+		// Call that succeeds immediately.
+		clock.EXPECT().Now().Return(time.Unix(1000, 0))
+		baseBlobAccess.EXPECT().GetCapabilities(ctx, instanceName).Return(&remoteexecution.ServerCapabilities{
+			CacheCapabilities: &remoteexecution.CacheCapabilities{},
+		}, nil)
+
+		serverCapabilities, err := blobAccess.GetCapabilities(ctx, instanceName)
+		require.NoError(t, err)
+		testutil.RequireEqualProto(t, &remoteexecution.ServerCapabilities{
+			CacheCapabilities: &remoteexecution.CacheCapabilities{},
+		}, serverCapabilities)
 	})
 }

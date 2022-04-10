@@ -1,4 +1,4 @@
-package fuse_test
+package virtual_test
 
 import (
 	"context"
@@ -7,14 +7,13 @@ import (
 
 	remoteexecution "github.com/bazelbuild/remote-apis/build/bazel/remote/execution/v2"
 	"github.com/buildbarn/bb-clientd/internal/mock"
-	cd_fuse "github.com/buildbarn/bb-clientd/pkg/filesystem/fuse"
-	re_fuse "github.com/buildbarn/bb-remote-execution/pkg/filesystem/fuse"
+	cd_vfs "github.com/buildbarn/bb-clientd/pkg/filesystem/virtual"
+	re_vfs "github.com/buildbarn/bb-remote-execution/pkg/filesystem/virtual"
 	"github.com/buildbarn/bb-remote-execution/pkg/proto/remoteoutputservice"
 	"github.com/buildbarn/bb-storage/pkg/digest"
 	"github.com/buildbarn/bb-storage/pkg/filesystem/path"
 	"github.com/buildbarn/bb-storage/pkg/testutil"
 	"github.com/golang/mock/gomock"
-	"github.com/hanwen/go-fuse/v2/fuse"
 	"github.com/stretchr/testify/require"
 
 	"google.golang.org/grpc/codes"
@@ -25,20 +24,23 @@ import (
 func TestRemoteOutputServiceDirectoryClean(t *testing.T) {
 	ctrl, ctx := gomock.WithContext(context.Background(), t)
 
-	inodeNumberGenerator := mock.NewMockSingleThreadedGenerator(ctrl)
-	entryNotifier := mock.NewMockEntryNotifier(ctrl)
+	handleAllocator := mock.NewMockStatefulHandleAllocator(ctrl)
 	outputPathFactory := mock.NewMockOutputPathFactory(ctrl)
 	bareContentAddressableStorage := mock.NewMockBlobAccess(ctrl)
 	retryingContentAddressableStorage := mock.NewMockBlobAccess(ctrl)
 	indexedTreeFetcher := mock.NewMockIndexedTreeFetcher(ctrl)
-	d := cd_fuse.NewRemoteOutputServiceDirectory(
-		100,
-		inodeNumberGenerator,
-		entryNotifier.Call,
+	symlinkFactory := mock.NewMockSymlinkFactory(ctrl)
+	dHandleAllocation := mock.NewMockStatefulHandleAllocation(ctrl)
+	handleAllocator.EXPECT().New().Return(dHandleAllocation)
+	dHandle := mock.NewMockStatefulDirectoryHandle(ctrl)
+	dHandleAllocation.EXPECT().AsStatefulDirectory(gomock.Any()).Return(dHandle)
+	d := cd_vfs.NewRemoteOutputServiceDirectory(
+		handleAllocator,
 		outputPathFactory,
 		bareContentAddressableStorage,
 		retryingContentAddressableStorage,
-		indexedTreeFetcher)
+		indexedTreeFetcher,
+		symlinkFactory)
 
 	t.Run("InvalidOutputBaseID", func(t *testing.T) {
 		// The output base ID must be a valid directory name.
@@ -64,9 +66,12 @@ func TestRemoteOutputServiceDirectoryClean(t *testing.T) {
 
 	t.Run("ExistentOutputPath", func(t *testing.T) {
 		// Create an output path.
-		inodeNumberGenerator.EXPECT().Uint64().Return(uint64(101))
+		casFileHandleAllocation := mock.NewMockStatefulHandleAllocation(ctrl)
+		handleAllocator.EXPECT().New().Return(casFileHandleAllocation)
+		casFileHandleAllocator := mock.NewMockStatelessHandleAllocator(ctrl)
+		casFileHandleAllocation.EXPECT().AsStatelessAllocator().Return(casFileHandleAllocator)
 		outputPath := mock.NewMockOutputPath(ctrl)
-		outputPathFactory.EXPECT().StartInitialBuild(path.MustNewComponent("a448da900e7bd4b025ab91da2aba6244"), gomock.Any(), digest.EmptyInstanceName, gomock.Any(), uint64(101)).Return(outputPath)
+		outputPathFactory.EXPECT().StartInitialBuild(path.MustNewComponent("a448da900e7bd4b025ab91da2aba6244"), gomock.Any(), digest.EmptyInstanceName, gomock.Any()).Return(outputPath)
 		outputPath.EXPECT().FilterChildren(gomock.Any())
 
 		response, err := d.StartBuild(ctx, &remoteoutputservice.StartBuildRequest{
@@ -94,7 +99,7 @@ func TestRemoteOutputServiceDirectoryClean(t *testing.T) {
 
 		// A second removal attempt succeeds.
 		outputPath.EXPECT().RemoveAllChildren(true)
-		entryNotifier.EXPECT().Call(uint64(100), path.MustNewComponent("a448da900e7bd4b025ab91da2aba6244"))
+		dHandle.EXPECT().NotifyRemoval(path.MustNewComponent("a448da900e7bd4b025ab91da2aba6244"))
 		_, err = d.Clean(ctx, &remoteoutputservice.CleanRequest{
 			OutputBaseId: "a448da900e7bd4b025ab91da2aba6244",
 		})
@@ -113,20 +118,23 @@ func TestRemoteOutputServiceDirectoryClean(t *testing.T) {
 func TestRemoteOutputServiceDirectoryStartBuild(t *testing.T) {
 	ctrl, ctx := gomock.WithContext(context.Background(), t)
 
-	inodeNumberGenerator := mock.NewMockSingleThreadedGenerator(ctrl)
-	entryNotifier := mock.NewMockEntryNotifier(ctrl)
+	handleAllocator := mock.NewMockStatefulHandleAllocator(ctrl)
 	outputPathFactory := mock.NewMockOutputPathFactory(ctrl)
 	bareContentAddressableStorage := mock.NewMockBlobAccess(ctrl)
 	retryingContentAddressableStorage := mock.NewMockBlobAccess(ctrl)
 	indexedTreeFetcher := mock.NewMockIndexedTreeFetcher(ctrl)
-	d := cd_fuse.NewRemoteOutputServiceDirectory(
-		100,
-		inodeNumberGenerator,
-		entryNotifier.Call,
+	symlinkFactory := mock.NewMockSymlinkFactory(ctrl)
+	dHandleAllocation := mock.NewMockStatefulHandleAllocation(ctrl)
+	handleAllocator.EXPECT().New().Return(dHandleAllocation)
+	dHandle := mock.NewMockStatefulDirectoryHandle(ctrl)
+	dHandleAllocation.EXPECT().AsStatefulDirectory(gomock.Any()).Return(dHandle)
+	d := cd_vfs.NewRemoteOutputServiceDirectory(
+		handleAllocator,
 		outputPathFactory,
 		bareContentAddressableStorage,
 		retryingContentAddressableStorage,
-		indexedTreeFetcher)
+		indexedTreeFetcher,
+		symlinkFactory)
 
 	t.Run("InvalidOutputBaseID", func(t *testing.T) {
 		// The output base ID must be a valid directory name.
@@ -187,9 +195,12 @@ func TestRemoteOutputServiceDirectoryStartBuild(t *testing.T) {
 	t.Run("InitialSuccess", func(t *testing.T) {
 		// An initial successful call should create the output
 		// path directory.
-		inodeNumberGenerator.EXPECT().Uint64().Return(uint64(101))
+		casFileHandleAllocation := mock.NewMockStatefulHandleAllocation(ctrl)
+		handleAllocator.EXPECT().New().Return(casFileHandleAllocation)
+		casFileHandleAllocator := mock.NewMockStatelessHandleAllocator(ctrl)
+		casFileHandleAllocation.EXPECT().AsStatelessAllocator().Return(casFileHandleAllocator)
 		outputPath := mock.NewMockOutputPath(ctrl)
-		outputPathFactory.EXPECT().StartInitialBuild(path.MustNewComponent("9da951b8cb759233037166e28f7ea186"), gomock.Any(), digest.MustNewInstanceName("my-cluster"), gomock.Any(), uint64(101)).Return(outputPath)
+		outputPathFactory.EXPECT().StartInitialBuild(path.MustNewComponent("9da951b8cb759233037166e28f7ea186"), gomock.Any(), digest.MustNewInstanceName("my-cluster"), gomock.Any()).Return(outputPath)
 		outputPath.EXPECT().FilterChildren(gomock.Any())
 
 		response, err := d.StartBuild(ctx, &remoteoutputservice.StartBuildRequest{
@@ -233,11 +244,11 @@ func TestRemoteOutputServiceDirectoryStartBuild(t *testing.T) {
 			// completeness of an uninitialized directory,
 			// because its contents cannot be loaded from
 			// the Content Addressable Storage.
-			outputPath.EXPECT().FilterChildren(gomock.Any()).DoAndReturn(func(childFilter re_fuse.ChildFilter) error {
+			outputPath.EXPECT().FilterChildren(gomock.Any()).DoAndReturn(func(childFilter re_vfs.ChildFilter) error {
 				child := mock.NewMockInitialContentsFetcher(ctrl)
 				child.EXPECT().GetContainingDigests(ctx).Return(digest.EmptySet, status.Error(codes.Unavailable, "Tree \"4fb75adebd02251c9663125582e51102\": CAS unavailable"))
 				remover := mock.NewMockChildRemover(ctrl)
-				require.False(t, childFilter(re_fuse.InitialNode{Directory: child}, remover.Call))
+				require.False(t, childFilter(re_vfs.InitialNode{Directory: child}, remover.Call))
 				return nil
 			})
 
@@ -259,12 +270,12 @@ func TestRemoteOutputServiceDirectoryStartBuild(t *testing.T) {
 			// directory cannot be loaded, because it's
 			// absent, and removing its contents locally
 			// fails due to local storage errors.
-			outputPath.EXPECT().FilterChildren(gomock.Any()).DoAndReturn(func(childFilter re_fuse.ChildFilter) error {
+			outputPath.EXPECT().FilterChildren(gomock.Any()).DoAndReturn(func(childFilter re_vfs.ChildFilter) error {
 				child := mock.NewMockInitialContentsFetcher(ctrl)
 				child.EXPECT().GetContainingDigests(ctx).Return(digest.EmptySet, status.Error(codes.NotFound, "Tree \"4fb75adebd02251c9663125582e51102\": Object not found"))
 				remover := mock.NewMockChildRemover(ctrl)
 				remover.EXPECT().Call().Return(status.Error(codes.Internal, "Disk on fire"))
-				require.False(t, childFilter(re_fuse.InitialNode{Directory: child}, remover.Call))
+				require.False(t, childFilter(re_vfs.InitialNode{Directory: child}, remover.Call))
 				return nil
 			})
 
@@ -286,13 +297,13 @@ func TestRemoteOutputServiceDirectoryStartBuild(t *testing.T) {
 			// path uses a different instance name. This
 			// file should be removed to prevent unnecessary
 			// copying of files between clusters.
-			outputPath.EXPECT().FilterChildren(gomock.Any()).DoAndReturn(func(childFilter re_fuse.ChildFilter) error {
+			outputPath.EXPECT().FilterChildren(gomock.Any()).DoAndReturn(func(childFilter re_vfs.ChildFilter) error {
 				child := mock.NewMockNativeLeaf(ctrl)
 				child.EXPECT().GetContainingDigests().
 					Return(digest.MustNewDigest("some-other-cluster", "338db227a0de09b4309e928cdbb7d40a", 42).ToSingletonSet())
 				remover := mock.NewMockChildRemover(ctrl)
 				remover.EXPECT().Call().Return(status.Error(codes.Internal, "Disk on fire"))
-				require.False(t, childFilter(re_fuse.InitialNode{Leaf: child}, remover.Call))
+				require.False(t, childFilter(re_vfs.InitialNode{Leaf: child}, remover.Call))
 				return nil
 			})
 
@@ -314,11 +325,11 @@ func TestRemoteOutputServiceDirectoryStartBuild(t *testing.T) {
 			// in the output, but failed to check for their
 			// existence remotely.
 			digests := digest.MustNewDigest("my-cluster", "338db227a0de09b4309e928cdbb7d40a", 42).ToSingletonSet()
-			outputPath.EXPECT().FilterChildren(gomock.Any()).DoAndReturn(func(childFilter re_fuse.ChildFilter) error {
+			outputPath.EXPECT().FilterChildren(gomock.Any()).DoAndReturn(func(childFilter re_vfs.ChildFilter) error {
 				child := mock.NewMockNativeLeaf(ctrl)
 				child.EXPECT().GetContainingDigests().Return(digests)
 				remover := mock.NewMockChildRemover(ctrl)
-				require.True(t, childFilter(re_fuse.InitialNode{Leaf: child}, remover.Call))
+				require.True(t, childFilter(re_vfs.InitialNode{Leaf: child}, remover.Call))
 				return nil
 			})
 			bareContentAddressableStorage.EXPECT().FindMissing(ctx, digests).
@@ -343,10 +354,10 @@ func TestRemoteOutputServiceDirectoryStartBuild(t *testing.T) {
 			// storage.
 			digests := digest.MustNewDigest("my-cluster", "338db227a0de09b4309e928cdbb7d40a", 42).ToSingletonSet()
 			remover := mock.NewMockChildRemover(ctrl)
-			outputPath.EXPECT().FilterChildren(gomock.Any()).DoAndReturn(func(childFilter re_fuse.ChildFilter) error {
+			outputPath.EXPECT().FilterChildren(gomock.Any()).DoAndReturn(func(childFilter re_vfs.ChildFilter) error {
 				child := mock.NewMockNativeLeaf(ctrl)
 				child.EXPECT().GetContainingDigests().Return(digests)
-				require.True(t, childFilter(re_fuse.InitialNode{Leaf: child}, remover.Call))
+				require.True(t, childFilter(re_vfs.InitialNode{Leaf: child}, remover.Call))
 				return nil
 			})
 			bareContentAddressableStorage.EXPECT().FindMissing(ctx, digests).Return(digests, nil)
@@ -368,7 +379,7 @@ func TestRemoteOutputServiceDirectoryStartBuild(t *testing.T) {
 		t.Run("Success", func(t *testing.T) {
 			remover4 := mock.NewMockChildRemover(ctrl)
 			remover7 := mock.NewMockChildRemover(ctrl)
-			outputPath.EXPECT().FilterChildren(gomock.Any()).DoAndReturn(func(childFilter re_fuse.ChildFilter) error {
+			outputPath.EXPECT().FilterChildren(gomock.Any()).DoAndReturn(func(childFilter re_vfs.ChildFilter) error {
 				// Serve a file that uses a different instance
 				// name. It should get removed immediately.
 				child1 := mock.NewMockNativeLeaf(ctrl)
@@ -376,7 +387,7 @@ func TestRemoteOutputServiceDirectoryStartBuild(t *testing.T) {
 					Return(digest.MustNewDigest("other-instance-name", "3ec839e3d5d0af404c6dc6bf3ff7f2eb", 1).ToSingletonSet())
 				remover1 := mock.NewMockChildRemover(ctrl)
 				remover1.EXPECT().Call()
-				require.True(t, childFilter(re_fuse.InitialNode{Leaf: child1}, remover1.Call))
+				require.True(t, childFilter(re_vfs.InitialNode{Leaf: child1}, remover1.Call))
 
 				// Serve a file that uses a different
 				// hashing algorithm. It should also get
@@ -386,20 +397,20 @@ func TestRemoteOutputServiceDirectoryStartBuild(t *testing.T) {
 					Return(digest.MustNewDigest("my-cluster", "f11999245771a5c184b62dc5380e0d8b42df67b4", 2).ToSingletonSet())
 				remover2 := mock.NewMockChildRemover(ctrl)
 				remover2.EXPECT().Call()
-				require.True(t, childFilter(re_fuse.InitialNode{Leaf: child2}, remover2.Call))
+				require.True(t, childFilter(re_vfs.InitialNode{Leaf: child2}, remover2.Call))
 
 				// A file which we'll later report as present.
 				child3 := mock.NewMockNativeLeaf(ctrl)
 				child3.EXPECT().GetContainingDigests().
 					Return(digest.MustNewDigest("my-cluster", "a32ea15346cf1848ab49e0913ff07531", 3).ToSingletonSet())
 				remover3 := mock.NewMockChildRemover(ctrl)
-				require.True(t, childFilter(re_fuse.InitialNode{Leaf: child3}, remover3.Call))
+				require.True(t, childFilter(re_vfs.InitialNode{Leaf: child3}, remover3.Call))
 
 				// A file which we'll later report as missing.
 				child4 := mock.NewMockNativeLeaf(ctrl)
 				child4.EXPECT().GetContainingDigests().
 					Return(digest.MustNewDigest("my-cluster", "9435918583fd2e37882751bbc51f4085", 4).ToSingletonSet())
-				require.True(t, childFilter(re_fuse.InitialNode{Leaf: child4}, remover4.Call))
+				require.True(t, childFilter(re_vfs.InitialNode{Leaf: child4}, remover4.Call))
 
 				// A directory that no longer exists. It
 				// should be removed immediately.
@@ -407,7 +418,7 @@ func TestRemoteOutputServiceDirectoryStartBuild(t *testing.T) {
 				child5.EXPECT().GetContainingDigests(ctx).Return(digest.EmptySet, status.Error(codes.NotFound, "Tree \"4fb75adebd02251c9663125582e51102\": Object not found"))
 				remover5 := mock.NewMockChildRemover(ctrl)
 				remover5.EXPECT().Call()
-				require.True(t, childFilter(re_fuse.InitialNode{Directory: child5}, remover5.Call))
+				require.True(t, childFilter(re_vfs.InitialNode{Directory: child5}, remover5.Call))
 
 				// A directory for which all files exist.
 				child6 := mock.NewMockInitialContentsFetcher(ctrl)
@@ -418,7 +429,7 @@ func TestRemoteOutputServiceDirectoryStartBuild(t *testing.T) {
 						Build(),
 					nil)
 				remover6 := mock.NewMockChildRemover(ctrl)
-				require.True(t, childFilter(re_fuse.InitialNode{Directory: child6}, remover6.Call))
+				require.True(t, childFilter(re_vfs.InitialNode{Directory: child6}, remover6.Call))
 
 				// A directory for which one file does not
 				// exist. It should be removed later on.
@@ -429,7 +440,7 @@ func TestRemoteOutputServiceDirectoryStartBuild(t *testing.T) {
 						Add(digest.MustNewDigest("my-cluster", "6b9105a7125cb9f190a3e44ab5f22663", 8)).
 						Build(),
 					nil)
-				require.True(t, childFilter(re_fuse.InitialNode{Directory: child7}, remover7.Call))
+				require.True(t, childFilter(re_vfs.InitialNode{Directory: child7}, remover7.Call))
 				return nil
 			})
 
@@ -475,20 +486,23 @@ func TestRemoteOutputServiceDirectoryStartBuild(t *testing.T) {
 func TestRemoteOutputServiceDirectoryBatchCreate(t *testing.T) {
 	ctrl, ctx := gomock.WithContext(context.Background(), t)
 
-	inodeNumberGenerator := mock.NewMockSingleThreadedGenerator(ctrl)
-	entryNotifier := mock.NewMockEntryNotifier(ctrl)
+	handleAllocator := mock.NewMockStatefulHandleAllocator(ctrl)
 	outputPathFactory := mock.NewMockOutputPathFactory(ctrl)
 	bareContentAddressableStorage := mock.NewMockBlobAccess(ctrl)
 	retryingContentAddressableStorage := mock.NewMockBlobAccess(ctrl)
 	indexedTreeFetcher := mock.NewMockIndexedTreeFetcher(ctrl)
-	d := cd_fuse.NewRemoteOutputServiceDirectory(
-		100,
-		inodeNumberGenerator,
-		entryNotifier.Call,
+	symlinkFactory := mock.NewMockSymlinkFactory(ctrl)
+	dHandleAllocation := mock.NewMockStatefulHandleAllocation(ctrl)
+	handleAllocator.EXPECT().New().Return(dHandleAllocation)
+	dHandle := mock.NewMockStatefulDirectoryHandle(ctrl)
+	dHandleAllocation.EXPECT().AsStatefulDirectory(gomock.Any()).Return(dHandle)
+	d := cd_vfs.NewRemoteOutputServiceDirectory(
+		handleAllocator,
 		outputPathFactory,
 		bareContentAddressableStorage,
 		retryingContentAddressableStorage,
-		indexedTreeFetcher)
+		indexedTreeFetcher,
+		symlinkFactory)
 
 	t.Run("InvalidBuildID", func(t *testing.T) {
 		// StartBuild() should be called first.
@@ -508,9 +522,12 @@ func TestRemoteOutputServiceDirectoryBatchCreate(t *testing.T) {
 	})
 
 	// Let the remainder of the tests assume that a build is running.
-	inodeNumberGenerator.EXPECT().Uint64().Return(uint64(101))
+	casFileHandleAllocation := mock.NewMockStatefulHandleAllocation(ctrl)
+	handleAllocator.EXPECT().New().Return(casFileHandleAllocation)
+	casFileHandleAllocator := mock.NewMockStatelessHandleAllocator(ctrl)
+	casFileHandleAllocation.EXPECT().AsStatelessAllocator().Return(casFileHandleAllocator)
 	outputPath := mock.NewMockOutputPath(ctrl)
-	outputPathFactory.EXPECT().StartInitialBuild(path.MustNewComponent("c6adef0d5ca1888a4aa847fb51229a8c"), gomock.Any(), digest.MustNewInstanceName("my-cluster"), gomock.Any(), uint64(101)).Return(outputPath)
+	outputPathFactory.EXPECT().StartInitialBuild(path.MustNewComponent("c6adef0d5ca1888a4aa847fb51229a8c"), gomock.Any(), digest.MustNewInstanceName("my-cluster"), gomock.Any()).Return(outputPath)
 	outputPath.EXPECT().FilterChildren(gomock.Any())
 
 	response, err := d.StartBuild(ctx, &remoteoutputservice.StartBuildRequest{
@@ -593,6 +610,26 @@ func TestRemoteOutputServiceDirectoryBatchCreate(t *testing.T) {
 		testutil.RequireEqualStatus(t, status.Error(codes.Internal, "Failed to clean path prefix directory: Disk failure"), err)
 	})
 
+	t.Run("SymlinkCreationFailure", func(t *testing.T) {
+		symlink := mock.NewMockNativeLeaf(ctrl)
+		symlinkFactory.EXPECT().LookupSymlink([]byte("target")).Return(symlink)
+		outputPath.EXPECT().CreateChildren(map[path.Component]re_vfs.InitialNode{
+			path.MustNewComponent("foo"): {Leaf: symlink},
+		}, true).Return(status.Error(codes.Internal, "I/O error"))
+		symlink.EXPECT().Unlink()
+
+		_, err := d.BatchCreate(ctx, &remoteoutputservice.BatchCreateRequest{
+			BuildId: "ad778a53-48e6-4ae1-b1f5-01b84a508f5f",
+			Symlinks: []*remoteexecution.OutputSymlink{
+				{
+					Path:   "foo",
+					Target: "target",
+				},
+			},
+		})
+		testutil.RequireEqualStatus(t, status.Error(codes.Internal, "Failed to create symbolic link \"foo\": I/O error"), err)
+	})
+
 	// The creation of actual files and directories is hard to test,
 	// as the InitialNode arguments provided to CreateChildren()
 	// contain objects that are hard to compare. At least provide a
@@ -606,7 +643,25 @@ func TestRemoteOutputServiceDirectoryBatchCreate(t *testing.T) {
 		child2 := mock.NewMockPrepopulatedDirectory(ctrl)
 		child1.EXPECT().CreateAndEnterPrepopulatedDirectory(path.MustNewComponent("b")).
 			Return(child2, nil).Times(3)
-		child2.EXPECT().CreateChildren(gomock.Any(), true).Times(3)
+
+		// Creation of "file".
+		casFileHandleAllocation := mock.NewMockStatelessHandleAllocation(ctrl)
+		casFileHandleAllocator.EXPECT().New(gomock.Any()).Return(casFileHandleAllocation)
+		file := mock.NewMockNativeLeaf(ctrl)
+		casFileHandleAllocation.EXPECT().AsNativeLeaf(gomock.Any()).Return(file)
+		child2.EXPECT().CreateChildren(map[path.Component]re_vfs.InitialNode{
+			path.MustNewComponent("file"): {Leaf: file},
+		}, true)
+
+		// Creation of "directory".
+		child2.EXPECT().CreateChildren(gomock.Any(), true)
+
+		// Creation of "symlink".
+		symlink := mock.NewMockNativeLeaf(ctrl)
+		symlinkFactory.EXPECT().LookupSymlink([]byte("file")).Return(symlink)
+		child2.EXPECT().CreateChildren(map[path.Component]re_vfs.InitialNode{
+			path.MustNewComponent("symlink"): {Leaf: symlink},
+		}, true)
 
 		_, err := d.BatchCreate(ctx, &remoteoutputservice.BatchCreateRequest{
 			BuildId:    "ad778a53-48e6-4ae1-b1f5-01b84a508f5f",
@@ -644,20 +699,23 @@ func TestRemoteOutputServiceDirectoryBatchCreate(t *testing.T) {
 func TestRemoteOutputServiceDirectoryBatchStat(t *testing.T) {
 	ctrl, ctx := gomock.WithContext(context.Background(), t)
 
-	inodeNumberGenerator := mock.NewMockSingleThreadedGenerator(ctrl)
-	entryNotifier := mock.NewMockEntryNotifier(ctrl)
+	handleAllocator := mock.NewMockStatefulHandleAllocator(ctrl)
 	outputPathFactory := mock.NewMockOutputPathFactory(ctrl)
 	bareContentAddressableStorage := mock.NewMockBlobAccess(ctrl)
 	retryingContentAddressableStorage := mock.NewMockBlobAccess(ctrl)
 	indexedTreeFetcher := mock.NewMockIndexedTreeFetcher(ctrl)
-	d := cd_fuse.NewRemoteOutputServiceDirectory(
-		100,
-		inodeNumberGenerator,
-		entryNotifier.Call,
+	symlinkFactory := mock.NewMockSymlinkFactory(ctrl)
+	dHandleAllocation := mock.NewMockStatefulHandleAllocation(ctrl)
+	handleAllocator.EXPECT().New().Return(dHandleAllocation)
+	dHandle := mock.NewMockStatefulDirectoryHandle(ctrl)
+	dHandleAllocation.EXPECT().AsStatefulDirectory(gomock.Any()).Return(dHandle)
+	d := cd_vfs.NewRemoteOutputServiceDirectory(
+		handleAllocator,
 		outputPathFactory,
 		bareContentAddressableStorage,
 		retryingContentAddressableStorage,
-		indexedTreeFetcher)
+		indexedTreeFetcher,
+		symlinkFactory)
 
 	t.Run("InvalidBuildID", func(t *testing.T) {
 		// StartBuild() should be called first.
@@ -669,9 +727,12 @@ func TestRemoteOutputServiceDirectoryBatchStat(t *testing.T) {
 	})
 
 	// Let the remainder of the tests assume that a build is running.
-	inodeNumberGenerator.EXPECT().Uint64().Return(uint64(101))
+	casFileHandleAllocation := mock.NewMockStatefulHandleAllocation(ctrl)
+	handleAllocator.EXPECT().New().Return(casFileHandleAllocation)
+	casFileHandleAllocator := mock.NewMockStatelessHandleAllocator(ctrl)
+	casFileHandleAllocation.EXPECT().AsStatelessAllocator().Return(casFileHandleAllocator)
 	outputPath := mock.NewMockOutputPath(ctrl)
-	outputPathFactory.EXPECT().StartInitialBuild(path.MustNewComponent("9da951b8cb759233037166e28f7ea186"), gomock.Any(), digest.MustNewInstanceName("my-cluster"), gomock.Any(), uint64(101)).Return(outputPath)
+	outputPathFactory.EXPECT().StartInitialBuild(path.MustNewComponent("9da951b8cb759233037166e28f7ea186"), gomock.Any(), digest.MustNewInstanceName("my-cluster"), gomock.Any()).Return(outputPath)
 	outputPath.EXPECT().FilterChildren(gomock.Any())
 
 	response, err := d.StartBuild(ctx, &remoteoutputservice.StartBuildRequest{
@@ -962,33 +1023,39 @@ func TestRemoteOutputServiceDirectoryBatchStat(t *testing.T) {
 	})
 }
 
-func TestRemoteOutputServiceDirectoryFUSELookup(t *testing.T) {
+func TestRemoteOutputServiceDirectoryVirtualLookup(t *testing.T) {
 	ctrl, ctx := gomock.WithContext(context.Background(), t)
 
-	inodeNumberGenerator := mock.NewMockSingleThreadedGenerator(ctrl)
-	entryNotifier := mock.NewMockEntryNotifier(ctrl)
+	handleAllocator := mock.NewMockStatefulHandleAllocator(ctrl)
 	outputPathFactory := mock.NewMockOutputPathFactory(ctrl)
 	bareContentAddressableStorage := mock.NewMockBlobAccess(ctrl)
 	retryingContentAddressableStorage := mock.NewMockBlobAccess(ctrl)
 	indexedTreeFetcher := mock.NewMockIndexedTreeFetcher(ctrl)
-	d := cd_fuse.NewRemoteOutputServiceDirectory(
-		100,
-		inodeNumberGenerator,
-		entryNotifier.Call,
+	symlinkFactory := mock.NewMockSymlinkFactory(ctrl)
+	dHandleAllocation := mock.NewMockStatefulHandleAllocation(ctrl)
+	handleAllocator.EXPECT().New().Return(dHandleAllocation)
+	dHandle := mock.NewMockStatefulDirectoryHandle(ctrl)
+	dHandleAllocation.EXPECT().AsStatefulDirectory(gomock.Any()).Return(dHandle)
+	d := cd_vfs.NewRemoteOutputServiceDirectory(
+		handleAllocator,
 		outputPathFactory,
 		bareContentAddressableStorage,
 		retryingContentAddressableStorage,
-		indexedTreeFetcher)
+		indexedTreeFetcher,
+		symlinkFactory)
 
-	// No output paths exist, so FUSELookup() should always fail.
-	var out1 fuse.Attr
-	_, _, s := d.FUSELookup(path.MustNewComponent("eda09135e50ff6e877fe5f8136ddc759"), &out1)
-	require.Equal(t, fuse.ENOENT, s)
+	// No output paths exist, so VirtualLookup() should always fail.
+	var out1 re_vfs.Attributes
+	_, _, s := d.VirtualLookup(path.MustNewComponent("eda09135e50ff6e877fe5f8136ddc759"), 0, &out1)
+	require.Equal(t, re_vfs.StatusErrNoEnt, s)
 
 	// Create an output path.
-	inodeNumberGenerator.EXPECT().Uint64().Return(uint64(101))
+	casFileHandleAllocation := mock.NewMockStatefulHandleAllocation(ctrl)
+	handleAllocator.EXPECT().New().Return(casFileHandleAllocation)
+	casFileHandleAllocator := mock.NewMockStatelessHandleAllocator(ctrl)
+	casFileHandleAllocation.EXPECT().AsStatelessAllocator().Return(casFileHandleAllocator)
 	outputPath := mock.NewMockOutputPath(ctrl)
-	outputPathFactory.EXPECT().StartInitialBuild(path.MustNewComponent("eaf1d65b7ab802934e6b57d0e14b3f30"), gomock.Any(), digest.EmptyInstanceName, gomock.Any(), uint64(101)).Return(outputPath)
+	outputPathFactory.EXPECT().StartInitialBuild(path.MustNewComponent("eaf1d65b7ab802934e6b57d0e14b3f30"), gomock.Any(), digest.EmptyInstanceName, gomock.Any()).Return(outputPath)
 	outputPath.EXPECT().FilterChildren(gomock.Any())
 
 	response, err := d.StartBuild(ctx, &remoteoutputservice.StartBuildRequest{
@@ -1005,66 +1072,74 @@ func TestRemoteOutputServiceDirectoryFUSELookup(t *testing.T) {
 		OutputPathSuffix: "eaf1d65b7ab802934e6b57d0e14b3f30",
 	}, response)
 
-	outputPath.EXPECT().FUSEGetAttr(gomock.Any()).Do(func(out *fuse.Attr) {
-		out.Ino = 101
-		out.Mode = fuse.S_IFDIR | 0o555
-		out.Nlink = 1
+	outputPath.EXPECT().VirtualGetAttributes(
+		re_vfs.AttributesMaskInodeNumber,
+		gomock.Any(),
+	).Do(func(requested re_vfs.AttributesMask, out *re_vfs.Attributes) {
+		out.SetInodeNumber(101)
 	})
 
-	// Call FUSELookup() again. It should now succeed.
-	var out2 fuse.Attr
-	directory, leaf, s := d.FUSELookup(path.MustNewComponent("eaf1d65b7ab802934e6b57d0e14b3f30"), &out2)
-	require.Equal(t, fuse.OK, s)
+	// Call VirtualLookup() again. It should now succeed.
+	var out2 re_vfs.Attributes
+	directory, leaf, s := d.VirtualLookup(path.MustNewComponent("eaf1d65b7ab802934e6b57d0e14b3f30"), re_vfs.AttributesMaskInodeNumber, &out2)
+	require.Equal(t, re_vfs.StatusOK, s)
 	require.Equal(t, outputPath, directory)
 	require.Nil(t, leaf)
-	require.Equal(t, fuse.Attr{
-		Ino:   101,
-		Mode:  fuse.S_IFDIR | 0o555,
-		Nlink: 1,
-	}, out2)
+	require.Equal(t, *(&re_vfs.Attributes{}).SetInodeNumber(101), out2)
 
 	// Remove the output path.
 	outputPath.EXPECT().RemoveAllChildren(true)
-	entryNotifier.EXPECT().Call(uint64(100), path.MustNewComponent("eaf1d65b7ab802934e6b57d0e14b3f30"))
+	dHandle.EXPECT().NotifyRemoval(path.MustNewComponent("eaf1d65b7ab802934e6b57d0e14b3f30"))
 
 	_, err = d.Clean(ctx, &remoteoutputservice.CleanRequest{
 		OutputBaseId: "eaf1d65b7ab802934e6b57d0e14b3f30",
 	})
 	require.NoError(t, err)
 
-	// FUSELookup() should fail once again.
-	var out3 fuse.Attr
-	_, _, s = d.FUSELookup(path.MustNewComponent("eda09135e50ff6e877fe5f8136ddc759"), &out3)
-	require.Equal(t, fuse.ENOENT, s)
+	// VirtualLookup() should fail once again.
+	var out3 re_vfs.Attributes
+	_, _, s = d.VirtualLookup(path.MustNewComponent("eda09135e50ff6e877fe5f8136ddc759"), 0, &out3)
+	require.Equal(t, re_vfs.StatusErrNoEnt, s)
 }
 
-func TestRemoteOutputServiceDirectoryFUSEReadDir(t *testing.T) {
+func TestRemoteOutputServiceDirectoryVirtualReadDir(t *testing.T) {
 	ctrl, ctx := gomock.WithContext(context.Background(), t)
 
-	inodeNumberGenerator := mock.NewMockSingleThreadedGenerator(ctrl)
-	entryNotifier := mock.NewMockEntryNotifier(ctrl)
+	handleAllocator := mock.NewMockStatefulHandleAllocator(ctrl)
 	outputPathFactory := mock.NewMockOutputPathFactory(ctrl)
 	bareContentAddressableStorage := mock.NewMockBlobAccess(ctrl)
 	retryingContentAddressableStorage := mock.NewMockBlobAccess(ctrl)
 	indexedTreeFetcher := mock.NewMockIndexedTreeFetcher(ctrl)
-	d := cd_fuse.NewRemoteOutputServiceDirectory(
-		100,
-		inodeNumberGenerator,
-		entryNotifier.Call,
+	symlinkFactory := mock.NewMockSymlinkFactory(ctrl)
+	dHandleAllocation := mock.NewMockStatefulHandleAllocation(ctrl)
+	handleAllocator.EXPECT().New().Return(dHandleAllocation)
+	dHandle := mock.NewMockStatefulDirectoryHandle(ctrl)
+	dHandleAllocation.EXPECT().AsStatefulDirectory(gomock.Any()).Return(dHandle)
+	d := cd_vfs.NewRemoteOutputServiceDirectory(
+		handleAllocator,
 		outputPathFactory,
 		bareContentAddressableStorage,
 		retryingContentAddressableStorage,
-		indexedTreeFetcher)
+		indexedTreeFetcher,
+		symlinkFactory)
 
-	// The directory should initially be empty.
-	entries, s := d.FUSEReadDir()
-	require.Equal(t, fuse.OK, s)
-	require.Empty(t, entries)
+	t.Run("InitialState", func(t *testing.T) {
+		// The directory should initially be empty.
+		reporter := mock.NewMockDirectoryEntryReporter(ctrl)
+
+		require.Equal(
+			t,
+			re_vfs.StatusOK,
+			d.VirtualReadDir(0, re_vfs.AttributesMaskInodeNumber, reporter))
+	})
 
 	// Create two output paths.
-	inodeNumberGenerator.EXPECT().Uint64().Return(uint64(101))
+	casFileHandleAllocation1 := mock.NewMockStatefulHandleAllocation(ctrl)
+	handleAllocator.EXPECT().New().Return(casFileHandleAllocation1)
+	casFileHandleAllocator1 := mock.NewMockStatelessHandleAllocator(ctrl)
+	casFileHandleAllocation1.EXPECT().AsStatelessAllocator().Return(casFileHandleAllocator1)
 	outputPath1 := mock.NewMockOutputPath(ctrl)
-	outputPathFactory.EXPECT().StartInitialBuild(path.MustNewComponent("83f3e6ff93a5403cbfb14682d8165968"), gomock.Any(), digest.EmptyInstanceName, gomock.Any(), uint64(101)).Return(outputPath1)
+	outputPathFactory.EXPECT().StartInitialBuild(path.MustNewComponent("83f3e6ff93a5403cbfb14682d8165968"), gomock.Any(), digest.EmptyInstanceName, gomock.Any()).Return(outputPath1)
 	outputPath1.EXPECT().FilterChildren(gomock.Any())
 
 	response, err := d.StartBuild(ctx, &remoteoutputservice.StartBuildRequest{
@@ -1081,9 +1156,12 @@ func TestRemoteOutputServiceDirectoryFUSEReadDir(t *testing.T) {
 		OutputPathSuffix: "83f3e6ff93a5403cbfb14682d8165968",
 	}, response)
 
-	inodeNumberGenerator.EXPECT().Uint64().Return(uint64(102))
+	casFileHandleAllocation2 := mock.NewMockStatefulHandleAllocation(ctrl)
+	handleAllocator.EXPECT().New().Return(casFileHandleAllocation2)
+	casFileHandleAllocator2 := mock.NewMockStatelessHandleAllocator(ctrl)
+	casFileHandleAllocation2.EXPECT().AsStatelessAllocator().Return(casFileHandleAllocator2)
 	outputPath2 := mock.NewMockOutputPath(ctrl)
-	outputPathFactory.EXPECT().StartInitialBuild(path.MustNewComponent("d4b145a6191c6d8d037d13986274d08d"), gomock.Any(), digest.EmptyInstanceName, gomock.Any(), uint64(102)).Return(outputPath2)
+	outputPathFactory.EXPECT().StartInitialBuild(path.MustNewComponent("d4b145a6191c6d8d037d13986274d08d"), gomock.Any(), digest.EmptyInstanceName, gomock.Any()).Return(outputPath2)
 	outputPath2.EXPECT().FilterChildren(gomock.Any())
 
 	response, err = d.StartBuild(ctx, &remoteoutputservice.StartBuildRequest{
@@ -1100,22 +1178,98 @@ func TestRemoteOutputServiceDirectoryFUSEReadDir(t *testing.T) {
 		OutputPathSuffix: "d4b145a6191c6d8d037d13986274d08d",
 	}, response)
 
-	// The directory listing should contain both output paths.
-	entries, s = d.FUSEReadDir()
-	require.Equal(t, fuse.OK, s)
-	require.ElementsMatch(
-		t,
-		[]fuse.DirEntry{
-			{
-				Mode: fuse.S_IFDIR,
-				Ino:  101,
-				Name: "83f3e6ff93a5403cbfb14682d8165968",
-			},
-			{
-				Mode: fuse.S_IFDIR,
-				Ino:  102,
-				Name: "d4b145a6191c6d8d037d13986274d08d",
-			},
-		},
-		entries)
+	t.Run("FromStart", func(t *testing.T) {
+		// The directory listing should contain both output paths.
+		reporter := mock.NewMockDirectoryEntryReporter(ctrl)
+		outputPath1.EXPECT().VirtualGetAttributes(
+			re_vfs.AttributesMaskInodeNumber,
+			gomock.Any(),
+		).Do(func(requested re_vfs.AttributesMask, out *re_vfs.Attributes) {
+			out.SetInodeNumber(101)
+		})
+		reporter.EXPECT().ReportDirectory(
+			uint64(1),
+			path.MustNewComponent("83f3e6ff93a5403cbfb14682d8165968"),
+			outputPath1,
+			(&re_vfs.Attributes{}).SetInodeNumber(101),
+		).Return(true)
+		outputPath2.EXPECT().VirtualGetAttributes(
+			re_vfs.AttributesMaskInodeNumber,
+			gomock.Any(),
+		).Do(func(requested re_vfs.AttributesMask, out *re_vfs.Attributes) {
+			out.SetInodeNumber(102)
+		})
+		reporter.EXPECT().ReportDirectory(
+			uint64(2),
+			path.MustNewComponent("d4b145a6191c6d8d037d13986274d08d"),
+			outputPath1,
+			(&re_vfs.Attributes{}).SetInodeNumber(102),
+		).Return(true)
+
+		require.Equal(
+			t,
+			re_vfs.StatusOK,
+			d.VirtualReadDir(0, re_vfs.AttributesMaskInodeNumber, reporter))
+	})
+
+	t.Run("Partial", func(t *testing.T) {
+		reporter := mock.NewMockDirectoryEntryReporter(ctrl)
+		outputPath2.EXPECT().VirtualGetAttributes(
+			re_vfs.AttributesMaskInodeNumber,
+			gomock.Any(),
+		).Do(func(requested re_vfs.AttributesMask, out *re_vfs.Attributes) {
+			out.SetInodeNumber(102)
+		})
+		reporter.EXPECT().ReportDirectory(
+			uint64(2),
+			path.MustNewComponent("d4b145a6191c6d8d037d13986274d08d"),
+			outputPath1,
+			(&re_vfs.Attributes{}).SetInodeNumber(102),
+		).Return(true)
+
+		require.Equal(
+			t,
+			re_vfs.StatusOK,
+			d.VirtualReadDir(1, re_vfs.AttributesMaskInodeNumber, reporter))
+	})
+
+	t.Run("AtEOF", func(t *testing.T) {
+		reporter := mock.NewMockDirectoryEntryReporter(ctrl)
+		require.Equal(
+			t,
+			re_vfs.StatusOK,
+			d.VirtualReadDir(2, re_vfs.AttributesMaskInodeNumber, reporter))
+	})
+
+	t.Run("BeyondEOF", func(t *testing.T) {
+		reporter := mock.NewMockDirectoryEntryReporter(ctrl)
+		require.Equal(
+			t,
+			re_vfs.StatusOK,
+			d.VirtualReadDir(3, re_vfs.AttributesMaskInodeNumber, reporter))
+	})
+
+	// Remove all output paths.
+	outputPath1.EXPECT().RemoveAllChildren(true)
+	dHandle.EXPECT().NotifyRemoval(path.MustNewComponent("83f3e6ff93a5403cbfb14682d8165968"))
+	_, err = d.Clean(ctx, &remoteoutputservice.CleanRequest{
+		OutputBaseId: "83f3e6ff93a5403cbfb14682d8165968",
+	})
+	require.NoError(t, err)
+
+	outputPath2.EXPECT().RemoveAllChildren(true)
+	dHandle.EXPECT().NotifyRemoval(path.MustNewComponent("d4b145a6191c6d8d037d13986274d08d"))
+	_, err = d.Clean(ctx, &remoteoutputservice.CleanRequest{
+		OutputBaseId: "d4b145a6191c6d8d037d13986274d08d",
+	})
+	require.NoError(t, err)
+
+	t.Run("AfterClean", func(t *testing.T) {
+		reporter := mock.NewMockDirectoryEntryReporter(ctrl)
+
+		require.Equal(
+			t,
+			re_vfs.StatusOK,
+			d.VirtualReadDir(0, re_vfs.AttributesMaskInodeNumber, reporter))
+	})
 }

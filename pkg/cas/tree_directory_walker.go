@@ -50,10 +50,10 @@ func (dw *treeRootDirectoryWalker) GetDirectory(ctx context.Context) (*remoteexe
 	if err != nil {
 		return nil, err
 	}
-	if indexedTree.Root == nil {
+	if indexedTree.Tree.Root == nil {
 		return nil, status.Error(codes.InvalidArgument, "Tree does not contain a root directory")
 	}
-	return indexedTree.Root, nil
+	return indexedTree.Tree.Root, nil
 }
 
 func (dw *treeRootDirectoryWalker) GetDescription() string {
@@ -70,11 +70,11 @@ func (dw *treeChildDirectoryWalker) GetDirectory(ctx context.Context) (*remoteex
 	if err != nil {
 		return nil, err
 	}
-	child, ok := indexedTree.Children[dw.childDigest]
+	index, ok := indexedTree.Index[dw.childDigest]
 	if !ok {
 		return nil, status.Error(codes.InvalidArgument, "Child directory not found in tree")
 	}
-	return child, nil
+	return indexedTree.Tree.Children[index], nil
 }
 
 func (dw *treeChildDirectoryWalker) GetDescription() string {

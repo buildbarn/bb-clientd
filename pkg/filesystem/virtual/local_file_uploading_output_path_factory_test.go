@@ -1,4 +1,4 @@
-package fuse_test
+package virtual_test
 
 import (
 	"context"
@@ -6,8 +6,8 @@ import (
 
 	remoteexecution "github.com/bazelbuild/remote-apis/build/bazel/remote/execution/v2"
 	"github.com/buildbarn/bb-clientd/internal/mock"
-	cd_fuse "github.com/buildbarn/bb-clientd/pkg/filesystem/fuse"
-	re_fuse "github.com/buildbarn/bb-remote-execution/pkg/filesystem/fuse"
+	cd_vfs "github.com/buildbarn/bb-clientd/pkg/filesystem/virtual"
+	re_vfs "github.com/buildbarn/bb-remote-execution/pkg/filesystem/virtual"
 	"github.com/buildbarn/bb-storage/pkg/blobstore"
 	"github.com/buildbarn/bb-storage/pkg/blobstore/buffer"
 	"github.com/buildbarn/bb-storage/pkg/digest"
@@ -30,7 +30,7 @@ func TestLocalFileUploadingOutputPathFactory(t *testing.T) {
 		Return(digest.EmptySet, nil).
 		AnyTimes()
 	globalErrorLogger := mock.NewMockErrorLogger(ctrl)
-	outputPathFactory := cd_fuse.NewLocalFileUploadingOutputPathFactory(
+	outputPathFactory := cd_vfs.NewLocalFileUploadingOutputPathFactory(
 		baseOutputPathFactory,
 		contentAddressableStorage,
 		globalErrorLogger,
@@ -47,15 +47,13 @@ func TestLocalFileUploadingOutputPathFactory(t *testing.T) {
 		casFileFactory,
 		instanceName,
 		fileErrorLogger,
-		uint64(100),
 	).Return(baseOutputPath)
 
 	outputPath := outputPathFactory.StartInitialBuild(
 		outputBaseID,
 		casFileFactory,
 		instanceName,
-		fileErrorLogger,
-		uint64(100))
+		fileErrorLogger)
 
 	t.Run("Empty", func(t *testing.T) {
 		// Output path is empty, meaning there is nothing to upload.
@@ -72,7 +70,7 @@ func TestLocalFileUploadingOutputPathFactory(t *testing.T) {
 
 		subDirectory := mock.NewMockPrepopulatedDirectory(ctrl)
 		baseOutputPath.EXPECT().LookupAllChildren().Return(
-			[]re_fuse.DirectoryPrepopulatedDirEntry{
+			[]re_vfs.DirectoryPrepopulatedDirEntry{
 				{Name: path.MustNewComponent("subdirectory"), Child: subDirectory},
 			},
 			nil,
@@ -93,7 +91,7 @@ func TestLocalFileUploadingOutputPathFactory(t *testing.T) {
 		leaf := mock.NewMockNativeLeaf(ctrl)
 		baseOutputPath.EXPECT().LookupAllChildren().Return(
 			nil,
-			[]re_fuse.LeafPrepopulatedDirEntry{
+			[]re_vfs.LeafPrepopulatedDirEntry{
 				{Name: path.MustNewComponent("leaf"), Child: leaf},
 			},
 			nil)
@@ -111,7 +109,7 @@ func TestLocalFileUploadingOutputPathFactory(t *testing.T) {
 		leaf := mock.NewMockNativeLeaf(ctrl)
 		baseOutputPath.EXPECT().LookupAllChildren().Return(
 			nil,
-			[]re_fuse.LeafPrepopulatedDirEntry{
+			[]re_vfs.LeafPrepopulatedDirEntry{
 				{Name: path.MustNewComponent("leaf"), Child: leaf},
 			},
 			nil)
@@ -138,10 +136,10 @@ func TestLocalFileUploadingOutputPathFactory(t *testing.T) {
 		subDirectory := mock.NewMockPrepopulatedDirectory(ctrl)
 		symlink := mock.NewMockNativeLeaf(ctrl)
 		baseOutputPath.EXPECT().LookupAllChildren().Return(
-			[]re_fuse.DirectoryPrepopulatedDirEntry{
+			[]re_vfs.DirectoryPrepopulatedDirEntry{
 				{Name: path.MustNewComponent("subdirectory"), Child: subDirectory},
 			},
-			[]re_fuse.LeafPrepopulatedDirEntry{
+			[]re_vfs.LeafPrepopulatedDirEntry{
 				{Name: path.MustNewComponent("symlink"), Child: symlink},
 			},
 			nil)
@@ -151,7 +149,7 @@ func TestLocalFileUploadingOutputPathFactory(t *testing.T) {
 		remoteFile := mock.NewMockNativeLeaf(ctrl)
 		subDirectory.EXPECT().LookupAllChildren().Return(
 			nil,
-			[]re_fuse.LeafPrepopulatedDirEntry{
+			[]re_vfs.LeafPrepopulatedDirEntry{
 				{Name: path.MustNewComponent("missing_local_file"), Child: missingLocalFile},
 				{Name: path.MustNewComponent("present_local_file"), Child: presentLocalFile},
 				{Name: path.MustNewComponent("remote_file"), Child: remoteFile},

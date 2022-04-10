@@ -12,7 +12,6 @@ gomock(
     ],
     library = "//internal/mock/aliases",
     package = "mock",
-    tags = ["manual"],
 )
 
 gomock(
@@ -55,31 +54,17 @@ gomock(
 )
 
 gomock(
-    name = "filesystem_fuse",
-    out = "filesystem_fuse.go",
+    name = "filesystem_virtual",
+    out = "filesystem_virtual.go",
     interfaces = [
         "DigestLookupFunc",
+        "DirectoryContentsContext",
         "DirectoryContext",
         "InstanceNameLookupFunc",
         "OutputPath",
         "OutputPathFactory",
     ],
-    library = "//pkg/filesystem/fuse",
-    package = "mock",
-)
-
-gomock(
-    name = "filesystem_fuse_re",
-    out = "filesystem_fuse_re.go",
-    interfaces = [
-        "Directory",
-        "Leaf",
-    ],
-    library = "@com_github_buildbarn_bb_remote_execution//pkg/filesystem/fuse",
-    mock_names = {
-        "Directory": "MockFUSEDirectory",
-        "Leaf": "MockFUSELeaf",
-    },
+    library = "//pkg/filesystem/virtual",
     package = "mock",
 )
 
@@ -118,17 +103,31 @@ gomock(
 )
 
 gomock(
-    name = "re_filesystem_fuse",
-    out = "re_filesystem_fuse.go",
+    name = "re_filesystem_virtual",
+    out = "re_filesystem_virtual.go",
     interfaces = [
         "CASFileFactory",
         "ChildRemover",
-        "EntryNotifier",
+        "Directory",
+        "DirectoryEntryReporter",
         "InitialContentsFetcher",
+        "Leaf",
         "NativeLeaf",
         "PrepopulatedDirectory",
+        "ResolvableHandleAllocation",
+        "ResolvableHandleAllocator",
+        "StatefulDirectoryHandle",
+        "StatefulHandleAllocation",
+        "StatefulHandleAllocator",
+        "StatelessHandleAllocation",
+        "StatelessHandleAllocator",
+        "SymlinkFactory",
     ],
-    library = "@com_github_buildbarn_bb_remote_execution//pkg/filesystem/fuse",
+    library = "@com_github_buildbarn_bb_remote_execution//pkg/filesystem/virtual",
+    mock_names = {
+        "Directory": "MockVirtualDirectory",
+        "Leaf": "MockVirtualLeaf",
+    },
     package = "mock",
 )
 
@@ -148,22 +147,21 @@ go_library(
         ":cas.go",
         ":clock.go",
         ":filesystem.go",
-        ":filesystem_fuse.go",
-        ":filesystem_fuse_re.go",
+        ":filesystem_virtual.go",
         ":outputpathpersistency.go",
         ":random.go",
         ":re_cas.go",
-        ":re_filesystem_fuse.go",
+        ":re_filesystem_virtual.go",
         ":storage_util.go",
     ],
     importpath = "github.com/buildbarn/bb-clientd/internal/mock",
     visibility = ["//:__subpackages__"],
     deps = [
         "//pkg/cas",
-        "//pkg/filesystem/fuse",
+        "//pkg/filesystem/virtual",
         "//pkg/outputpathpersistency",
         "@com_github_bazelbuild_remote_apis//build/bazel/remote/execution/v2:execution",
-        "@com_github_buildbarn_bb_remote_execution//pkg/filesystem/fuse",
+        "@com_github_buildbarn_bb_remote_execution//pkg/filesystem/virtual",
         "@com_github_buildbarn_bb_remote_execution//pkg/proto/outputpathpersistency",
         "@com_github_buildbarn_bb_remote_execution//pkg/proto/remoteoutputservice",
         "@com_github_buildbarn_bb_storage//pkg/blobstore",
@@ -174,6 +172,5 @@ go_library(
         "@com_github_buildbarn_bb_storage//pkg/filesystem/path",
         "@com_github_buildbarn_bb_storage//pkg/util",
         "@com_github_golang_mock//gomock",
-        "@com_github_hanwen_go_fuse_v2//fuse",
     ],
 )

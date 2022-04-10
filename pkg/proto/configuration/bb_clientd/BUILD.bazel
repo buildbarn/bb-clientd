@@ -8,7 +8,7 @@ proto_library(
     visibility = ["//visibility:public"],
     deps = [
         "@com_github_buildbarn_bb_remote_execution//pkg/proto/configuration/filesystem:filesystem_proto",
-        "@com_github_buildbarn_bb_remote_execution//pkg/proto/configuration/fuse:fuse_proto",
+        "@com_github_buildbarn_bb_remote_execution//pkg/proto/configuration/filesystem/virtual:virtual_proto",
         "@com_github_buildbarn_bb_storage//pkg/proto/configuration/blobstore:blobstore_proto",
         "@com_github_buildbarn_bb_storage//pkg/proto/configuration/builder:builder_proto",
         "@com_github_buildbarn_bb_storage//pkg/proto/configuration/global:global_proto",
@@ -24,7 +24,7 @@ go_proto_library(
     visibility = ["//visibility:public"],
     deps = [
         "@com_github_buildbarn_bb_remote_execution//pkg/proto/configuration/filesystem",
-        "@com_github_buildbarn_bb_remote_execution//pkg/proto/configuration/fuse",
+        "@com_github_buildbarn_bb_remote_execution//pkg/proto/configuration/filesystem/virtual",
         "@com_github_buildbarn_bb_storage//pkg/proto/configuration/blobstore",
         "@com_github_buildbarn_bb_storage//pkg/proto/configuration/builder",
         "@com_github_buildbarn_bb_storage//pkg/proto/configuration/global",

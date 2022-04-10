@@ -36,8 +36,8 @@ func (itf *blobAccessIndexedTreeFetcher) GetIndexedTree(ctx context.Context, tre
 	// Convert the Tree message to an IndexedTree.
 	tree := m.(*remoteexecution.Tree)
 	indexedTree := IndexedTree{
-		Root:     tree.Root,
-		Children: map[string]*remoteexecution.Directory{},
+		Tree:  tree,
+		Index: make(map[string]int, len(tree.Children)),
 	}
 	digestFunction := treeDigest.GetDigestFunction()
 	for index, child := range tree.Children {
@@ -51,7 +51,7 @@ func (itf *blobAccessIndexedTreeFetcher) GetIndexedTree(ctx context.Context, tre
 		if _, err := digestGenerator.Write(data); err != nil {
 			panic(err)
 		}
-		indexedTree.Children[digestGenerator.Sum().GetKey(digest.KeyWithoutInstance)] = child
+		indexedTree.Index[digestGenerator.Sum().GetKey(digest.KeyWithoutInstance)] = index
 	}
 	return &indexedTree, nil
 }

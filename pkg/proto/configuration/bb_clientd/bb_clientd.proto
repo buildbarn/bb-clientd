@@ -6,7 +6,7 @@ import "google/protobuf/duration.proto";
 import "pkg/proto/configuration/blobstore/blobstore.proto";
 import "pkg/proto/configuration/builder/builder.proto";
 import "pkg/proto/configuration/filesystem/filesystem.proto";
-import "pkg/proto/configuration/fuse/fuse.proto";
+import "pkg/proto/configuration/filesystem/virtual/virtual.proto";
 import "pkg/proto/configuration/global/global.proto";
 import "pkg/proto/configuration/grpc/grpc.proto";
 
@@ -23,9 +23,9 @@ message ApplicationConfiguration {
   // Common configuration options that apply to all Buildbarn binaries.
   buildbarn.configuration.global.Configuration global = 3;
 
-  // FUSE mount under which the contents of the Content Addressable
-  // Storage (CAS) are exposed for reading. The following pathname
-  // schemes are supported:
+  // Mount of a virtual file system under which the contents of the
+  // Content Addressable Storage (CAS) are exposed for reading. The
+  // following pathname schemes are supported:
   //
   // - cas/${instance_name}/blobs/command/${hash}-${size_bytes}:
   //   An executable Bourne shell script that can be used to run the
@@ -55,7 +55,7 @@ message ApplicationConfiguration {
   // Instance names containing slashes are permitted. It automatically
   // causes intermediate directories to be created. "blobs" directories
   // exist at every level.
-  buildbarn.configuration.fuse.MountConfiguration fuse = 4;
+  buildbarn.configuration.filesystem.virtual.MountConfiguration mount = 4;
 
   // gRPC servers to spawn to listen for requests from clients.
   repeated buildbarn.configuration.grpc.ServerConfiguration grpc_servers = 5;

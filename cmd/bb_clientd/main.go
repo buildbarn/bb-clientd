@@ -1,25 +1,28 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"log"
 	"os"
+	"sort"
 	"time"
 
 	remoteexecution "github.com/bazelbuild/remote-apis/build/bazel/remote/execution/v2"
 	cd_blobstore "github.com/buildbarn/bb-clientd/pkg/blobstore"
 	cd_cas "github.com/buildbarn/bb-clientd/pkg/cas"
-	cd_fuse "github.com/buildbarn/bb-clientd/pkg/filesystem/fuse"
+	cd_vfs "github.com/buildbarn/bb-clientd/pkg/filesystem/virtual"
 	"github.com/buildbarn/bb-clientd/pkg/outputpathpersistency"
 	"github.com/buildbarn/bb-clientd/pkg/proto/configuration/bb_clientd"
 	re_cas "github.com/buildbarn/bb-remote-execution/pkg/cas"
 	re_filesystem "github.com/buildbarn/bb-remote-execution/pkg/filesystem"
-	re_fuse "github.com/buildbarn/bb-remote-execution/pkg/filesystem/fuse"
+	re_vfs "github.com/buildbarn/bb-remote-execution/pkg/filesystem/virtual"
+	virtual_configuration "github.com/buildbarn/bb-remote-execution/pkg/filesystem/virtual/configuration"
 	"github.com/buildbarn/bb-remote-execution/pkg/proto/remoteoutputservice"
-	"github.com/buildbarn/bb-storage/pkg/auth"
 	blobstore_configuration "github.com/buildbarn/bb-storage/pkg/blobstore/configuration"
 	"github.com/buildbarn/bb-storage/pkg/blobstore/grpcservers"
 	"github.com/buildbarn/bb-storage/pkg/builder"
+	"github.com/buildbarn/bb-storage/pkg/capabilities"
 	"github.com/buildbarn/bb-storage/pkg/clock"
 	"github.com/buildbarn/bb-storage/pkg/digest"
 	"github.com/buildbarn/bb-storage/pkg/filesystem"
@@ -28,7 +31,6 @@ import (
 	bb_grpc "github.com/buildbarn/bb-storage/pkg/grpc"
 	"github.com/buildbarn/bb-storage/pkg/random"
 	"github.com/buildbarn/bb-storage/pkg/util"
-	"github.com/hanwen/go-fuse/v2/fuse"
 
 	"golang.org/x/sync/semaphore"
 	"google.golang.org/genproto/googleapis/bytestream"
@@ -59,10 +61,7 @@ func main() {
 
 	// Create a demultiplexing build queue that forwards traffic to
 	// one or more schedulers specified in the configuration file.
-	buildQueue, err := builder.NewDemultiplexingBuildQueueFromConfiguration(
-		configuration.Schedulers,
-		grpcClientFactory,
-		auth.NewStaticAuthorizer(func(instanceName digest.InstanceName) bool { return false }))
+	buildQueue, err := builder.NewDemultiplexingBuildQueueFromConfiguration(configuration.Schedulers, grpcClientFactory)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -92,6 +91,12 @@ func main() {
 			maximumDelay.AsDuration())
 	}
 
+	// Create the virtual file system.
+	mount, rootHandleAllocator, err := virtual_configuration.NewMountFromConfiguration(configuration.Mount, "bb_clientd")
+	if err != nil {
+		log.Fatal("Failed to create virtual file system mount: ", err)
+	}
+
 	// Factories for FUSE nodes corresponding to plain files,
 	// executable files, directories and trees.
 	//
@@ -103,99 +108,99 @@ func main() {
 	indexedTreeFetcher := cd_cas.NewBlobAccessIndexedTreeFetcher(
 		retryingContentAddressableStorage,
 		int(configuration.MaximumMessageSizeBytes))
-	globalFileContext := NewGlobalFileContext(
-		context.Background(),
-		retryingContentAddressableStorage,
-		util.DefaultErrorLogger)
+	casFileFactory := re_vfs.NewResolvableHandleAllocatingCASFileFactory(
+		re_vfs.NewBlobAccessCASFileFactory(
+			context.Background(),
+			retryingContentAddressableStorage,
+			util.DefaultErrorLogger),
+		rootHandleAllocator.New())
 	globalDirectoryContext := NewGlobalDirectoryContext(
-		globalFileContext,
+		context.Background(),
+		casFileFactory,
 		re_cas.NewBlobAccessDirectoryFetcher(
 			retryingContentAddressableStorage,
-			int(configuration.MaximumMessageSizeBytes)))
-	globalTreeContext := NewGlobalTreeContext(globalFileContext, indexedTreeFetcher)
+			int(configuration.MaximumMessageSizeBytes)),
+		rootHandleAllocator.New(),
+		util.DefaultErrorLogger)
+	globalTreeContext := NewGlobalTreeContext(
+		context.Background(),
+		casFileFactory,
+		indexedTreeFetcher,
+		rootHandleAllocator.New(),
+		util.DefaultErrorLogger)
 
 	// Factory function for per instance name "blobs" directories
 	// that give access to arbitrary files, directories and trees.
-	blobsDirectoryInodeNumberTree := re_fuse.NewRandomInodeNumberTree()
-	commandFileFactory := cd_fuse.NewCommandFileFactory(
-		context.Background(),
-		retryingContentAddressableStorage,
-		int(configuration.MaximumMessageSizeBytes),
-		util.DefaultErrorLogger)
-	blobsDirectoryLookupFunc := func(instanceName digest.InstanceName, out *fuse.Attr) (re_fuse.Directory, re_fuse.Leaf) {
-		inodeNumberTree := blobsDirectoryInodeNumberTree.AddString(instanceName.String())
-		commandInodeNumber := inodeNumberTree.AddUint64(0).Get()
-		directoryInodeNumber := inodeNumberTree.AddUint64(1).Get()
-		executableInodeNumber := inodeNumberTree.AddUint64(2).Get()
-		fileInodeNumber := inodeNumberTree.AddUint64(3).Get()
-		treeInodeNumber := inodeNumberTree.AddUint64(4).Get()
-		d := cd_fuse.NewStaticDirectory(
-			inodeNumberTree.Get(),
-			map[path.Component]cd_fuse.StaticDirectoryEntry{
-				path.MustNewComponent("command"): {
-					Child: cd_fuse.NewDigestParsingDirectory(
-						instanceName,
-						commandInodeNumber,
-						func(digest digest.Digest, out *fuse.Attr) (re_fuse.Directory, re_fuse.Leaf, fuse.Status) {
-							f, s := commandFileFactory.LookupFile(digest, out)
-							return nil, f, s
-						}),
-					InodeNumber: commandInodeNumber,
-				},
-				path.MustNewComponent("directory"): {
-					Child: cd_fuse.NewDigestParsingDirectory(
-						instanceName,
-						directoryInodeNumber,
-						func(digest digest.Digest, out *fuse.Attr) (re_fuse.Directory, re_fuse.Leaf, fuse.Status) {
-							return globalDirectoryContext.LookupDirectory(digest, out), nil, fuse.OK
-						}),
-					InodeNumber: directoryInodeNumber,
-				},
-				path.MustNewComponent("executable"): {
-					Child: cd_fuse.NewDigestParsingDirectory(
-						instanceName,
-						executableInodeNumber,
-						func(digest digest.Digest, out *fuse.Attr) (re_fuse.Directory, re_fuse.Leaf, fuse.Status) {
-							return nil, globalFileContext.LookupFile(digest, true, out), fuse.OK
-						}),
-					InodeNumber: executableInodeNumber,
-				},
-				path.MustNewComponent("file"): {
-					Child: cd_fuse.NewDigestParsingDirectory(
-						instanceName,
-						fileInodeNumber,
-						func(digest digest.Digest, out *fuse.Attr) (re_fuse.Directory, re_fuse.Leaf, fuse.Status) {
-							return nil, globalFileContext.LookupFile(digest, false, out), fuse.OK
-						}),
-					InodeNumber: fileInodeNumber,
-				},
-				path.MustNewComponent("tree"): {
-					Child: cd_fuse.NewDigestParsingDirectory(
-						instanceName,
-						treeInodeNumber,
-						func(digest digest.Digest, out *fuse.Attr) (re_fuse.Directory, re_fuse.Leaf, fuse.Status) {
-							return globalTreeContext.LookupTree(digest, out), nil, fuse.OK
-						}),
-					InodeNumber: treeInodeNumber,
-				},
-			})
-		d.FUSEGetAttr(out)
-		return d, nil
+	blobsDirectoryHandleAllocator := rootHandleAllocator.New().AsStatelessAllocator()
+	commandFileFactory := cd_vfs.NewHandleAllocatingCommandFileFactory(
+		cd_vfs.NewBlobAccessCommandFileFactory(
+			context.Background(),
+			retryingContentAddressableStorage,
+			int(configuration.MaximumMessageSizeBytes),
+			util.DefaultErrorLogger),
+		rootHandleAllocator.New())
+	blobsDirectoryLookupFunc := func(instanceName digest.InstanceName) re_vfs.Directory {
+		handleAllocator := blobsDirectoryHandleAllocator.
+			New(re_vfs.ByteSliceID([]byte(instanceName.String()))).
+			AsStatelessAllocator()
+		return handleAllocator.
+			New(bytes.NewBuffer([]byte{0})).
+			AsStatelessDirectory(cd_vfs.NewStaticDirectory(
+				map[path.Component]re_vfs.Directory{
+					path.MustNewComponent("command"): handleAllocator.
+						New(bytes.NewBuffer([]byte{1})).
+						AsStatelessDirectory(cd_vfs.NewDigestParsingDirectory(
+							instanceName,
+							func(digest digest.Digest) (re_vfs.Directory, re_vfs.Leaf, re_vfs.Status) {
+								f, s := commandFileFactory.LookupFile(digest)
+								return nil, f, s
+							})),
+					path.MustNewComponent("directory"): handleAllocator.
+						New(bytes.NewBuffer([]byte{2})).
+						AsStatelessDirectory(cd_vfs.NewDigestParsingDirectory(
+							instanceName,
+							func(digest digest.Digest) (re_vfs.Directory, re_vfs.Leaf, re_vfs.Status) {
+								return globalDirectoryContext.LookupDirectory(digest), nil, re_vfs.StatusOK
+							})),
+					path.MustNewComponent("executable"): handleAllocator.
+						New(bytes.NewBuffer([]byte{3})).
+						AsStatelessDirectory(cd_vfs.NewDigestParsingDirectory(
+							instanceName,
+							func(digest digest.Digest) (re_vfs.Directory, re_vfs.Leaf, re_vfs.Status) {
+								return nil, casFileFactory.LookupFile(digest, true), re_vfs.StatusOK
+							})),
+					path.MustNewComponent("file"): handleAllocator.
+						New(bytes.NewBuffer([]byte{4})).
+						AsStatelessDirectory(cd_vfs.NewDigestParsingDirectory(
+							instanceName,
+							func(digest digest.Digest) (re_vfs.Directory, re_vfs.Leaf, re_vfs.Status) {
+								return nil, casFileFactory.LookupFile(digest, false), re_vfs.StatusOK
+							})),
+					path.MustNewComponent("tree"): handleAllocator.
+						New(bytes.NewBuffer([]byte{5})).
+						AsStatelessDirectory(cd_vfs.NewDigestParsingDirectory(
+							instanceName,
+							func(digest digest.Digest) (re_vfs.Directory, re_vfs.Leaf, re_vfs.Status) {
+								return globalTreeContext.LookupTree(digest), nil, re_vfs.StatusOK
+							})),
+				}))
 	}
 
 	// Implementation of the Remote Output Service. The Remote
 	// Output Service allows Bazel to place its bazel-out/
 	// directories on a FUSE file system, thereby allowing data to
 	// be loaded lazily.
-	var serverCallbacks re_fuse.SimpleRawFileSystemServerCallbacks
-	outputPathFactory := cd_fuse.NewInMemoryOutputPathFactory(filePool, serverCallbacks.EntryNotify)
+	symlinkFactory := re_vfs.NewHandleAllocatingSymlinkFactory(
+		re_vfs.BaseSymlinkFactory,
+		rootHandleAllocator.New())
+	outputPathFactory := cd_vfs.NewInMemoryOutputPathFactory(filePool, symlinkFactory, rootHandleAllocator, sort.Sort)
 	if persistencyConfiguration := configuration.OutputPathPersistency; persistencyConfiguration != nil {
 		// Upload local files at the end of every build. This
 		// decorator needs to be added before
 		// PersistentOutputPathFactory, as it also ensures that
 		// local files have a digest.
 		if concurrency := persistencyConfiguration.LocalFileUploadConcurrency; concurrency > 0 {
-			outputPathFactory = cd_fuse.NewLocalFileUploadingOutputPathFactory(
+			outputPathFactory = cd_vfs.NewLocalFileUploadingOutputPathFactory(
 				outputPathFactory,
 				bareContentAddressableStorage,
 				util.DefaultErrorLogger,
@@ -211,7 +216,7 @@ func main() {
 		if err := maximumStateFileAge.CheckValid(); err != nil {
 			log.Fatal("Invalid maximum state file age: ", err)
 		}
-		outputPathFactory = cd_fuse.NewPersistentOutputPathFactory(
+		outputPathFactory = cd_vfs.NewPersistentOutputPathFactory(
 			outputPathFactory,
 			outputpathpersistency.NewMaximumAgeStore(
 				outputpathpersistency.NewDirectoryBackedStore(
@@ -220,18 +225,17 @@ func main() {
 				clock.SystemClock,
 				maximumStateFileAge.AsDuration()),
 			clock.SystemClock,
-			util.DefaultErrorLogger)
+			util.DefaultErrorLogger,
+			symlinkFactory)
 	}
 
-	outputsInodeNumber := random.FastThreadSafeGenerator.Uint64()
-	outputsDirectory := cd_fuse.NewRemoteOutputServiceDirectory(
-		outputsInodeNumber,
-		random.NewFastSingleThreadedGenerator(),
-		serverCallbacks.EntryNotify,
+	outputsDirectory := cd_vfs.NewRemoteOutputServiceDirectory(
+		rootHandleAllocator,
 		outputPathFactory,
 		bareContentAddressableStorage,
 		retryingContentAddressableStorage,
-		indexedTreeFetcher)
+		indexedTreeFetcher,
+		symlinkFactory)
 
 	// Construct the top-level directory of the FUSE mount. It contains
 	// three subdirectories:
@@ -239,46 +243,28 @@ func main() {
 	// - "cas": raw access to the Content Addressable Storage.
 	// - "outputs": outputs of builds performed using Bazel.
 	// - "scratch": a writable directory for testing.
-	rootInodeNumber := random.FastThreadSafeGenerator.Uint64()
-	casInodeNumberTree := re_fuse.NewRandomInodeNumberTree()
-	scratchInodeNumber := random.FastThreadSafeGenerator.Uint64()
-	rootDirectory := cd_fuse.NewStaticDirectory(
-		rootInodeNumber,
-		map[path.Component]cd_fuse.StaticDirectoryEntry{
-			path.MustNewComponent("cas"): {
-				Child: cd_fuse.NewInstanceNameParsingDirectory(
-					casInodeNumberTree,
-					map[path.Component]cd_fuse.InstanceNameLookupFunc{
-						path.MustNewComponent("blobs"): blobsDirectoryLookupFunc,
-					}),
-				InodeNumber: casInodeNumberTree.Get(),
-			},
-			path.MustNewComponent("outputs"): {
-				Child:       outputsDirectory,
-				InodeNumber: outputsInodeNumber,
-			},
-			path.MustNewComponent("scratch"): {
-				Child: re_fuse.NewInMemoryPrepopulatedDirectory(
-					re_fuse.NewPoolBackedFileAllocator(
+	rootDirectory := rootHandleAllocator.New().AsStatelessDirectory(cd_vfs.NewStaticDirectory(
+		map[path.Component]re_vfs.Directory{
+			path.MustNewComponent("cas"): cd_vfs.NewInstanceNameParsingDirectory(
+				rootHandleAllocator.New(),
+				map[path.Component]cd_vfs.InstanceNameLookupFunc{
+					path.MustNewComponent("blobs"): blobsDirectoryLookupFunc,
+				}),
+			path.MustNewComponent("outputs"): outputsDirectory,
+			path.MustNewComponent("scratch"): re_vfs.NewInMemoryPrepopulatedDirectory(
+				re_vfs.NewHandleAllocatingFileAllocator(
+					re_vfs.NewPoolBackedFileAllocator(
 						filePool,
-						util.DefaultErrorLogger,
-						random.FastThreadSafeGenerator),
-					util.DefaultErrorLogger,
-					scratchInodeNumber,
-					random.FastThreadSafeGenerator,
-					serverCallbacks.EntryNotify),
-				InodeNumber: scratchInodeNumber,
-			},
-		})
+						util.DefaultErrorLogger),
+					rootHandleAllocator),
+				symlinkFactory,
+				util.DefaultErrorLogger,
+				rootHandleAllocator,
+				sort.Sort),
+		}))
 
-	// Expose the FUSE file system.
-	if err := re_fuse.NewMountFromConfiguration(
-		configuration.Fuse,
-		rootDirectory,
-		rootInodeNumber,
-		&serverCallbacks,
-		"bb_clientd"); err != nil {
-		log.Fatal("Failed to mount FUSE file system: ", err)
+	if err := mount.Expose(rootDirectory); err != nil {
+		log.Fatal("Failed to expose virtual file system mount: ", err)
 	}
 
 	// Create a gRPC server that forwards requests to backend clusters.
@@ -303,7 +289,14 @@ func main() {
 						grpcservers.NewByteStreamServer(
 							bareContentAddressableStorage,
 							1<<16))
-					remoteexecution.RegisterCapabilitiesServer(s, buildQueue)
+					remoteexecution.RegisterCapabilitiesServer(
+						s,
+						capabilities.NewServer(
+							capabilities.NewMergingProvider([]capabilities.Provider{
+								bareContentAddressableStorage,
+								actionCache,
+								buildQueue,
+							})))
 					remoteexecution.RegisterExecutionServer(s, buildQueue)
 
 					remoteoutputservice.RegisterRemoteOutputServiceServer(s, outputsDirectory)

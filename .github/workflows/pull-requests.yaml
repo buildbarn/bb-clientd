@@ -29,7 +29,7 @@
             },
             {
                "name": "Gofmt",
-               "run": "bazel run @cc_mvdan_gofumpt//:gofumpt -- -lang 1.15 -s -w -extra $(pwd)"
+               "run": "bazel run @cc_mvdan_gofumpt//:gofumpt -- -lang 1.18 -w -extra $(pwd)"
             },
             {
                "name": "Clang format",
@@ -78,6 +78,14 @@
             {
                "name": "darwin_arm64: build and test",
                "run": "bazel build --platforms=@io_bazel_rules_go//go/toolchain:darwin_arm64 //..."
+            },
+            {
+               "name": "freebsd_amd64: build and test",
+               "run": "bazel build --platforms=@io_bazel_rules_go//go/toolchain:freebsd_amd64 //cmd/bb_clientd"
+            },
+            {
+               "name": "windows_amd64: build and test",
+               "run": "bazel build --platforms=@io_bazel_rules_go//go/toolchain:windows_amd64 //..."
             }
          ]
       }

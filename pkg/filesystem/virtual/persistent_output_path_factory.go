@@ -1,16 +1,15 @@
-package fuse
+package virtual
 
 import (
 	"context"
 
 	"github.com/buildbarn/bb-clientd/pkg/outputpathpersistency"
-	re_fuse "github.com/buildbarn/bb-remote-execution/pkg/filesystem/fuse"
+	"github.com/buildbarn/bb-remote-execution/pkg/filesystem/virtual"
 	outputpathpersistency_pb "github.com/buildbarn/bb-remote-execution/pkg/proto/outputpathpersistency"
 	"github.com/buildbarn/bb-storage/pkg/clock"
 	"github.com/buildbarn/bb-storage/pkg/digest"
 	"github.com/buildbarn/bb-storage/pkg/filesystem/path"
 	"github.com/buildbarn/bb-storage/pkg/util"
-	"github.com/hanwen/go-fuse/v2/fuse"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -18,31 +17,34 @@ import (
 )
 
 type persistentOutputPathFactory struct {
-	base        OutputPathFactory
-	store       outputpathpersistency.Store
-	clock       clock.Clock
-	errorLogger util.ErrorLogger
+	base           OutputPathFactory
+	store          outputpathpersistency.Store
+	clock          clock.Clock
+	errorLogger    util.ErrorLogger
+	symlinkFactory virtual.SymlinkFactory
 }
 
 // NewPersistentOutputPathFactory creates a decorator for
 // OutputPathFactory that persists the contents of an OutputPath to disk
 // after every build. When an OutputPath is created, it will attempt to
 // reload the state from disk.
-func NewPersistentOutputPathFactory(base OutputPathFactory, store outputpathpersistency.Store, clock clock.Clock, errorLogger util.ErrorLogger) OutputPathFactory {
+func NewPersistentOutputPathFactory(base OutputPathFactory, store outputpathpersistency.Store, clock clock.Clock, errorLogger util.ErrorLogger, symlinkFactory virtual.SymlinkFactory) OutputPathFactory {
 	return &persistentOutputPathFactory{
-		base:        base,
-		store:       store,
-		clock:       clock,
-		errorLogger: errorLogger,
+		base:           base,
+		store:          store,
+		clock:          clock,
+		errorLogger:    errorLogger,
+		symlinkFactory: symlinkFactory,
 	}
 }
 
 type stateRestorer struct {
-	casFileFactory re_fuse.CASFileFactory
+	casFileFactory virtual.CASFileFactory
+	symlinkFactory virtual.SymlinkFactory
 	instanceName   digest.InstanceName
 }
 
-func (sr *stateRestorer) restoreDirectoryRecursive(reader outputpathpersistency.Reader, contents *outputpathpersistency_pb.Directory, d re_fuse.PrepopulatedDirectory, dPath *path.Trace) error {
+func (sr *stateRestorer) restoreDirectoryRecursive(reader outputpathpersistency.Reader, contents *outputpathpersistency_pb.Directory, d virtual.PrepopulatedDirectory, dPath *path.Trace) error {
 	// Recursively create nested directories.
 	for _, entry := range contents.Directories {
 		component, ok := path.NewComponent(entry.Name)
@@ -63,21 +65,31 @@ func (sr *stateRestorer) restoreDirectoryRecursive(reader outputpathpersistency.
 		}
 	}
 
-	// Create files and symbolic links.
-	initialNodes := map[path.Component]re_fuse.InitialNode{}
+	// Create files and symbolic links. Ensure that leaves are properly
+	// unlinked if this method fails.
+	initialNodes := map[path.Component]virtual.InitialNode{}
+	defer func() {
+		for _, initialNode := range initialNodes {
+			initialNode.Leaf.Unlink()
+		}
+	}()
+
 	for _, entry := range contents.Files {
 		component, ok := path.NewComponent(entry.Name)
 		if !ok {
 			return status.Errorf(codes.InvalidArgument, "File %#v inside directory %#v has an invalid name", entry.Name, dPath.String())
 		}
+		if _, ok := initialNodes[component]; ok {
+			return status.Errorf(codes.InvalidArgument, "Directory contains multiple children named %#v", entry.Name)
+		}
+
 		childPath := dPath.Append(component)
 		childDigest, err := sr.instanceName.NewDigestFromProto(entry.Digest)
 		if err != nil {
 			return util.StatusWrapf(err, "Failed to obtain digest for file %#v", childPath.String())
 		}
-		var out fuse.Attr
-		initialNodes[component] = re_fuse.InitialNode{
-			Leaf: sr.casFileFactory.LookupFile(childDigest, entry.IsExecutable, &out),
+		initialNodes[component] = virtual.InitialNode{
+			Leaf: sr.casFileFactory.LookupFile(childDigest, entry.IsExecutable),
 		}
 	}
 	for _, entry := range contents.Symlinks {
@@ -85,18 +97,24 @@ func (sr *stateRestorer) restoreDirectoryRecursive(reader outputpathpersistency.
 		if !ok {
 			return status.Errorf(codes.InvalidArgument, "Symlink %#v inside directory %#v has an invalid name", entry.Name, dPath.String())
 		}
-		initialNodes[component] = re_fuse.InitialNode{
-			Leaf: re_fuse.NewSymlink(entry.Target),
+		if _, ok := initialNodes[component]; ok {
+			return status.Errorf(codes.InvalidArgument, "Directory contains multiple children named %#v", entry.Name)
+		}
+
+		initialNodes[component] = virtual.InitialNode{
+			Leaf: sr.symlinkFactory.LookupSymlink([]byte(entry.Target)),
 		}
 	}
 	if err := d.CreateChildren(initialNodes, true); err != nil {
 		return util.StatusWrap(err, "Failed to create files and symbolic links")
 	}
+
+	initialNodes = nil
 	return nil
 }
 
-func (opf *persistentOutputPathFactory) StartInitialBuild(outputBaseID path.Component, casFileFactory re_fuse.CASFileFactory, instanceName digest.InstanceName, errorLogger util.ErrorLogger, inodeNumber uint64) OutputPath {
-	d := opf.base.StartInitialBuild(outputBaseID, casFileFactory, instanceName, errorLogger, inodeNumber)
+func (opf *persistentOutputPathFactory) StartInitialBuild(outputBaseID path.Component, casFileFactory virtual.CASFileFactory, instanceName digest.InstanceName, errorLogger util.ErrorLogger) OutputPath {
+	d := opf.base.StartInitialBuild(outputBaseID, casFileFactory, instanceName, errorLogger)
 
 	var initialCreationTime *timestamppb.Timestamp
 	if reader, rootDirectory, err := opf.store.Read(outputBaseID); err != nil {
@@ -174,7 +192,7 @@ func (op *persistentOutputPath) saveOutputPath() error {
 	return nil
 }
 
-func saveDirectoryRecursive(d re_fuse.PrepopulatedDirectory, dPath *path.Trace, w outputpathpersistency.Writer) (*outputpathpersistency_pb.Directory, error) {
+func saveDirectoryRecursive(d virtual.PrepopulatedDirectory, dPath *path.Trace, w outputpathpersistency.Writer) (*outputpathpersistency_pb.Directory, error) {
 	directories, leaves, err := d.LookupAllChildren()
 	if err != nil {
 		return nil, util.StatusWrapf(err, "Failed to look up children of directory %#v", dPath.String())
