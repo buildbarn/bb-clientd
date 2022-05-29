@@ -39,7 +39,8 @@ func (opf *inMemoryOutputPathFactory) StartInitialBuild(outputBaseID path.Compon
 			opf.symlinkFactory,
 			errorLogger,
 			opf.handleAllocator,
-			opf.initialContentsSorter),
+			opf.initialContentsSorter,
+			/* hiddenFilesMatcher = */ func(string) bool { return false }),
 	}
 }
 

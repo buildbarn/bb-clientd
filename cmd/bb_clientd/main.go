@@ -260,7 +260,8 @@ func main() {
 				symlinkFactory,
 				util.DefaultErrorLogger,
 				rootHandleAllocator,
-				sort.Sort),
+				sort.Sort,
+				/* hiddenFilesMatcher = */ func(string) bool { return false }),
 		}))
 
 	if err := mount.Expose(rootDirectory); err != nil {
