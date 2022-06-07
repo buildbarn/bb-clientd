@@ -204,15 +204,24 @@ func TestPersistentOutputPathFactoryStartInitialBuild(t *testing.T) {
 						IsExecutable: true,
 					},
 				},
+				Symlinks: []*remoteexecution.SymlinkNode{
+					{
+						Name:   "symlink1",
+						Target: "target1",
+					},
+				},
 			},
 		}, nil)
 		file1 := mock.NewMockNativeLeaf(ctrl)
 		casFileFactory.EXPECT().LookupFile(digest.MustNewDigest("default", "f132632084ca4e2124fbc88223901e3976e126ebb8f8cc5a09116a0191369d9b", 34), false).Return(file1)
 		file2 := mock.NewMockNativeLeaf(ctrl)
 		casFileFactory.EXPECT().LookupFile(digest.MustNewDigest("default", "ce22e2423b7d501d45f6b8aeab15cb40f28c73fb2edfe03e0f3cd450583fcef8", 42), true).Return(file2)
+		symlink1 := mock.NewMockNativeLeaf(ctrl)
+		symlinkFactory.EXPECT().LookupSymlink([]byte("target1")).Return(symlink1)
 		baseOutputPath.EXPECT().CreateChildren(map[path.Component]re_vfs.InitialNode{
-			path.MustNewComponent("file1"): {Leaf: file1},
-			path.MustNewComponent("file2"): {Leaf: file2},
+			path.MustNewComponent("file1"):    {Leaf: file1},
+			path.MustNewComponent("file2"):    {Leaf: file2},
+			path.MustNewComponent("symlink1"): {Leaf: symlink1},
 		}, true)
 		reader.EXPECT().Close()
 		clock.EXPECT().Now().Return(time.Unix(1000, 0))

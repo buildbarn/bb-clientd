@@ -127,6 +127,7 @@ func (opf *persistentOutputPathFactory) StartInitialBuild(outputBaseID path.Comp
 		sr := stateRestorer{
 			casFileFactory: casFileFactory,
 			instanceName:   instanceName,
+			symlinkFactory: opf.symlinkFactory,
 		}
 		err = sr.restoreDirectoryRecursive(reader, rootDirectory.Contents, d, nil)
 		reader.Close()
