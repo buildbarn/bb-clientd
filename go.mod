@@ -6,7 +6,7 @@ replace github.com/gordonklaus/ineffassign => github.com/gordonklaus/ineffassign
 
 require (
 	github.com/bazelbuild/remote-apis v0.0.0-20220510175640-3b4b64021035
-	github.com/buildbarn/bb-remote-execution v0.0.0-20220529175532-86db6b9e9f24
+	github.com/buildbarn/bb-remote-execution v0.0.0-20220609221633-dab89519c061
 	github.com/buildbarn/bb-storage v0.0.0-20220409201227-01fc04b652f6
 	golang.org/x/sync v0.0.0-20220513210516-0976fa681c29
 	google.golang.org/genproto v0.0.0-20220527130721-00d5c0f3be58

@@ -193,7 +193,7 @@ func main() {
 	symlinkFactory := re_vfs.NewHandleAllocatingSymlinkFactory(
 		re_vfs.BaseSymlinkFactory,
 		rootHandleAllocator.New())
-	outputPathFactory := cd_vfs.NewInMemoryOutputPathFactory(filePool, symlinkFactory, rootHandleAllocator, sort.Sort)
+	outputPathFactory := cd_vfs.NewInMemoryOutputPathFactory(filePool, symlinkFactory, rootHandleAllocator, sort.Sort, clock.SystemClock)
 	if persistencyConfiguration := configuration.OutputPathPersistency; persistencyConfiguration != nil {
 		// Upload local files at the end of every build. This
 		// decorator needs to be added before
@@ -261,7 +261,8 @@ func main() {
 				util.DefaultErrorLogger,
 				rootHandleAllocator,
 				sort.Sort,
-				/* hiddenFilesMatcher = */ func(string) bool { return false }),
+				/* hiddenFilesMatcher = */ func(string) bool { return false },
+				clock.SystemClock),
 		}))
 
 	if err := mount.Expose(rootDirectory); err != nil {

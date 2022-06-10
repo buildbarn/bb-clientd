@@ -4,6 +4,7 @@ import (
 	"context"
 	"syscall"
 	"testing"
+	"time"
 
 	remoteexecution "github.com/bazelbuild/remote-apis/build/bazel/remote/execution/v2"
 	"github.com/buildbarn/bb-clientd/internal/mock"
@@ -18,7 +19,7 @@ import (
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"google.golang.org/protobuf/types/known/emptypb"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 func TestRemoteOutputServiceDirectoryClean(t *testing.T) {
@@ -835,6 +836,10 @@ func TestRemoteOutputServiceDirectoryBatchStat(t *testing.T) {
 		// Lookup of "directory". pointing directly to a directory.
 		directory1 := mock.NewMockPrepopulatedDirectory(ctrl)
 		outputPath.EXPECT().LookupChild(path.MustNewComponent("directory")).Return(directory1, nil, nil)
+		directory1.EXPECT().VirtualGetAttributes(re_vfs.AttributesMaskLastDataModificationTime, gomock.Any()).
+			Do(func(requested re_vfs.AttributesMask, attributes *re_vfs.Attributes) {
+				attributes.SetLastDataModificationTime(time.Unix(1000, 0))
+			})
 
 		// Lookup of "nested/symlink_internal_relative_file",
 		// being a symlink that points to a file.
@@ -864,6 +869,10 @@ func TestRemoteOutputServiceDirectoryBatchStat(t *testing.T) {
 		leaf4 := mock.NewMockNativeLeaf(ctrl)
 		directory3.EXPECT().LookupChild(path.MustNewComponent("symlink_internal_relative_directory")).Return(nil, leaf4, nil)
 		leaf4.EXPECT().Readlink().Return("..", nil)
+		outputPath.EXPECT().VirtualGetAttributes(re_vfs.AttributesMaskLastDataModificationTime, gomock.Any()).
+			Do(func(requested re_vfs.AttributesMask, attributes *re_vfs.Attributes) {
+				attributes.SetLastDataModificationTime(time.Unix(1001, 0))
+			})
 
 		// Lookup of "nested/symlink_internal_absolute_path",
 		// being a symlink containing an absolute path starting
@@ -875,6 +884,10 @@ func TestRemoteOutputServiceDirectoryBatchStat(t *testing.T) {
 		leaf5.EXPECT().Readlink().Return("/home/bob/bb_clientd/outputs/9da951b8cb759233037166e28f7ea186/hello", nil)
 		directory5 := mock.NewMockPrepopulatedDirectory(ctrl)
 		outputPath.EXPECT().LookupChild(path.MustNewComponent("hello")).Return(directory5, nil, nil)
+		directory5.EXPECT().VirtualGetAttributes(re_vfs.AttributesMaskLastDataModificationTime, gomock.Any()).
+			Do(func(requested re_vfs.AttributesMask, attributes *re_vfs.Attributes) {
+				attributes.SetLastDataModificationTime(time.Unix(1002, 0))
+			})
 
 		// Lookup of "nested/symlink_internal_absolute_alias",
 		// being a symlink containing an absolute path starting
@@ -886,6 +899,10 @@ func TestRemoteOutputServiceDirectoryBatchStat(t *testing.T) {
 		leaf6.EXPECT().Readlink().Return("/home/bob/.cache/bazel/_bazel_bob/9da951b8cb759233037166e28f7ea186/execroot/myproject/bazel-out/hello", nil)
 		directory7 := mock.NewMockPrepopulatedDirectory(ctrl)
 		outputPath.EXPECT().LookupChild(path.MustNewComponent("hello")).Return(directory7, nil, nil)
+		directory7.EXPECT().VirtualGetAttributes(re_vfs.AttributesMaskLastDataModificationTime, gomock.Any()).
+			Do(func(requested re_vfs.AttributesMask, attributes *re_vfs.Attributes) {
+				attributes.SetLastDataModificationTime(time.Unix(1003, 0))
+			})
 
 		// Lookup of "nested/symlink_external", being a symlink
 		// containing an absolute path that doesn't start with
@@ -898,6 +915,12 @@ func TestRemoteOutputServiceDirectoryBatchStat(t *testing.T) {
 
 		// Lookup of "nonexistent".
 		outputPath.EXPECT().LookupChild(path.MustNewComponent("nonexistent")).Return(nil, nil, syscall.ENOENT)
+
+		// Lookup of ".".
+		outputPath.EXPECT().VirtualGetAttributes(re_vfs.AttributesMaskLastDataModificationTime, gomock.Any()).
+			Do(func(requested re_vfs.AttributesMask, attributes *re_vfs.Attributes) {
+				attributes.SetLastDataModificationTime(time.Unix(1004, 0))
+			})
 
 		response, err := d.BatchStat(ctx, &remoteoutputservice.BatchStatRequest{
 			BuildId:           "37f5dbef-b117-4fb6-bce8-5c147cb603b4",
@@ -936,8 +959,10 @@ func TestRemoteOutputServiceDirectoryBatchStat(t *testing.T) {
 				// "directory".
 				{
 					FileStatus: &remoteoutputservice.FileStatus{
-						FileType: &remoteoutputservice.FileStatus_Directory{
-							Directory: &emptypb.Empty{},
+						FileType: &remoteoutputservice.FileStatus_Directory_{
+							Directory: &remoteoutputservice.FileStatus_Directory{
+								LastModifiedTime: &timestamppb.Timestamp{Seconds: 1000},
+							},
 						},
 					},
 				},
@@ -957,24 +982,30 @@ func TestRemoteOutputServiceDirectoryBatchStat(t *testing.T) {
 				// "nested/symlink_internal_relative_directory".
 				{
 					FileStatus: &remoteoutputservice.FileStatus{
-						FileType: &remoteoutputservice.FileStatus_Directory{
-							Directory: &emptypb.Empty{},
+						FileType: &remoteoutputservice.FileStatus_Directory_{
+							Directory: &remoteoutputservice.FileStatus_Directory{
+								LastModifiedTime: &timestamppb.Timestamp{Seconds: 1001},
+							},
 						},
 					},
 				},
 				// "nested/symlink_internal_absolute_path".
 				{
 					FileStatus: &remoteoutputservice.FileStatus{
-						FileType: &remoteoutputservice.FileStatus_Directory{
-							Directory: &emptypb.Empty{},
+						FileType: &remoteoutputservice.FileStatus_Directory_{
+							Directory: &remoteoutputservice.FileStatus_Directory{
+								LastModifiedTime: &timestamppb.Timestamp{Seconds: 1002},
+							},
 						},
 					},
 				},
 				// "nested/symlink_internal_absolute_alias".
 				{
 					FileStatus: &remoteoutputservice.FileStatus{
-						FileType: &remoteoutputservice.FileStatus_Directory{
-							Directory: &emptypb.Empty{},
+						FileType: &remoteoutputservice.FileStatus_Directory_{
+							Directory: &remoteoutputservice.FileStatus_Directory{
+								LastModifiedTime: &timestamppb.Timestamp{Seconds: 1003},
+							},
 						},
 					},
 				},
@@ -1013,8 +1044,10 @@ func TestRemoteOutputServiceDirectoryBatchStat(t *testing.T) {
 				// ".".
 				{
 					FileStatus: &remoteoutputservice.FileStatus{
-						FileType: &remoteoutputservice.FileStatus_Directory{
-							Directory: &emptypb.Empty{},
+						FileType: &remoteoutputservice.FileStatus_Directory_{
+							Directory: &remoteoutputservice.FileStatus_Directory{
+								LastModifiedTime: &timestamppb.Timestamp{Seconds: 1004},
+							},
 						},
 					},
 				},

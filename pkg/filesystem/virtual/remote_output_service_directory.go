@@ -17,6 +17,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type buildState struct {
@@ -545,9 +546,7 @@ func (cw *statWalker) OnScope(absolute bool) (path.ComponentWalker, error) {
 	}
 	// Currently in a known directory.
 	cw.fileStatus = &remoteoutputservice.FileStatus{
-		FileType: &remoteoutputservice.FileStatus_Directory{
-			Directory: &emptypb.Empty{},
-		},
+		FileType: &remoteoutputservice.FileStatus_Directory_{},
 	}
 	return cw, nil
 }
@@ -577,7 +576,9 @@ func (cw *statWalker) OnDirectory(name path.Component) (path.GotDirectoryOrSymli
 
 	// Got a symbolic link in the middle of a path. Those should
 	// always be followed.
-	cw.fileStatus = nil
+	cw.fileStatus = &remoteoutputservice.FileStatus{
+		FileType: &remoteoutputservice.FileStatus_External_{},
+	}
 	return path.GotSymlink{
 		Parent: cw,
 		Target: target,
@@ -593,6 +594,7 @@ func (cw *statWalker) OnTerminal(name path.Component) (*path.GotSymlink, error) 
 
 	if directory != nil {
 		// Got a directory. The existing FileStatus is sufficient.
+		cw.stack = append(cw.stack, directory)
 		return nil, nil
 	}
 
@@ -600,7 +602,9 @@ func (cw *statWalker) OnTerminal(name path.Component) (*path.GotSymlink, error) 
 		target, err := leaf.Readlink()
 		if err == nil {
 			// Got a symbolic link, and we should follow it.
-			cw.fileStatus = nil
+			cw.fileStatus = &remoteoutputservice.FileStatus{
+				FileType: &remoteoutputservice.FileStatus_External_{},
+			}
 			return &path.GotSymlink{
 				Parent: cw,
 				Target: target,
@@ -621,7 +625,9 @@ func (cw *statWalker) OnTerminal(name path.Component) (*path.GotSymlink, error) 
 
 func (cw *statWalker) OnUp() (path.ComponentWalker, error) {
 	if len(cw.stack) == 1 {
-		cw.fileStatus = nil
+		cw.fileStatus = &remoteoutputservice.FileStatus{
+			FileType: &remoteoutputservice.FileStatus_External_{},
+		}
 		return path.VoidComponentWalker, nil
 	}
 	cw.stack = cw.stack[:len(cw.stack)-1]
@@ -649,6 +655,9 @@ func (d *RemoteOutputServiceDirectory) BatchStat(ctx context.Context, request *r
 		statWalker := statWalker{
 			followSymlinks: request.FollowSymlinks,
 			stack:          []virtual.PrepopulatedDirectory{outputPathState.rootDirectory},
+			fileStatus: &remoteoutputservice.FileStatus{
+				FileType: &remoteoutputservice.FileStatus_External_{},
+			},
 		}
 		if request.IncludeFileDigest {
 			statWalker.digestFunction = &buildState.digestFunction
@@ -662,22 +671,30 @@ func (d *RemoteOutputServiceDirectory) BatchStat(ctx context.Context, request *r
 		} else if err != nil {
 			// Some other error occurred.
 			return nil, util.StatusWrapf(err, "Failed to resolve path %#v beyond %#v", statPath, resolvedPath.String())
-		} else if statWalker.fileStatus == nil {
-			// Path resolves to a location outside the file
-			// system. Return the resolved path back to the
-			// client, so it can stat() it manually.
-			response.Responses = append(response.Responses, &remoteoutputservice.StatResponse{
-				FileStatus: &remoteoutputservice.FileStatus{
-					FileType: &remoteoutputservice.FileStatus_External_{
-						External: &remoteoutputservice.FileStatus_External{
-							NextPath: resolvedPath.String(),
-						},
-					},
-				},
-			})
 		} else {
-			// Path resolved to a location inside the file system.
-			// Return the stat response that was captured.
+			switch fileType := statWalker.fileStatus.FileType.(type) {
+			case *remoteoutputservice.FileStatus_Directory_:
+				// For directories we need to provide the last
+				// modification time, as the client uses that to
+				// invalidate cached results.
+				d := statWalker.stack[len(statWalker.stack)-1]
+				var attributes virtual.Attributes
+				d.VirtualGetAttributes(virtual.AttributesMaskLastDataModificationTime, &attributes)
+				lastModifiedTime, ok := attributes.GetLastDataModificationTime()
+				if !ok {
+					panic("Directory did not provide a last data modification time, even though the Remote Output Service protocol requires it")
+				}
+				fileType.Directory = &remoteoutputservice.FileStatus_Directory{
+					LastModifiedTime: timestamppb.New(lastModifiedTime),
+				}
+			case *remoteoutputservice.FileStatus_External_:
+				// Path resolves to a location outside the file
+				// system. Return the resolved path back to the
+				// client, so it can stat() it manually.
+				fileType.External = &remoteoutputservice.FileStatus_External{
+					NextPath: resolvedPath.String(),
+				}
+			}
 			response.Responses = append(response.Responses, &remoteoutputservice.StatResponse{
 				FileStatus: statWalker.fileStatus,
 			})
