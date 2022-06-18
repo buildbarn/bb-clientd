@@ -103,6 +103,14 @@ gomock(
 )
 
 gomock(
+    name = "re_filesystem",
+    out = "re_filesystem.go",
+    interfaces = ["FilePool"],
+    library = "@com_github_buildbarn_bb_remote_execution//pkg/filesystem",
+    package = "mock",
+)
+
+gomock(
     name = "re_filesystem_virtual",
     out = "re_filesystem_virtual.go",
     interfaces = [
@@ -151,6 +159,7 @@ go_library(
         ":outputpathpersistency.go",
         ":random.go",
         ":re_cas.go",
+        ":re_filesystem.go",
         ":re_filesystem_virtual.go",
         ":storage_util.go",
     ],

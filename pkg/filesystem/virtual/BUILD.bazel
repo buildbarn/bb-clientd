@@ -49,6 +49,7 @@ go_test(
     srcs = [
         "content_addressable_storage_directory_test.go",
         "digest_parsing_directory_test.go",
+        "in_memory_output_path_factory_test.go",
         "instance_name_parsing_directory_test.go",
         "local_file_uploading_output_path_factory_test.go",
         "persistent_output_path_factory_test.go",

@@ -27,6 +27,7 @@ func NewInMemoryOutputPathFactory(filePool filesystem.FilePool, symlinkFactory v
 		symlinkFactory:        symlinkFactory,
 		handleAllocator:       handleAllocator,
 		initialContentsSorter: initialContentsSorter,
+		clock:                 clock,
 	}
 }
 
