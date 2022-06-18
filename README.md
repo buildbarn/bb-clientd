@@ -38,11 +38,11 @@ bb\_clientd:
 ```sh
 umount ~/bb_clientd; fusermount -u ~/bb_clientd
 mkdir -p ~/.cache/bb_clientd/cas/persistent_state ~/.cache/bb_clientd/outputs ~/bb_clientd
-bazel run //cmd/bb_clientd $(bazel info workspace)/configs/bb_clientd.jsonnet
+OS=$(uname) bazel run //cmd/bb_clientd $(bazel info workspace)/configs/bb_clientd.jsonnet
 ```
 
 You may validate that bb\_clientd is running by inspecting the top-level
-directory of its FUSE mount:
+directory of its FUSE (Linux) or NFSv4 (macOS) mount:
 
 ```
 $ ls -l ~/bb_clientd
@@ -107,8 +107,8 @@ Remote Execution service. This means that bb\_clientd can give you
 direct access to your cluster's Content Addressable Storage, at least
 until your token expires or bb\_clientd restarts.
 
-The FUSE file system provided by bb\_clientd automatically generates a
-"blobs" directory for every instance name provided:
+The FUSE/NFSv4 file system provided by bb\_clientd automatically
+generates a "blobs" directory for every instance name provided:
 
 ```
 $ ls -l ~/bb_clientd/cas/mycluster-prod.example.com/hello/blobs
@@ -142,8 +142,8 @@ and is cached locally.
 
 ### ... as a playground
 
-The FUSE file system also provides a "scratch" directory that you can
-(mostly) use like an ordinary directory on your system. Because it
+The FUSE/NFSv4 file system also provides a "scratch" directory that you
+can (mostly) use like an ordinary directory on your system. Because it
 resides on the same file system as the "cas" directory shown above, it
 is possible to create hard links to files that are backed by the Content
 Addressable Storage. This may be useful when trying to reproduce
@@ -191,10 +191,10 @@ disadvantages:
 
 To solve these issues, bb\_clientd implements a gRPC API named the
 Remote Output Service. Bazel can use this API to store the entire
-`bazel-out/` directory inside the FUSE file system. Every time Bazel
-needs to download a file from the Remote Execution service, it calls
-into a `BatchCreate()` gRPC method. bb\_clientd implements this method
-by creating lazy-loading files, just like the ones in the "cas"
+`bazel-out/` directory inside the FUSE/NFSv4 file system. Every time
+Bazel needs to download a file from the Remote Execution service, it
+calls into a `BatchCreate()` gRPC method. bb\_clientd implements this
+method by creating lazy-loading files, just like the ones in the "cas"
 directory. This means that you can enjoy the performance improvements of
 "Remote Builds without the Bytes", but not with the restrictions that it
 currently imposes.

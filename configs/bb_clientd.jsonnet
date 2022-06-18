@@ -1,13 +1,16 @@
 // List of clusters to which bb_clientd is permitted to connect.
-local clusters = [
-  'mycluster-prod.example.com',
-  'mycluster-qa.example.com',
-  'mycluster-dev.example.com',
-];
+local clusters = {
+  'mycluster-prod.example.com': 'api.mycluster-prod.example.com',
+  'mycluster-qa.example.com': 'api.mycluster-qa.example.com',
+  'mycluster-dev.example.com': 'api.mycluster-dev.example.com',
+};
 
-local grpcClient(cluster) = {
-  address: cluster + ':443',
+local grpcClient(hostname, authorizationHeader, proxyURL) = {
+  address: hostname + ':443',
   tls: {},
+  [if authorizationHeader != null then 'addMetadata']: [
+    { header: 'authorization', values: [authorizationHeader] },
+  ],
   forwardMetadata: ['build.bazel.remote.execution.v2.requestmetadata-bin'],
   // Enable gRPC keepalives. Make sure to tune these settings based on
   // what your cluster permits.
@@ -15,16 +18,19 @@ local grpcClient(cluster) = {
     time: '60s',
     timeout: '30s',
   },
+  proxyUrl: proxyURL,
 };
 
 // Route requests to one of the clusters listed above by parsing the
 // prefix of the instance name. This prefix will be stripped on outgoing
 // requests.
-local blobstoreConfig = {
+local blobstoreConfig(authorizationHeader, proxyURL) = {
   demultiplexing: {
     instanceNamePrefixes: {
-      [cluster]: { backend: { grpc: grpcClient(cluster) } }
-      for cluster in clusters
+      [cluster]: { backend: {
+        grpc: grpcClient(clusters[cluster], authorizationHeader, proxyURL),
+      } }
+      for cluster in std.objectFields(clusters)
     },
   },
 };
@@ -41,15 +47,26 @@ local cacheDirectory = homeDirectory + '/.cache/bb_clientd';
   // Maximum supported Protobuf message size.
   maximumMessageSizeBytes: 16 * 1024 * 1024,
 
+  // When set, don't forward credentials from Bazel to clusters and
+  // office caches. Instead, use a static credentials in the form of a
+  // HTTP "Authorization" header.
+  authorizationHeader:: null,
+
+  // HTTP proxy to use for all outgoing requests not going to office caches.
+  proxyURL:: '',
+
+  // If enabled, use NFSv4 instead of FUSE.
+  useNFSv4:: std.extVar('OS') == 'Darwin',
+
   // Backends for the Action Cache and Content Addressable Storage.
   blobstore: {
-    actionCache: blobstoreConfig,
+    actionCache: blobstoreConfig($.authorizationHeader, $.proxyURL),
     contentAddressableStorage: {
       readCaching: {
         // Clusters are the source of truth.
         slow: {
           existenceCaching: {
-            backend: blobstoreConfig,
+            backend: blobstoreConfig($.authorizationHeader, $.proxyURL),
             // Assume that if FindMissingBlobs() reports a blob as being
             // present, it's going to stay around for five more minutes.
             // This significantly reduces the combined size of
@@ -118,8 +135,10 @@ local cacheDirectory = homeDirectory + '/.cache/bb_clientd';
   // Schedulers to which to route execution requests. This uses the same
   // routing policy as the storage configuration above.
   schedulers: {
-    [cluster]: { endpoint: grpcClient(cluster) }
-    for cluster in clusters
+    [cluster]: {
+      endpoint: grpcClient(clusters[cluster], $.authorizationHeader, $.proxyURL),
+    }
+    for cluster in std.objectFields(clusters)
   },
 
   // A gRPC server to which Bazel can send requests, as opposed to
@@ -130,10 +149,20 @@ local cacheDirectory = homeDirectory + '/.cache/bb_clientd';
     authenticationPolicy: { allow: {} },
   }],
 
-  // The FUSE file system through which data stored in the Content
-  // Addressable Storage can be loaded lazily. This file system relies
-  // on credentials captured through gRPC.
-  mount: {
+  // The FUSE or NFSv4 file system through which data stored in the
+  // Content Addressable Storage can be loaded lazily. This file system
+  // relies on credentials captured through gRPC.
+  mount: if $.useNFSv4 then {
+    mountPath: homeDirectory + '/bb_clientd',
+    nfsv4: {
+      enforcedLeaseTime: '120s',
+      announcedLeaseTime: '60s',
+      darwin: {
+        minimumDirectoriesAttributeCacheTimeout: '0s',
+        maximumDirectoriesAttributeCacheTimeout: '0s',
+      },
+    },
+  } else {
     mountPath: homeDirectory + '/bb_clientd',
     fuse: {
       directoryEntryValidity: '300s',
@@ -171,7 +200,7 @@ local cacheDirectory = homeDirectory + '/.cache/bb_clientd';
     logPaths: [cacheDirectory + '/log'],
 
     // Attach credentials provided by Bazel to all outgoing gRPC calls.
-    grpcForwardAndReuseMetadata: ['authorization'],
+    [if $.authorizationHeader == null then 'grpcForwardAndReuseMetadata']: ['authorization'],
 
     // Optional: create a HTTP server that exposes Prometheus metrics
     // and allows debugging using pprof. Make sure to only enable it
