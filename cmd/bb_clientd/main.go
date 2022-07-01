@@ -49,9 +49,12 @@ func main() {
 	if err != nil {
 		log.Fatal("Failed to apply global configuration options: ", err)
 	}
+	terminationContext, terminationGroup := global.InstallGracefulTerminationHandler()
 
 	// Storage access.
 	bareContentAddressableStorage, actionCache, err := blobstore_configuration.NewCASAndACBlobAccessFromConfiguration(
+		terminationContext,
+		terminationGroup,
 		configuration.Blobstore,
 		grpcClientFactory,
 		int(configuration.MaximumMessageSizeBytes))
