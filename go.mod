@@ -9,9 +9,9 @@ replace github.com/golang/mock => github.com/golang/mock v1.6.1-0.20220512030613
 replace github.com/gordonklaus/ineffassign => github.com/gordonklaus/ineffassign v0.0.0-20201223204552-cba2d2a1d5d9
 
 require (
-	github.com/bazelbuild/remote-apis v0.0.0-20220510175640-3b4b64021035
+	github.com/bazelbuild/remote-apis v0.0.0-20220704144913-f1cd5229e3e5
 	github.com/buildbarn/bb-remote-execution v0.0.0-20220701054925-679e6da5d5b9
-	github.com/buildbarn/bb-storage v0.0.0-20220701050019-3f0259c1cd28
+	github.com/buildbarn/bb-storage v0.0.0-20220704171601-9233317bd73e
 	golang.org/x/sync v0.0.0-20220601150217-0de741cfad7f
 	google.golang.org/genproto v0.0.0-20220630174209-ad1d48641aa7
 	google.golang.org/grpc v1.47.0

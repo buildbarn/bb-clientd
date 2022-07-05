@@ -155,8 +155,8 @@ def go_dependencies():
         name = "com_github_bazelbuild_remote_apis",
         importpath = "github.com/bazelbuild/remote-apis",
         patches = ["@com_github_buildbarn_bb_storage//:patches/com_github_bazelbuild_remote_apis/golang.diff"],
-        sum = "h1:Zf6l8jLGtvSgdpqqiCRtLvF99VsoDD++uz7eSxvIafE=",
-        version = "v0.0.0-20220510175640-3b4b64021035",
+        sum = "h1:W7ZkUHjVx0JK9AEdVhtRdIWl36dJMGMVgG7pNPt/OSc=",
+        version = "v0.0.0-20220704144913-f1cd5229e3e5",
     )
     go_repository(
         name = "com_github_beorn7_perks",
@@ -173,8 +173,8 @@ def go_dependencies():
     go_repository(
         name = "com_github_buildbarn_bb_storage",
         importpath = "github.com/buildbarn/bb-storage",
-        sum = "h1:xX4tjLv5Rb6ExVafrpWKo87wNPvxp+OCJRs8cQqMNHA=",
-        version = "v0.0.0-20220701050019-3f0259c1cd28",
+        sum = "h1:vvd95mnx2dOJA1qCJ8TCwtEvyQF+lBI86Sz4HLgy6Qw=",
+        version = "v0.0.0-20220704171601-9233317bd73e",
     )
     go_repository(
         name = "com_github_buildbarn_go_xdr",
