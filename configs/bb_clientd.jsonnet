@@ -11,7 +11,7 @@ local grpcClient(hostname, authorizationHeader, proxyURL) = {
   [if authorizationHeader != null then 'addMetadata']: [
     { header: 'authorization', values: [authorizationHeader] },
   ],
-  forwardMetadata: ['build.bazel.remote.execution.v2.requestmetadata-bin'],
+  addMetadataJmespathExpression: '{"build.bazel.remote.execution.v2.requestmetadata-bin": incomingGRPCMetadata."build.bazel.remote.execution.v2.requestmetadata-bin"}',
   // Enable gRPC keepalives. Make sure to tune these settings based on
   // what your cluster permits.
   keepalive: {
