@@ -37,7 +37,11 @@ bb\_clientd:
 
 ```sh
 umount ~/bb_clientd; fusermount -u ~/bb_clientd
-mkdir -p ~/.cache/bb_clientd/cas/persistent_state ~/.cache/bb_clientd/outputs ~/bb_clientd
+mkdir -p \
+    ~/.cache/bb_clientd/ac/persistent_state \
+    ~/.cache/bb_clientd/cas/persistent_state \
+    ~/.cache/bb_clientd/outputs \
+    ~/bb_clientd
 OS=$(uname) bazel run //cmd/bb_clientd $(bazel info workspace)/configs/bb_clientd.jsonnet
 ```
 
@@ -91,6 +95,21 @@ Notice how the hostname of the cluster has become a prefix of
 configuration provides support for routing requests to multiple
 clusters. It uses the instance name to determine to which cluster
 traffic needs to be routed.
+
+### ... as a system local cache
+
+bb\_clientd's example configuration also reserves instance names
+`local/*` to act as a general purpose remote cache, where each instance
+name acts as its own namespace. This means that if you want to cache the
+results of a build performed locally, you may run Bazel as follows:
+
+```
+bazel build --remote_cache unix:${HOME}/.cache/bb_clientd/grpc --remote_instance_name local/some/project [more options]
+```
+
+The advantage of this option over Bazel's own `--disk_cache` flag is
+that the cache space is bounded in size and shared with that of
+bb\_clientd's proxy feature.
 
 ### ... as a tool for exploring the Content Addressable Storage
 
