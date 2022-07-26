@@ -1,0 +1,12 @@
+# systemd unit file for bb_clientd.
+
+[Unit]
+Description=The Buildbarn client daemon
+
+[Service]
+ExecStart=/usr/lib/bb_clientd/launch_bb_clientd_linux.sh start
+ExecStopPost=/usr/lib/bb_clientd/launch_bb_clientd_linux.sh cleanup
+Restart=always
+
+[Install]
+WantedBy=default.target

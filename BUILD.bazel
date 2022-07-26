@@ -1,4 +1,5 @@
 load("@bazel_gazelle//:def.bzl", "gazelle")
+load("@rules_pkg//:pkg.bzl", "pkg_deb", "pkg_tar")
 
 # gazelle:prefix github.com/buildbarn/bb-clientd
 # gazelle:resolve proto pkg/proto/configuration/blobstore/blobstore.proto @com_github_buildbarn_bb_storage//pkg/proto/configuration/blobstore:blobstore_proto
@@ -15,4 +16,29 @@ load("@bazel_gazelle//:def.bzl", "gazelle")
 # gazelle:resolve proto go pkg/proto/configuration/grpc/grpc.proto @com_github_buildbarn_bb_storage//pkg/proto/configuration/grpc
 gazelle(
     name = "gazelle",
+)
+
+pkg_tar(
+    name = "bb_clientd_deb_data",
+    extension = "tar.gz",
+    files = {
+        "//cmd/bb_clientd": "/usr/bin/bb_clientd",
+        ":configs/bb_clientd.jsonnet": "/usr/lib/bb_clientd/bb_clientd.jsonnet",
+        ":configs/linux/launch_bb_clientd_linux.sh": "/usr/lib/bb_clientd/launch_bb_clientd_linux.sh",
+        ":configs/linux/logind.conf": "/etc/systemd/logind.conf.d/bb_clientd.conf",
+        ":configs/linux/systemd.service": "/usr/lib/systemd/user/bb_clientd.service",
+    },
+)
+
+pkg_deb(
+    name = "bb_clientd_deb",
+    architecture = "amd64",
+    data = ":bb_clientd_deb_data",
+    depends = ["fuse"],
+    description = "The Buildbarn client daemon",
+    homepage = "https://github.com/buildbarn/bb-clientd",
+    maintainer = "The Buildbarn team",
+    package = "bb-clientd",
+    postinst = "configs/linux/postinst.sh",
+    version = "0.0.0",
 )
