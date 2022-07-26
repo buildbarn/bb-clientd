@@ -135,7 +135,7 @@ name acts as its own namespace. This means that if you want to cache the
 results of a build performed locally, you may run Bazel as follows:
 
 ```
-bazel build --remote_cache unix:${HOME}/.cache/bb_clientd/grpc --remote_instance_name local/some/project [more options]
+bazel build --remote_cache unix:${HOME}/.cache/bb_clientd/grpc --remote_instance_name local/some/project --remote_upload_local_results=true [more options]
 ```
 
 The advantage of this option over Bazel's own `--disk_cache` flag is
