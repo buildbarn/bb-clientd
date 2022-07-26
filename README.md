@@ -21,14 +21,14 @@ features.
 There are various ways in which a copy of bb\_clientd may be obtained:
 
 - By running `bazel run //cmd/bb_clientd` inside this repository.
-- By downloading [a precompiled binary built through GitHub Actions](https://github.com/buildbarn/bb-clientd/actions?query=workflow%3Amaster).
+- By downloading [a precompiled binary or package built through GitHub Actions](https://github.com/buildbarn/bb-clientd/actions?query=workflow%3Amaster).
 - By downloading [a container image from Docker Hub](https://hub.docker.com/r/buildbarn/bb-clientd).
+  Keep in mind that running bb\_clientd inside a Docker container may
+  require it to be privileged, as bb\_clientd creates a FUSE mount.
 
-bb\_clientd is only available for Linux and macOS for the time being.
-Keep in mind that running bb\_clientd inside a Docker container may
-require it to be privileged, as bb\_clientd creates a FUSE mount.
+## Running bb\_clientd...
 
-## Running bb\_clientd
+### ... from within this source tree
 
 After carefully reviewing the contents of
 [configs/bb\_clientd.jsonnet](configs/bb_clientd.jsonnet) and making
@@ -54,6 +54,37 @@ total 0
 d--x--x--x  1 root  wheel  0 Jan  1  2000 cas
 dr-xr-xr-x  2 root  wheel  0 Jan  1  2000 outputs
 drwxrwxrwx  1 root  wheel  0 Jan  1  2000 scratch
+```
+
+### ... as a systemd service
+
+After installing the bb\_clientd Debian package ([available through GitHub Actions](https://github.com/buildbarn/bb-clientd/actions?query=workflow%3Amaster))
+you may launch it for any user on the system by running the following
+commands:
+
+```sh
+systemctl enable --user bb_clientd
+systemctl start --user bb_clientd
+loginctl enable-linger
+```
+
+The following commands may be used to inspect its status and logs:
+
+```sh
+systemctl status --user bb_clientd
+journalctl --user -u bb_clientd -f
+```
+
+By default, bb\_clientd will use the configuration file that is also
+shipped with this repository. It is possible to override configuration
+options by creating a file named `~/.config/bb_clientd.jsonnet` that
+uses the following structure:
+
+```jsonnet
+local defaultConfiguration = import 'bb_clientd_defaults.jsonnet';
+defaultConfiguration {
+  // Options that you want to override go here.
+}
 ```
 
 ## Using bb\_clientd...
