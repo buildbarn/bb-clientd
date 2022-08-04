@@ -54,12 +54,12 @@ type outputPathState struct {
 // This implementation of the Remote Output Service is relatively
 // simple:
 //
-// - There is no persistency of build information across restarts.
-// - No snapshotting of completed builds takes place, meaning that only
-//   the results of the latest build of a given output base are exposed.
-// - Every output path is backed by an InMemoryPrepopulatedDirectory,
-//   meaning that memory usage may be high.
-// - No automatic garbage collection of old output paths is performed.
+//   - There is no persistency of build information across restarts.
+//   - No snapshotting of completed builds takes place, meaning that only
+//     the results of the latest build of a given output base are exposed.
+//   - Every output path is backed by an InMemoryPrepopulatedDirectory,
+//     meaning that memory usage may be high.
+//   - No automatic garbage collection of old output paths is performed.
 //
 // This implementation should eventually be extended to address the
 // issues listed above.
