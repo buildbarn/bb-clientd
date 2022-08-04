@@ -14,6 +14,7 @@ import (
 	"github.com/buildbarn/bb-storage/pkg/digest"
 	"github.com/buildbarn/bb-storage/pkg/filesystem"
 	"github.com/buildbarn/bb-storage/pkg/filesystem/path"
+	"github.com/buildbarn/bb-storage/pkg/testutil"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
 
@@ -143,7 +144,7 @@ func TestGlobalTreeContextLookupTree(t *testing.T) {
 		// of the tree should be prepended, included the fact
 		// that this applied to loading the root directory.
 		indexedTreeFetcher.EXPECT().GetIndexedTree(ctx, treeDigest).Return(nil, status.Error(codes.Internal, "Server on fire"))
-		errorLogger.EXPECT().Log(status.Error(codes.Internal, "Tree \"e0f28d311a9b2deff103e32f6105b2b29d636c287797ca72077a648cd736cd36-123-hello\" root directory: Server on fire"))
+		errorLogger.EXPECT().Log(testutil.EqStatus(t, status.Error(codes.Internal, "Tree \"e0f28d311a9b2deff103e32f6105b2b29d636c287797ca72077a648cd736cd36-123-hello\" root directory: Server on fire")))
 		reporter := mock.NewMockDirectoryEntryReporter(ctrl)
 
 		require.Equal(t, virtual.StatusErrIO, dRoot.VirtualReadDir(0, 0, reporter))
@@ -156,7 +157,7 @@ func TestGlobalTreeContextLookupTree(t *testing.T) {
 		indexedTreeFetcher.EXPECT().GetIndexedTree(ctx, treeDigest).Return(&cas.IndexedTree{
 			Tree: &remoteexecution.Tree{},
 		}, nil)
-		errorLogger.EXPECT().Log(status.Error(codes.InvalidArgument, "Tree \"e0f28d311a9b2deff103e32f6105b2b29d636c287797ca72077a648cd736cd36-123-hello\" root directory: Tree does not contain a root directory"))
+		errorLogger.EXPECT().Log(testutil.EqStatus(t, status.Error(codes.InvalidArgument, "Tree \"e0f28d311a9b2deff103e32f6105b2b29d636c287797ca72077a648cd736cd36-123-hello\" root directory: Tree does not contain a root directory")))
 		reporter := mock.NewMockDirectoryEntryReporter(ctrl)
 
 		require.Equal(t, virtual.StatusErrIO, dRoot.VirtualReadDir(0, 0, reporter))
@@ -259,7 +260,7 @@ func TestGlobalTreeContextLookupTree(t *testing.T) {
 		// be captured. The error string should make it explicit
 		// which child was being accessed.
 		indexedTreeFetcher.EXPECT().GetIndexedTree(ctx, treeDigest).Return(nil, status.Error(codes.Internal, "Server on fire"))
-		errorLogger.EXPECT().Log(status.Error(codes.Internal, "Tree \"e0f28d311a9b2deff103e32f6105b2b29d636c287797ca72077a648cd736cd36-123-hello\" child directory index 0: Server on fire"))
+		errorLogger.EXPECT().Log(testutil.EqStatus(t, status.Error(codes.Internal, "Tree \"e0f28d311a9b2deff103e32f6105b2b29d636c287797ca72077a648cd736cd36-123-hello\" child directory index 0: Server on fire")))
 		reporter := mock.NewMockDirectoryEntryReporter(ctrl)
 
 		require.Equal(t, virtual.StatusErrIO, dChild.VirtualReadDir(0, 0, reporter))
@@ -273,7 +274,7 @@ func TestGlobalTreeContextLookupTree(t *testing.T) {
 		indexedTreeFetcher.EXPECT().GetIndexedTree(ctx, treeDigest).Return(&cas.IndexedTree{
 			Tree: &remoteexecution.Tree{},
 		}, nil)
-		errorLogger.EXPECT().Log(status.Error(codes.InvalidArgument, "Tree \"e0f28d311a9b2deff103e32f6105b2b29d636c287797ca72077a648cd736cd36-123-hello\" child directory index 0: Directory index exceeds children list length of 0"))
+		errorLogger.EXPECT().Log(testutil.EqStatus(t, status.Error(codes.InvalidArgument, "Tree \"e0f28d311a9b2deff103e32f6105b2b29d636c287797ca72077a648cd736cd36-123-hello\" child directory index 0: Directory index exceeds children list length of 0")))
 		reporter := mock.NewMockDirectoryEntryReporter(ctrl)
 
 		require.Equal(t, virtual.StatusErrIO, dChild.VirtualReadDir(0, 0, reporter))

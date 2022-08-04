@@ -40,7 +40,7 @@ func TestPersistentOutputPathFactoryStartInitialBuild(t *testing.T) {
 		baseOutputPathFactory.EXPECT().StartInitialBuild(outputBaseID, casFileFactory, instanceName, fileErrorLogger).
 			Return(baseOutputPath)
 		store.EXPECT().Read(outputBaseID).Return(nil, nil, status.Error(codes.NotFound, "No data found"))
-		globalErrorLogger.EXPECT().Log(status.Error(codes.NotFound, "Failed to open state file for output path \"1603ee70687380f12cc8e7417a83f581\": No data found"))
+		globalErrorLogger.EXPECT().Log(testutil.EqStatus(t, status.Error(codes.NotFound, "Failed to open state file for output path \"1603ee70687380f12cc8e7417a83f581\": No data found")))
 		clock.EXPECT().Now().Return(time.Unix(1000, 0))
 
 		outputPath := outputPathFactory.StartInitialBuild(outputBaseID, casFileFactory, instanceName, fileErrorLogger)
@@ -59,7 +59,7 @@ func TestPersistentOutputPathFactoryStartInitialBuild(t *testing.T) {
 		reader := mock.NewMockOutputPathPersistencyReadCloser(ctrl)
 		store.EXPECT().Read(outputBaseID).Return(reader, &outputpathpersistency.RootDirectory{}, nil)
 		reader.EXPECT().Close()
-		globalErrorLogger.EXPECT().Log(status.Error(codes.InvalidArgument, "State file for output path \"d0657f2e9484212cb081e8cd6d73e998\" does not contain a root directory"))
+		globalErrorLogger.EXPECT().Log(testutil.EqStatus(t, status.Error(codes.InvalidArgument, "State file for output path \"d0657f2e9484212cb081e8cd6d73e998\" does not contain a root directory")))
 		clock.EXPECT().Now().Return(time.Unix(1000, 0))
 
 		outputPath := outputPathFactory.StartInitialBuild(outputBaseID, casFileFactory, instanceName, fileErrorLogger)
@@ -91,7 +91,7 @@ func TestPersistentOutputPathFactoryStartInitialBuild(t *testing.T) {
 			},
 		}, nil)
 		reader.EXPECT().Close()
-		globalErrorLogger.EXPECT().Log(status.Error(codes.InvalidArgument, "Failed to restore state file for output path \"0226bea917a1c8c9c2ad4f7d4229de01\": Directory \"hello/world\" inside directory \".\" has an invalid name"))
+		globalErrorLogger.EXPECT().Log(testutil.EqStatus(t, status.Error(codes.InvalidArgument, "Failed to restore state file for output path \"0226bea917a1c8c9c2ad4f7d4229de01\": Directory \"hello/world\" inside directory \".\" has an invalid name")))
 		clock.EXPECT().Now().Return(time.Unix(1000, 0))
 
 		outputPath := outputPathFactory.StartInitialBuild(outputBaseID, casFileFactory, instanceName, fileErrorLogger)
@@ -127,7 +127,7 @@ func TestPersistentOutputPathFactoryStartInitialBuild(t *testing.T) {
 		})).Return(nil, nil, status.Error(codes.Internal, "Disk I/O failure"))
 
 		reader.EXPECT().Close()
-		globalErrorLogger.EXPECT().Log(status.Error(codes.Internal, "Failed to restore state file for output path \"054f6c2d674d23e67e011b1bb1ba7a5e\": Failed to load directory \"hello\": Disk I/O failure"))
+		globalErrorLogger.EXPECT().Log(testutil.EqStatus(t, status.Error(codes.Internal, "Failed to restore state file for output path \"054f6c2d674d23e67e011b1bb1ba7a5e\": Failed to load directory \"hello\": Disk I/O failure")))
 		clock.EXPECT().Now().Return(time.Unix(1000, 0))
 
 		outputPath := outputPathFactory.StartInitialBuild(outputBaseID, casFileFactory, instanceName, fileErrorLogger)
@@ -170,7 +170,7 @@ func TestPersistentOutputPathFactoryStartInitialBuild(t *testing.T) {
 		casFileFactory.EXPECT().LookupFile(digest.MustNewDigest("default", "f132632084ca4e2124fbc88223901e3976e126ebb8f8cc5a09116a0191369d9b", 34), false).Return(file1)
 		file1.EXPECT().Unlink()
 		reader.EXPECT().Close()
-		globalErrorLogger.EXPECT().Log(status.Error(codes.InvalidArgument, "Failed to restore state file for output path \"0226bea917a1c8c9c2ad4f7d4229de01\": Failed to obtain digest for file \"file2\": Unknown digest hash length: 20 characters"))
+		globalErrorLogger.EXPECT().Log(testutil.EqStatus(t, status.Error(codes.InvalidArgument, "Failed to restore state file for output path \"0226bea917a1c8c9c2ad4f7d4229de01\": Failed to obtain digest for file \"file2\": Unknown digest hash length: 20 characters")))
 		clock.EXPECT().Now().Return(time.Unix(1000, 0))
 
 		outputPath := outputPathFactory.StartInitialBuild(outputBaseID, casFileFactory, instanceName, fileErrorLogger)

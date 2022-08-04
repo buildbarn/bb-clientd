@@ -12,6 +12,7 @@ import (
 	"github.com/buildbarn/bb-storage/pkg/blobstore/buffer"
 	"github.com/buildbarn/bb-storage/pkg/digest"
 	"github.com/buildbarn/bb-storage/pkg/filesystem/path"
+	"github.com/buildbarn/bb-storage/pkg/testutil"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
 
@@ -79,7 +80,7 @@ func TestLocalFileUploadingOutputPathFactory(t *testing.T) {
 			nil,
 			nil,
 			status.Error(codes.Internal, "I/O error"))
-		globalErrorLogger.EXPECT().Log(status.Error(codes.Internal, "Failed to look up children of directory \"subdirectory\" in output path \"15c974d0b2820c3ae15a237e186cd84b\": I/O error"))
+		globalErrorLogger.EXPECT().Log(testutil.EqStatus(t, status.Error(codes.Internal, "Failed to look up children of directory \"subdirectory\" in output path \"15c974d0b2820c3ae15a237e186cd84b\": I/O error")))
 
 		outputPath.FinalizeBuild(ctx, digestFunction)
 	})
@@ -97,7 +98,7 @@ func TestLocalFileUploadingOutputPathFactory(t *testing.T) {
 			nil)
 		leaf.EXPECT().UploadFile(gomock.Any(), gomock.Any(), gomock.Any()).
 			Return(digest.BadDigest, status.Error(codes.Internal, "Cannot compute digest due to read failure"))
-		globalErrorLogger.EXPECT().Log(status.Error(codes.Internal, "Failed to upload local file \"leaf\" in output path \"15c974d0b2820c3ae15a237e186cd84b\": Cannot compute digest due to read failure"))
+		globalErrorLogger.EXPECT().Log(testutil.EqStatus(t, status.Error(codes.Internal, "Failed to upload local file \"leaf\" in output path \"15c974d0b2820c3ae15a237e186cd84b\": Cannot compute digest due to read failure")))
 
 		outputPath.FinalizeBuild(ctx, digestFunction)
 	})
@@ -123,7 +124,7 @@ func TestLocalFileUploadingOutputPathFactory(t *testing.T) {
 			gomock.Any(),
 			leafDigest.ToSingletonSet(),
 		).Return(digest.EmptySet, status.Error(codes.Internal, "Storage offline"))
-		globalErrorLogger.EXPECT().Log(status.Error(codes.Internal, "Failed to upload the contents of output path \"15c974d0b2820c3ae15a237e186cd84b\": Failed to determine existence of previous batch of blobs: Storage offline"))
+		globalErrorLogger.EXPECT().Log(testutil.EqStatus(t, status.Error(codes.Internal, "Failed to upload the contents of output path \"15c974d0b2820c3ae15a237e186cd84b\": Failed to determine existence of previous batch of blobs: Storage offline")))
 
 		outputPath.FinalizeBuild(ctx, digestFunction)
 	})

@@ -12,6 +12,7 @@ import (
 	"github.com/buildbarn/bb-storage/pkg/digest"
 	"github.com/buildbarn/bb-storage/pkg/filesystem"
 	"github.com/buildbarn/bb-storage/pkg/filesystem/path"
+	"github.com/buildbarn/bb-storage/pkg/testutil"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
 
@@ -140,7 +141,7 @@ func TestContentAddressableStorageDirectoryVirtualLookup(t *testing.T) {
 	t.Run("MalformedDirectory", func(t *testing.T) {
 		// Attempting to look up a directory for which the
 		// digest is malformed.
-		directoryContext.EXPECT().LogError(status.Error(codes.InvalidArgument, "Failed to parse digest for directory \"malformed_directory\": Unknown digest hash length: 41 characters"))
+		directoryContext.EXPECT().LogError(testutil.EqStatus(t, status.Error(codes.InvalidArgument, "Failed to parse digest for directory \"malformed_directory\": Unknown digest hash length: 41 characters")))
 
 		var out re_vfs.Attributes
 		_, _, s := d.VirtualLookup(path.MustNewComponent("malformed_directory"), 0, &out)
@@ -150,7 +151,7 @@ func TestContentAddressableStorageDirectoryVirtualLookup(t *testing.T) {
 	t.Run("MalformedFile", func(t *testing.T) {
 		// Attempting to look up a file for which the digest is
 		// malformed.
-		directoryContext.EXPECT().LogError(status.Error(codes.InvalidArgument, "Failed to parse digest for file \"malformed_file\": Unknown digest hash length: 36 characters"))
+		directoryContext.EXPECT().LogError(testutil.EqStatus(t, status.Error(codes.InvalidArgument, "Failed to parse digest for file \"malformed_file\": Unknown digest hash length: 36 characters")))
 
 		var out re_vfs.Attributes
 		_, _, s := d.VirtualLookup(path.MustNewComponent("malformed_file"), 0, &out)
@@ -279,7 +280,7 @@ func TestContentAddressableStorageDirectoryVirtualReadDir(t *testing.T) {
 				},
 			},
 		}, directoryContentsContext, re_vfs.StatusOK)
-		directoryContext.EXPECT().LogError(status.Error(codes.InvalidArgument, "Directory \"..\" has an invalid name"))
+		directoryContext.EXPECT().LogError(testutil.EqStatus(t, status.Error(codes.InvalidArgument, "Directory \"..\" has an invalid name")))
 		reporter := mock.NewMockDirectoryEntryReporter(ctrl)
 
 		require.Equal(
@@ -302,7 +303,7 @@ func TestContentAddressableStorageDirectoryVirtualReadDir(t *testing.T) {
 				},
 			},
 		}, directoryContentsContext, re_vfs.StatusOK)
-		directoryContext.EXPECT().LogError(status.Error(codes.InvalidArgument, "Failed to parse digest for directory \"hello\": Unknown digest hash length: 41 characters"))
+		directoryContext.EXPECT().LogError(testutil.EqStatus(t, status.Error(codes.InvalidArgument, "Failed to parse digest for directory \"hello\": Unknown digest hash length: 41 characters")))
 		reporter := mock.NewMockDirectoryEntryReporter(ctrl)
 
 		require.Equal(

@@ -13,6 +13,7 @@ import (
 	"github.com/buildbarn/bb-storage/pkg/digest"
 	"github.com/buildbarn/bb-storage/pkg/filesystem"
 	"github.com/buildbarn/bb-storage/pkg/filesystem/path"
+	"github.com/buildbarn/bb-storage/pkg/testutil"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
 
@@ -125,7 +126,7 @@ func TestGlobalDirectoryContextLookupDirectory(t *testing.T) {
 		// of the directory should be prepended to the error
 		// message.
 		directoryFetcher.EXPECT().GetDirectory(ctx, directoryDigest).Return(nil, status.Error(codes.Internal, "Server on fire"))
-		errorLogger.EXPECT().Log(status.Error(codes.Internal, "Directory \"e0f28d311a9b2deff103e32f6105b2b29d636c287797ca72077a648cd736cd36-123-hello\": Server on fire"))
+		errorLogger.EXPECT().Log(testutil.EqStatus(t, status.Error(codes.Internal, "Directory \"e0f28d311a9b2deff103e32f6105b2b29d636c287797ca72077a648cd736cd36-123-hello\": Server on fire")))
 		reporter := mock.NewMockDirectoryEntryReporter(ctrl)
 
 		require.Equal(t, virtual.StatusErrIO, d.VirtualReadDir(0, 0, reporter))
@@ -143,7 +144,7 @@ func TestGlobalDirectoryContextLookupDirectory(t *testing.T) {
 				},
 			},
 		}, nil)
-		errorLogger.EXPECT().Log(status.Error(codes.InvalidArgument, "Directory \"e0f28d311a9b2deff103e32f6105b2b29d636c287797ca72077a648cd736cd36-123-hello\": Failed to parse digest for file \"broken\": Unknown digest hash length: 24 characters"))
+		errorLogger.EXPECT().Log(testutil.EqStatus(t, status.Error(codes.InvalidArgument, "Directory \"e0f28d311a9b2deff103e32f6105b2b29d636c287797ca72077a648cd736cd36-123-hello\": Failed to parse digest for file \"broken\": Unknown digest hash length: 24 characters")))
 		reporter := mock.NewMockDirectoryEntryReporter(ctrl)
 
 		require.Equal(t, virtual.StatusErrIO, d.VirtualReadDir(0, 0, reporter))
