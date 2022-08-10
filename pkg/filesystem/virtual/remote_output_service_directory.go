@@ -377,16 +377,15 @@ func (d *RemoteOutputServiceDirectory) getOutputPathAndBuildState(buildID string
 // This resolver forcefully creates all intermediate pathname
 // components, removing any non-directories that are in the way.
 type directoryCreatingComponentWalker struct {
-	stack []virtual.PrepopulatedDirectory
+	stack util.NonEmptyStack[virtual.PrepopulatedDirectory]
 }
 
 func (cw *directoryCreatingComponentWalker) OnDirectory(name path.Component) (path.GotDirectoryOrSymlink, error) {
-	d := cw.stack[len(cw.stack)-1]
-	child, err := d.CreateAndEnterPrepopulatedDirectory(name)
+	child, err := cw.stack.Peek().CreateAndEnterPrepopulatedDirectory(name)
 	if err != nil {
 		return nil, err
 	}
-	cw.stack = append(cw.stack, child)
+	cw.stack.Push(child)
 	return path.GotDirectory{
 		Child:        cw,
 		IsReversible: true,
@@ -398,25 +397,24 @@ func (cw *directoryCreatingComponentWalker) OnTerminal(name path.Component) (*pa
 }
 
 func (cw *directoryCreatingComponentWalker) OnUp() (path.ComponentWalker, error) {
-	if len(cw.stack) == 1 {
+	if _, ok := cw.stack.PopSingle(); !ok {
 		return nil, status.Error(codes.InvalidArgument, "Path resolves to a location outside the output path")
 	}
-	cw.stack = cw.stack[:len(cw.stack)-1]
 	return cw, nil
 }
 
 func (cw *directoryCreatingComponentWalker) createChild(outputPath string, initialNode virtual.InitialNode) error {
 	outputParentCreator := parentDirectoryCreatingComponentWalker{
-		stack: append([]virtual.PrepopulatedDirectory(nil), cw.stack...),
+		stack: cw.stack.Copy(),
 	}
 	if err := path.Resolve(outputPath, path.NewRelativeScopeWalker(&outputParentCreator)); err != nil {
 		return util.StatusWrap(err, "Failed to resolve path")
 	}
-	name := outputParentCreator.name
+	name := outputParentCreator.TerminalName
 	if name == nil {
 		return status.Errorf(codes.InvalidArgument, "Path resolves to a directory")
 	}
-	return outputParentCreator.stack[len(outputParentCreator.stack)-1].CreateChildren(
+	return outputParentCreator.stack.Peek().CreateChildren(
 		map[path.Component]virtual.InitialNode{
 			*name: initialNode,
 		},
@@ -428,33 +426,26 @@ func (cw *directoryCreatingComponentWalker) createChild(outputPath string, initi
 // directory of the path where a file, directory or symlink needs to be
 // created.
 type parentDirectoryCreatingComponentWalker struct {
-	stack []virtual.PrepopulatedDirectory
-	name  *path.Component
+	path.TerminalNameTrackingComponentWalker
+	stack util.NonEmptyStack[virtual.PrepopulatedDirectory]
 }
 
 func (cw *parentDirectoryCreatingComponentWalker) OnDirectory(name path.Component) (path.GotDirectoryOrSymlink, error) {
-	d := cw.stack[len(cw.stack)-1]
-	child, err := d.CreateAndEnterPrepopulatedDirectory(name)
+	child, err := cw.stack.Peek().CreateAndEnterPrepopulatedDirectory(name)
 	if err != nil {
 		return nil, err
 	}
-	cw.stack = append(cw.stack, child)
+	cw.stack.Push(child)
 	return path.GotDirectory{
 		Child:        cw,
 		IsReversible: true,
 	}, nil
 }
 
-func (cw *parentDirectoryCreatingComponentWalker) OnTerminal(name path.Component) (*path.GotSymlink, error) {
-	cw.name = &name
-	return nil, nil
-}
-
 func (cw *parentDirectoryCreatingComponentWalker) OnUp() (path.ComponentWalker, error) {
-	if len(cw.stack) == 1 {
+	if _, ok := cw.stack.PopSingle(); !ok {
 		return nil, status.Error(codes.InvalidArgument, "Path resolves to a location outside the output path")
 	}
-	cw.stack = cw.stack[:len(cw.stack)-1]
 	return cw, nil
 }
 
@@ -473,13 +464,13 @@ func (d *RemoteOutputServiceDirectory) BatchCreate(ctx context.Context, request 
 
 	// Resolve the path prefix. Optionally, remove all of its contents.
 	prefixCreator := directoryCreatingComponentWalker{
-		stack: []virtual.PrepopulatedDirectory{outputPathState.rootDirectory},
+		stack: util.NewNonEmptyStack[virtual.PrepopulatedDirectory](outputPathState.rootDirectory),
 	}
 	if err := path.Resolve(request.PathPrefix, path.NewRelativeScopeWalker(&prefixCreator)); err != nil {
 		return nil, util.StatusWrap(err, "Failed to create path prefix directory")
 	}
 	if request.CleanPathPrefix {
-		if err := prefixCreator.stack[len(prefixCreator.stack)-1].RemoveAllChildren(false); err != nil {
+		if err := prefixCreator.stack.Peek().RemoveAllChildren(false); err != nil {
 			return nil, util.StatusWrap(err, "Failed to clean path prefix directory")
 		}
 	}
@@ -536,13 +527,13 @@ type statWalker struct {
 	followSymlinks bool
 	digestFunction *digest.Function
 
-	stack      []virtual.PrepopulatedDirectory
+	stack      util.NonEmptyStack[virtual.PrepopulatedDirectory]
 	fileStatus *remoteoutputservice.FileStatus
 }
 
 func (cw *statWalker) OnScope(absolute bool) (path.ComponentWalker, error) {
 	if absolute {
-		cw.stack = cw.stack[:1]
+		cw.stack.PopAll()
 	}
 	// Currently in a known directory.
 	cw.fileStatus = &remoteoutputservice.FileStatus{
@@ -552,15 +543,14 @@ func (cw *statWalker) OnScope(absolute bool) (path.ComponentWalker, error) {
 }
 
 func (cw *statWalker) OnDirectory(name path.Component) (path.GotDirectoryOrSymlink, error) {
-	d := cw.stack[len(cw.stack)-1]
-	directory, leaf, err := d.LookupChild(name)
+	directory, leaf, err := cw.stack.Peek().LookupChild(name)
 	if err != nil {
 		return nil, err
 	}
 
 	if directory != nil {
 		// Got a directory.
-		cw.stack = append(cw.stack, directory)
+		cw.stack.Push(directory)
 		return path.GotDirectory{
 			Child:        cw,
 			IsReversible: true,
@@ -586,15 +576,14 @@ func (cw *statWalker) OnDirectory(name path.Component) (path.GotDirectoryOrSymli
 }
 
 func (cw *statWalker) OnTerminal(name path.Component) (*path.GotSymlink, error) {
-	d := cw.stack[len(cw.stack)-1]
-	directory, leaf, err := d.LookupChild(name)
+	directory, leaf, err := cw.stack.Peek().LookupChild(name)
 	if err != nil {
 		return nil, err
 	}
 
 	if directory != nil {
 		// Got a directory. The existing FileStatus is sufficient.
-		cw.stack = append(cw.stack, directory)
+		cw.stack.Push(directory)
 		return nil, nil
 	}
 
@@ -624,13 +613,12 @@ func (cw *statWalker) OnTerminal(name path.Component) (*path.GotSymlink, error) 
 }
 
 func (cw *statWalker) OnUp() (path.ComponentWalker, error) {
-	if len(cw.stack) == 1 {
+	if _, ok := cw.stack.PopSingle(); !ok {
 		cw.fileStatus = &remoteoutputservice.FileStatus{
 			FileType: &remoteoutputservice.FileStatus_External_{},
 		}
 		return path.VoidComponentWalker, nil
 	}
-	cw.stack = cw.stack[:len(cw.stack)-1]
 	return cw, nil
 }
 
@@ -654,7 +642,7 @@ func (d *RemoteOutputServiceDirectory) BatchStat(ctx context.Context, request *r
 	for _, statPath := range request.Paths {
 		statWalker := statWalker{
 			followSymlinks: request.FollowSymlinks,
-			stack:          []virtual.PrepopulatedDirectory{outputPathState.rootDirectory},
+			stack:          util.NewNonEmptyStack[virtual.PrepopulatedDirectory](outputPathState.rootDirectory),
 			fileStatus: &remoteoutputservice.FileStatus{
 				FileType: &remoteoutputservice.FileStatus_External_{},
 			},
@@ -677,9 +665,8 @@ func (d *RemoteOutputServiceDirectory) BatchStat(ctx context.Context, request *r
 				// For directories we need to provide the last
 				// modification time, as the client uses that to
 				// invalidate cached results.
-				d := statWalker.stack[len(statWalker.stack)-1]
 				var attributes virtual.Attributes
-				d.VirtualGetAttributes(virtual.AttributesMaskLastDataModificationTime, &attributes)
+				statWalker.stack.Peek().VirtualGetAttributes(virtual.AttributesMaskLastDataModificationTime, &attributes)
 				lastModifiedTime, ok := attributes.GetLastDataModificationTime()
 				if !ok {
 					panic("Directory did not provide a last data modification time, even though the Remote Output Service protocol requires it")
