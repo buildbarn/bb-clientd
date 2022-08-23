@@ -66,7 +66,7 @@ func TestContentAddressableStorageDirectoryVirtualLookup(t *testing.T) {
 		// I/O error while loading directory contents. There is
 		// no need to log this explicitly, as that is done by
 		// GetDirectoryContents() already.
-		directoryContext.EXPECT().GetDirectoryContents().Return(nil, nil, re_vfs.StatusErrIO)
+		directoryContext.EXPECT().GetDirectoryContents().Return(nil, re_vfs.StatusErrIO)
 
 		var out re_vfs.Attributes
 		_, _, s := d.VirtualLookup(path.MustNewComponent("myfile"), 0, &out)
@@ -75,7 +75,6 @@ func TestContentAddressableStorageDirectoryVirtualLookup(t *testing.T) {
 
 	// The remainder of the tests assume that GetDirectoryContents()
 	// succeeds and always returns the following directory contents.
-	directoryContentsContext := mock.NewMockDirectoryContentsContext(ctrl)
 	directoryContext.EXPECT().GetDirectoryContents().Return(&remoteexecution.Directory{
 		Directories: []*remoteexecution.DirectoryNode{
 			{
@@ -123,7 +122,7 @@ func TestContentAddressableStorageDirectoryVirtualLookup(t *testing.T) {
 				Target: "target",
 			},
 		},
-	}, directoryContentsContext, re_vfs.StatusOK).AnyTimes()
+	}, re_vfs.StatusOK).AnyTimes()
 
 	t.Run("NotFound", func(t *testing.T) {
 		// Attempting to look up files that don't exist.
@@ -161,9 +160,9 @@ func TestContentAddressableStorageDirectoryVirtualLookup(t *testing.T) {
 	t.Run("SuccessDirectory", func(t *testing.T) {
 		// Successfully looking up a directory.
 		childDirectory := mock.NewMockVirtualDirectory(ctrl)
-		directoryContentsContext.EXPECT().LookupDirectory(
+		directoryContext.EXPECT().LookupDirectory(
 			digest.MustNewDigest("example", "47473788bad5e9991fcd8e8a2b6012745031089ebe6cc7342f78bf92570e4f52", 42),
-		).Return(childDirectory, re_vfs.StatusOK)
+		).Return(childDirectory)
 		childDirectory.EXPECT().VirtualGetAttributes(
 			re_vfs.AttributesMaskInodeNumber,
 			gomock.Any(),
@@ -257,7 +256,7 @@ func TestContentAddressableStorageDirectoryVirtualReadDir(t *testing.T) {
 		// I/O error while loading directory contents. There is
 		// no need to log this explicitly, as that is done by
 		// GetDirectoryContents() already.
-		directoryContext.EXPECT().GetDirectoryContents().Return(nil, nil, re_vfs.StatusErrIO)
+		directoryContext.EXPECT().GetDirectoryContents().Return(nil, re_vfs.StatusErrIO)
 		reporter := mock.NewMockDirectoryEntryReporter(ctrl)
 
 		require.Equal(
@@ -268,7 +267,6 @@ func TestContentAddressableStorageDirectoryVirtualReadDir(t *testing.T) {
 
 	t.Run("MalformedDirectory1", func(t *testing.T) {
 		// Directories with malformed names may not be reported.
-		directoryContentsContext := mock.NewMockDirectoryContentsContext(ctrl)
 		directoryContext.EXPECT().GetDirectoryContents().Return(&remoteexecution.Directory{
 			Directories: []*remoteexecution.DirectoryNode{
 				{
@@ -279,7 +277,7 @@ func TestContentAddressableStorageDirectoryVirtualReadDir(t *testing.T) {
 					},
 				},
 			},
-		}, directoryContentsContext, re_vfs.StatusOK)
+		}, re_vfs.StatusOK)
 		directoryContext.EXPECT().LogError(testutil.EqStatus(t, status.Error(codes.InvalidArgument, "Directory \"..\" has an invalid name")))
 		reporter := mock.NewMockDirectoryEntryReporter(ctrl)
 
@@ -291,7 +289,6 @@ func TestContentAddressableStorageDirectoryVirtualReadDir(t *testing.T) {
 
 	t.Run("MalformedDirectory2", func(t *testing.T) {
 		// Directories with malformed digests may not be reported.
-		directoryContentsContext := mock.NewMockDirectoryContentsContext(ctrl)
 		directoryContext.EXPECT().GetDirectoryContents().Return(&remoteexecution.Directory{
 			Directories: []*remoteexecution.DirectoryNode{
 				{
@@ -302,7 +299,7 @@ func TestContentAddressableStorageDirectoryVirtualReadDir(t *testing.T) {
 					},
 				},
 			},
-		}, directoryContentsContext, re_vfs.StatusOK)
+		}, re_vfs.StatusOK)
 		directoryContext.EXPECT().LogError(testutil.EqStatus(t, status.Error(codes.InvalidArgument, "Failed to parse digest for directory \"hello\": Unknown digest hash length: 41 characters")))
 		reporter := mock.NewMockDirectoryEntryReporter(ctrl)
 
@@ -315,7 +312,6 @@ func TestContentAddressableStorageDirectoryVirtualReadDir(t *testing.T) {
 	t.Run("NoSpaceDirectory", func(t *testing.T) {
 		// If there is no space to fit the directory, iteration
 		// should stop.
-		directoryContentsContext := mock.NewMockDirectoryContentsContext(ctrl)
 		directoryContext.EXPECT().GetDirectoryContents().Return(&remoteexecution.Directory{
 			Directories: []*remoteexecution.DirectoryNode{
 				{
@@ -333,12 +329,12 @@ func TestContentAddressableStorageDirectoryVirtualReadDir(t *testing.T) {
 					},
 				},
 			},
-		}, directoryContentsContext, re_vfs.StatusOK)
+		}, re_vfs.StatusOK)
 		reporter := mock.NewMockDirectoryEntryReporter(ctrl)
 		childDirectory := mock.NewMockVirtualDirectory(ctrl)
-		directoryContentsContext.EXPECT().LookupDirectory(
+		directoryContext.EXPECT().LookupDirectory(
 			digest.MustNewDigest("example", "47473788bad5e9991fcd8e8a2b6012745031089ebe6cc7342f78bf92570e4f52", 42),
-		).Return(childDirectory, re_vfs.StatusOK)
+		).Return(childDirectory)
 		childDirectory.EXPECT().VirtualGetAttributes(
 			re_vfs.AttributesMaskInodeNumber,
 			gomock.Any(),
@@ -358,7 +354,6 @@ func TestContentAddressableStorageDirectoryVirtualReadDir(t *testing.T) {
 			d.VirtualReadDir(0, re_vfs.AttributesMaskInodeNumber, reporter))
 	})
 
-	directoryContentsContext := mock.NewMockDirectoryContentsContext(ctrl)
 	directoryContext.EXPECT().GetDirectoryContents().Return(&remoteexecution.Directory{
 		Directories: []*remoteexecution.DirectoryNode{
 			{
@@ -392,14 +387,14 @@ func TestContentAddressableStorageDirectoryVirtualReadDir(t *testing.T) {
 				Target: "target",
 			},
 		},
-	}, directoryContentsContext, re_vfs.StatusOK).AnyTimes()
+	}, re_vfs.StatusOK).AnyTimes()
 
 	t.Run("FromStart", func(t *testing.T) {
 		reporter := mock.NewMockDirectoryEntryReporter(ctrl)
 		childDirectory := mock.NewMockVirtualDirectory(ctrl)
-		directoryContentsContext.EXPECT().LookupDirectory(
+		directoryContext.EXPECT().LookupDirectory(
 			digest.MustNewDigest("example", "f514a041bf7ae6ea7ec82e8296e17e10cffdf799ba565e052af59187936f1865", 123),
-		).Return(childDirectory, re_vfs.StatusOK)
+		).Return(childDirectory)
 		childDirectory.EXPECT().VirtualGetAttributes(
 			re_vfs.AttributesMaskInodeNumber,
 			gomock.Any(),
@@ -548,13 +543,12 @@ func TestContentAddressableStorageDirectoryHandleResolver(t *testing.T) {
 		// Providing a non-zero identifier will end up resolving
 		// a symbolic link inside the directory. Let this fail
 		// with an I/O error.
-		directoryContext.EXPECT().GetDirectoryContents().Return(nil, nil, re_vfs.StatusErrIO)
+		directoryContext.EXPECT().GetDirectoryContents().Return(nil, re_vfs.StatusErrIO)
 
 		_, _, s := handleResolver(bytes.NewBuffer([]byte{1}))
 		require.Equal(t, re_vfs.StatusErrIO, s)
 	})
 
-	directoryContentsContext := mock.NewMockDirectoryContentsContext(ctrl)
 	directoryContext.EXPECT().GetDirectoryContents().Return(&remoteexecution.Directory{
 		Symlinks: []*remoteexecution.SymlinkNode{
 			{
@@ -566,7 +560,7 @@ func TestContentAddressableStorageDirectoryHandleResolver(t *testing.T) {
 				Target: "target2",
 			},
 		},
-	}, directoryContentsContext, re_vfs.StatusOK).AnyTimes()
+	}, re_vfs.StatusOK).AnyTimes()
 
 	t.Run("SymlinkOutOfBounds", func(t *testing.T) {
 		// Provide a symlink index that is out of bounds.

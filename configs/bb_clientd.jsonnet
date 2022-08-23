@@ -223,6 +223,14 @@ local cacheDirectory = homeDirectory + '/.cache/bb_clientd';
     maximumStateFileAge: '604800s',
   },
 
+  // Keep a small number of unmarshaled REv2 Directory objects in memory
+  // to speed up their instantiation under "outputs".
+  directoryCache: {
+    maximumCount: 10000,
+    maximumSizeBytes: 1024 * self.maximumCount,
+    cacheReplacementPolicy: 'LEAST_RECENTLY_USED',
+  },
+
   global: {
     // Multiplex logs into a file. That way they remain accessible, even
     // if bb_clientd is run through a system that doesn't maintain logs

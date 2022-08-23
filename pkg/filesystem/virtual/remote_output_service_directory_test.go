@@ -29,7 +29,7 @@ func TestRemoteOutputServiceDirectoryClean(t *testing.T) {
 	outputPathFactory := mock.NewMockOutputPathFactory(ctrl)
 	bareContentAddressableStorage := mock.NewMockBlobAccess(ctrl)
 	retryingContentAddressableStorage := mock.NewMockBlobAccess(ctrl)
-	indexedTreeFetcher := mock.NewMockIndexedTreeFetcher(ctrl)
+	directoryFetcher := mock.NewMockDirectoryFetcher(ctrl)
 	symlinkFactory := mock.NewMockSymlinkFactory(ctrl)
 	dHandleAllocation := mock.NewMockStatefulHandleAllocation(ctrl)
 	handleAllocator.EXPECT().New().Return(dHandleAllocation)
@@ -40,8 +40,9 @@ func TestRemoteOutputServiceDirectoryClean(t *testing.T) {
 		outputPathFactory,
 		bareContentAddressableStorage,
 		retryingContentAddressableStorage,
-		indexedTreeFetcher,
-		symlinkFactory)
+		directoryFetcher,
+		symlinkFactory,
+		/* maximumMessageSizeBytes = */ 10000)
 
 	t.Run("InvalidOutputBaseID", func(t *testing.T) {
 		// The output base ID must be a valid directory name.
@@ -123,7 +124,7 @@ func TestRemoteOutputServiceDirectoryStartBuild(t *testing.T) {
 	outputPathFactory := mock.NewMockOutputPathFactory(ctrl)
 	bareContentAddressableStorage := mock.NewMockBlobAccess(ctrl)
 	retryingContentAddressableStorage := mock.NewMockBlobAccess(ctrl)
-	indexedTreeFetcher := mock.NewMockIndexedTreeFetcher(ctrl)
+	directoryFetcher := mock.NewMockDirectoryFetcher(ctrl)
 	symlinkFactory := mock.NewMockSymlinkFactory(ctrl)
 	dHandleAllocation := mock.NewMockStatefulHandleAllocation(ctrl)
 	handleAllocator.EXPECT().New().Return(dHandleAllocation)
@@ -134,8 +135,9 @@ func TestRemoteOutputServiceDirectoryStartBuild(t *testing.T) {
 		outputPathFactory,
 		bareContentAddressableStorage,
 		retryingContentAddressableStorage,
-		indexedTreeFetcher,
-		symlinkFactory)
+		directoryFetcher,
+		symlinkFactory,
+		/* maximumMessageSizeBytes = */ 10000)
 
 	t.Run("InvalidOutputBaseID", func(t *testing.T) {
 		// The output base ID must be a valid directory name.
@@ -491,7 +493,7 @@ func TestRemoteOutputServiceDirectoryBatchCreate(t *testing.T) {
 	outputPathFactory := mock.NewMockOutputPathFactory(ctrl)
 	bareContentAddressableStorage := mock.NewMockBlobAccess(ctrl)
 	retryingContentAddressableStorage := mock.NewMockBlobAccess(ctrl)
-	indexedTreeFetcher := mock.NewMockIndexedTreeFetcher(ctrl)
+	directoryFetcher := mock.NewMockDirectoryFetcher(ctrl)
 	symlinkFactory := mock.NewMockSymlinkFactory(ctrl)
 	dHandleAllocation := mock.NewMockStatefulHandleAllocation(ctrl)
 	handleAllocator.EXPECT().New().Return(dHandleAllocation)
@@ -502,8 +504,9 @@ func TestRemoteOutputServiceDirectoryBatchCreate(t *testing.T) {
 		outputPathFactory,
 		bareContentAddressableStorage,
 		retryingContentAddressableStorage,
-		indexedTreeFetcher,
-		symlinkFactory)
+		directoryFetcher,
+		symlinkFactory,
+		/* maximumMessageSizeBytes = */ 10000)
 
 	t.Run("InvalidBuildID", func(t *testing.T) {
 		// StartBuild() should be called first.
@@ -631,6 +634,25 @@ func TestRemoteOutputServiceDirectoryBatchCreate(t *testing.T) {
 		testutil.RequireEqualStatus(t, status.Error(codes.Internal, "Failed to create symbolic link \"foo\": I/O error"), err)
 	})
 
+	t.Run("DirectoryTooBig", func(t *testing.T) {
+		// We should forbid the creation of directories in the
+		// output directory that are too big, as attempting to
+		// access those would fail anyway.
+		_, err := d.BatchCreate(ctx, &remoteoutputservice.BatchCreateRequest{
+			BuildId: "ad778a53-48e6-4ae1-b1f5-01b84a508f5f",
+			Directories: []*remoteexecution.OutputDirectory{
+				{
+					Path: "large_directory",
+					TreeDigest: &remoteexecution.Digest{
+						Hash:      "b2bc8901bd2dfc25e0e43f0a1eaf8758",
+						SizeBytes: 9999999,
+					},
+				},
+			},
+		})
+		testutil.RequireEqualStatus(t, status.Error(codes.InvalidArgument, "Directory \"large_directory\" is 9999999 bytes in size, which exceeds the permitted maximum of 10000 bytes"), err)
+	})
+
 	// The creation of actual files and directories is hard to test,
 	// as the InitialNode arguments provided to CreateChildren()
 	// contain objects that are hard to compare. At least provide a
@@ -704,7 +726,7 @@ func TestRemoteOutputServiceDirectoryBatchStat(t *testing.T) {
 	outputPathFactory := mock.NewMockOutputPathFactory(ctrl)
 	bareContentAddressableStorage := mock.NewMockBlobAccess(ctrl)
 	retryingContentAddressableStorage := mock.NewMockBlobAccess(ctrl)
-	indexedTreeFetcher := mock.NewMockIndexedTreeFetcher(ctrl)
+	directoryFetcher := mock.NewMockDirectoryFetcher(ctrl)
 	symlinkFactory := mock.NewMockSymlinkFactory(ctrl)
 	dHandleAllocation := mock.NewMockStatefulHandleAllocation(ctrl)
 	handleAllocator.EXPECT().New().Return(dHandleAllocation)
@@ -715,8 +737,9 @@ func TestRemoteOutputServiceDirectoryBatchStat(t *testing.T) {
 		outputPathFactory,
 		bareContentAddressableStorage,
 		retryingContentAddressableStorage,
-		indexedTreeFetcher,
-		symlinkFactory)
+		directoryFetcher,
+		symlinkFactory,
+		/* maximumMessageSizeBytes = */ 10000)
 
 	t.Run("InvalidBuildID", func(t *testing.T) {
 		// StartBuild() should be called first.
@@ -1063,7 +1086,7 @@ func TestRemoteOutputServiceDirectoryVirtualLookup(t *testing.T) {
 	outputPathFactory := mock.NewMockOutputPathFactory(ctrl)
 	bareContentAddressableStorage := mock.NewMockBlobAccess(ctrl)
 	retryingContentAddressableStorage := mock.NewMockBlobAccess(ctrl)
-	indexedTreeFetcher := mock.NewMockIndexedTreeFetcher(ctrl)
+	directoryFetcher := mock.NewMockDirectoryFetcher(ctrl)
 	symlinkFactory := mock.NewMockSymlinkFactory(ctrl)
 	dHandleAllocation := mock.NewMockStatefulHandleAllocation(ctrl)
 	handleAllocator.EXPECT().New().Return(dHandleAllocation)
@@ -1074,8 +1097,9 @@ func TestRemoteOutputServiceDirectoryVirtualLookup(t *testing.T) {
 		outputPathFactory,
 		bareContentAddressableStorage,
 		retryingContentAddressableStorage,
-		indexedTreeFetcher,
-		symlinkFactory)
+		directoryFetcher,
+		symlinkFactory,
+		/* maximumMessageSizeBytes = */ 10000)
 
 	// No output paths exist, so VirtualLookup() should always fail.
 	var out1 re_vfs.Attributes
@@ -1142,7 +1166,7 @@ func TestRemoteOutputServiceDirectoryVirtualReadDir(t *testing.T) {
 	outputPathFactory := mock.NewMockOutputPathFactory(ctrl)
 	bareContentAddressableStorage := mock.NewMockBlobAccess(ctrl)
 	retryingContentAddressableStorage := mock.NewMockBlobAccess(ctrl)
-	indexedTreeFetcher := mock.NewMockIndexedTreeFetcher(ctrl)
+	directoryFetcher := mock.NewMockDirectoryFetcher(ctrl)
 	symlinkFactory := mock.NewMockSymlinkFactory(ctrl)
 	dHandleAllocation := mock.NewMockStatefulHandleAllocation(ctrl)
 	handleAllocator.EXPECT().New().Return(dHandleAllocation)
@@ -1153,8 +1177,9 @@ func TestRemoteOutputServiceDirectoryVirtualReadDir(t *testing.T) {
 		outputPathFactory,
 		bareContentAddressableStorage,
 		retryingContentAddressableStorage,
-		indexedTreeFetcher,
-		symlinkFactory)
+		directoryFetcher,
+		symlinkFactory,
+		/* maximumMessageSizeBytes = */ 10000)
 
 	t.Run("InitialState", func(t *testing.T) {
 		// The directory should initially be empty.

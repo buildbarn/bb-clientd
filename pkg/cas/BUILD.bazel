@@ -2,36 +2,23 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "cas",
-    srcs = [
-        "blob_access_indexed_tree_fetcher.go",
-        "indexed_tree_fetcher.go",
-        "tree_directory_walker.go",
-    ],
+    srcs = ["tree_directory_walker.go"],
     importpath = "github.com/buildbarn/bb-clientd/pkg/cas",
     visibility = ["//visibility:public"],
     deps = [
         "@com_github_bazelbuild_remote_apis//build/bazel/remote/execution/v2:execution",
         "@com_github_buildbarn_bb_remote_execution//pkg/cas",
-        "@com_github_buildbarn_bb_storage//pkg/blobstore",
         "@com_github_buildbarn_bb_storage//pkg/digest",
-        "@com_github_buildbarn_bb_storage//pkg/util",
-        "@org_golang_google_grpc//codes",
-        "@org_golang_google_grpc//status",
-        "@org_golang_google_protobuf//proto",
     ],
 )
 
 go_test(
     name = "cas_test",
-    srcs = [
-        "blob_access_indexed_tree_fetcher_test.go",
-        "tree_directory_walker_test.go",
-    ],
+    srcs = ["tree_directory_walker_test.go"],
     deps = [
         ":cas",
         "//internal/mock",
         "@com_github_bazelbuild_remote_apis//build/bazel/remote/execution/v2:execution",
-        "@com_github_buildbarn_bb_storage//pkg/blobstore/buffer",
         "@com_github_buildbarn_bb_storage//pkg/digest",
         "@com_github_buildbarn_bb_storage//pkg/testutil",
         "@com_github_golang_mock//gomock",

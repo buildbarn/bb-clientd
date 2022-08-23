@@ -10,7 +10,6 @@ import (
 
 	remoteexecution "github.com/bazelbuild/remote-apis/build/bazel/remote/execution/v2"
 	cd_blobstore "github.com/buildbarn/bb-clientd/pkg/blobstore"
-	cd_cas "github.com/buildbarn/bb-clientd/pkg/cas"
 	cd_vfs "github.com/buildbarn/bb-clientd/pkg/filesystem/virtual"
 	"github.com/buildbarn/bb-clientd/pkg/outputpathpersistency"
 	"github.com/buildbarn/bb-clientd/pkg/proto/configuration/bb_clientd"
@@ -103,14 +102,14 @@ func main() {
 	// Factories for FUSE nodes corresponding to plain files,
 	// executable files, directories and trees.
 	//
-	// TODO: We should use Caching{Directory,IndexedTree}Fetchers,
-	// so that don't call proto.Unmarshal() for every lookup within
-	// directory and tree objects. Let's not address this for the
-	// time being, as we mainly care about accessing individual
-	// files.
-	indexedTreeFetcher := cd_cas.NewBlobAccessIndexedTreeFetcher(
-		retryingContentAddressableStorage,
-		int(configuration.MaximumMessageSizeBytes))
+	// We create a CachingDirectoryFetcher for REv2 Directory nodes,
+	// as these tend to be loaded repeatedly when traversing a
+	// directory hierarchy, especially through "outputs/*".
+	directoryFetcher, err := re_cas.NewCachingDirectoryFetcherFromConfiguration(
+		configuration.DirectoryCache,
+		re_cas.NewBlobAccessDirectoryFetcher(
+			retryingContentAddressableStorage,
+			int(configuration.MaximumMessageSizeBytes)))
 	casFileFactory := re_vfs.NewResolvableHandleAllocatingCASFileFactory(
 		re_vfs.NewBlobAccessCASFileFactory(
 			context.Background(),
@@ -120,15 +119,13 @@ func main() {
 	globalDirectoryContext := NewGlobalDirectoryContext(
 		context.Background(),
 		casFileFactory,
-		re_cas.NewBlobAccessDirectoryFetcher(
-			retryingContentAddressableStorage,
-			int(configuration.MaximumMessageSizeBytes)),
+		directoryFetcher,
 		rootHandleAllocator.New(),
 		util.DefaultErrorLogger)
 	globalTreeContext := NewGlobalTreeContext(
 		context.Background(),
 		casFileFactory,
-		indexedTreeFetcher,
+		directoryFetcher,
 		rootHandleAllocator.New(),
 		util.DefaultErrorLogger)
 
@@ -237,8 +234,9 @@ func main() {
 		outputPathFactory,
 		bareContentAddressableStorage,
 		retryingContentAddressableStorage,
-		indexedTreeFetcher,
-		symlinkFactory)
+		directoryFetcher,
+		symlinkFactory,
+		configuration.MaximumMessageSizeBytes)
 
 	// Construct the top-level directory of the FUSE mount. It contains
 	// three subdirectories:

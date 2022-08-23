@@ -5,7 +5,8 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/buildbarn/bb-clientd/pkg/cas"
+	cd_cas "github.com/buildbarn/bb-clientd/pkg/cas"
+	re_cas "github.com/buildbarn/bb-remote-execution/pkg/cas"
 	"github.com/buildbarn/bb-remote-execution/pkg/filesystem/virtual"
 	"github.com/buildbarn/bb-remote-execution/pkg/proto/remoteoutputservice"
 	"github.com/buildbarn/bb-storage/pkg/blobstore"
@@ -71,8 +72,9 @@ type RemoteOutputServiceDirectory struct {
 	outputPathFactory                 OutputPathFactory
 	bareContentAddressableStorage     blobstore.BlobAccess
 	retryingContentAddressableStorage blobstore.BlobAccess
-	indexedTreeFetcher                cas.IndexedTreeFetcher
+	directoryFetcher                  re_cas.DirectoryFetcher
 	symlinkFactory                    virtual.SymlinkFactory
+	maximumMessageSizeBytes           int64
 
 	lock          sync.Mutex
 	changeID      uint64
@@ -88,14 +90,15 @@ var (
 
 // NewRemoteOutputServiceDirectory creates a new instance of
 // RemoteOutputServiceDirectory.
-func NewRemoteOutputServiceDirectory(handleAllocator virtual.StatefulHandleAllocator, outputPathFactory OutputPathFactory, bareContentAddressableStorage, retryingContentAddressableStorage blobstore.BlobAccess, indexedTreeFetcher cas.IndexedTreeFetcher, symlinkFactory virtual.SymlinkFactory) *RemoteOutputServiceDirectory {
+func NewRemoteOutputServiceDirectory(handleAllocator virtual.StatefulHandleAllocator, outputPathFactory OutputPathFactory, bareContentAddressableStorage, retryingContentAddressableStorage blobstore.BlobAccess, directoryFetcher re_cas.DirectoryFetcher, symlinkFactory virtual.SymlinkFactory, maximumMessageSizeBytes int64) *RemoteOutputServiceDirectory {
 	d := &RemoteOutputServiceDirectory{
 		handleAllocator:                   handleAllocator,
 		outputPathFactory:                 outputPathFactory,
 		bareContentAddressableStorage:     bareContentAddressableStorage,
 		retryingContentAddressableStorage: retryingContentAddressableStorage,
-		indexedTreeFetcher:                indexedTreeFetcher,
+		directoryFetcher:                  directoryFetcher,
 		symlinkFactory:                    symlinkFactory,
+		maximumMessageSizeBytes:           maximumMessageSizeBytes,
 
 		outputBaseIDs: map[path.Component]*outputPathState{},
 		buildIDs:      map[string]*outputPathState{},
@@ -495,10 +498,13 @@ func (d *RemoteOutputServiceDirectory) BatchCreate(ctx context.Context, request 
 		if err != nil {
 			return nil, util.StatusWrapf(err, "Invalid digest for directory %#v", entry.Path)
 		}
+		if sizeBytes := childDigest.GetSizeBytes(); sizeBytes > d.maximumMessageSizeBytes {
+			return nil, status.Errorf(codes.InvalidArgument, "Directory %#v is %d bytes in size, which exceeds the permitted maximum of %d bytes", entry.Path, sizeBytes, d.maximumMessageSizeBytes)
+		}
 		if err := prefixCreator.createChild(entry.Path, virtual.InitialNode{
 			Directory: virtual.NewCASInitialContentsFetcher(
 				context.Background(),
-				cas.NewTreeDirectoryWalker(d.indexedTreeFetcher, childDigest),
+				cd_cas.NewTreeDirectoryWalker(d.directoryFetcher, childDigest),
 				outputPathState.casFileFactory,
 				d.symlinkFactory,
 				instanceName),

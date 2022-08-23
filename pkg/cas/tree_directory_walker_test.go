@@ -19,9 +19,9 @@ import (
 func TestTreeDirectoryWalker(t *testing.T) {
 	ctrl, ctx := gomock.WithContext(context.Background(), t)
 
-	indexedTreeFetcher := mock.NewMockIndexedTreeFetcher(ctrl)
+	directoryFetcher := mock.NewMockDirectoryFetcher(ctrl)
 	treeDigest := digest.MustNewDigest("example", "6884a9e20905b512d1122a2b1ad8ba16", 123)
-	rootDirectoryWalker := cas.NewTreeDirectoryWalker(indexedTreeFetcher, treeDigest)
+	rootDirectoryWalker := cas.NewTreeDirectoryWalker(directoryFetcher, treeDigest)
 
 	exampleRootDirectory := &remoteexecution.Directory{
 		Directories: []*remoteexecution.DirectoryNode{
@@ -45,42 +45,23 @@ func TestTreeDirectoryWalker(t *testing.T) {
 			},
 		},
 	}
-	exampleIndexedTree := &cas.IndexedTree{
-		Tree: &remoteexecution.Tree{
-			Root: exampleRootDirectory,
-			Children: []*remoteexecution.Directory{
-				exampleChildDirectory,
-			},
-		},
-		Index: map[string]int{
-			"4df5f448a5e6b3c41e6aae7a8a9832aa-456": 0,
-		},
-	}
 
 	// Test that the DirectoryWalker loads the right object from the
 	// CAS, and that error messages use the right prefix.
 
 	t.Run("RootGetDirectorySuccess", func(t *testing.T) {
-		indexedTreeFetcher.EXPECT().GetIndexedTree(ctx, treeDigest).
-			Return(exampleIndexedTree, nil)
+		directoryFetcher.EXPECT().GetTreeRootDirectory(ctx, treeDigest).
+			Return(exampleRootDirectory, nil)
 		rootDirectory, err := rootDirectoryWalker.GetDirectory(ctx)
 		require.NoError(t, err)
 		testutil.RequireEqualProto(t, exampleRootDirectory, rootDirectory)
 	})
 
 	t.Run("RootGetDirectoryFailure", func(t *testing.T) {
-		indexedTreeFetcher.EXPECT().GetIndexedTree(ctx, treeDigest).
+		directoryFetcher.EXPECT().GetTreeRootDirectory(ctx, treeDigest).
 			Return(nil, status.Error(codes.Internal, "Server failure"))
 		_, err := rootDirectoryWalker.GetDirectory(ctx)
 		require.Equal(t, status.Error(codes.Internal, "Server failure"), err)
-	})
-
-	t.Run("RootGetDirectoryMissing", func(t *testing.T) {
-		indexedTreeFetcher.EXPECT().GetIndexedTree(ctx, treeDigest).Return(&cas.IndexedTree{
-			Tree: &remoteexecution.Tree{},
-		}, nil)
-		_, err := rootDirectoryWalker.GetDirectory(ctx)
-		require.Equal(t, status.Error(codes.InvalidArgument, "Tree does not contain a root directory"), err)
 	})
 
 	t.Run("RootGetDescription", func(t *testing.T) {
@@ -105,24 +86,24 @@ func TestTreeDirectoryWalker(t *testing.T) {
 	// Tree object.
 
 	t.Run("ChildGetDirectorySuccess", func(t *testing.T) {
-		indexedTreeFetcher.EXPECT().GetIndexedTree(ctx, treeDigest).
-			Return(exampleIndexedTree, nil)
+		directoryFetcher.EXPECT().GetTreeChildDirectory(ctx, treeDigest, childDigest).
+			Return(exampleChildDirectory, nil)
 		childDirectory, err := childDirectoryWalker.GetDirectory(ctx)
 		require.NoError(t, err)
 		testutil.RequireEqualProto(t, exampleChildDirectory, childDirectory)
 	})
 
-	t.Run("ChildGetDirectoryMissing", func(t *testing.T) {
-		indexedTreeFetcher.EXPECT().GetIndexedTree(ctx, treeDigest).
-			Return(&cas.IndexedTree{}, nil)
+	t.Run("ChildGetDirectoryFailure", func(t *testing.T) {
+		directoryFetcher.EXPECT().GetTreeChildDirectory(ctx, treeDigest, childDigest).
+			Return(nil, status.Error(codes.Internal, "Server failure"))
 		_, err := childDirectoryWalker.GetDirectory(ctx)
-		require.Equal(t, status.Error(codes.InvalidArgument, "Child directory not found in tree"), err)
+		require.Equal(t, status.Error(codes.Internal, "Server failure"), err)
 	})
 
 	t.Run("ChildGetDescription", func(t *testing.T) {
 		require.Equal(
 			t,
-			"Tree \"6884a9e20905b512d1122a2b1ad8ba16-123-example\" child directory \"4df5f448a5e6b3c41e6aae7a8a9832aa-456\"",
+			"Tree \"6884a9e20905b512d1122a2b1ad8ba16-123-example\" child directory \"4df5f448a5e6b3c41e6aae7a8a9832aa-456-example\"",
 			childDirectoryWalker.GetDescription())
 	})
 

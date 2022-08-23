@@ -36,6 +36,7 @@ func TestErrorRetryingBlobAccessGet(t *testing.T) {
 
 	helloDigest := digest.MustNewDigest("instance_name", "8b1a9953c4611296a827abf8c47804d7", 5)
 	helloDigestSet := helloDigest.ToSingletonSet()
+	llDigest := digest.MustNewDigest("instance_name", "5b54c0a045f179bcbbbc9abcb8b5cd4c", 2)
 	instanceName := digest.MustNewInstanceName("instance_name")
 
 	t.Run("GetNonRetriableError", func(t *testing.T) {
@@ -107,9 +108,32 @@ func TestErrorRetryingBlobAccessGet(t *testing.T) {
 		require.Equal(t, []byte("Hello"), data)
 	})
 
-	// Coverage for FindMissing() and GetCapabilities() is minimal,
-	// as the tests for Get() already exercise the retry logic that
-	// is shared by both methods.
+	// Coverage for GetFromComposite(), FindMissing() and
+	// GetCapabilities() is minimal, as the tests for Get() already
+	// exercise the retry logic that is shared by other methods.
+
+	t.Run("GetFromCompositeRetry", func(t *testing.T) {
+		// Call that only succeeds after a retry.
+		clock.EXPECT().Now().Return(time.Unix(1000, 0))
+
+		blobSlicer := mock.NewMockBlobSlicer(ctrl)
+		baseBlobAccess.EXPECT().GetFromComposite(ctx, helloDigest, llDigest, blobSlicer).
+			Return(buffer.NewBufferFromError(status.Error(codes.Internal, "Server on fire")))
+		clock.EXPECT().Now().Return(time.Unix(1001, 0))
+		errorLogger.EXPECT().Log(testutil.EqPrefixedStatus(status.Error(codes.Internal, "Retrying failed operation after 750ms: Server on fire")))
+		randomNumberGenerator.EXPECT().Int63n(int64(1000000000)).Return(int64(750000000))
+		timer1 := mock.NewMockTimer(ctrl)
+		timer1Wakeup := make(chan time.Time, 1)
+		timer1Wakeup <- time.Unix(1001, 750000000)
+		clock.EXPECT().NewTimer(750*time.Millisecond).Return(timer1, timer1Wakeup)
+
+		baseBlobAccess.EXPECT().GetFromComposite(ctx, helloDigest, llDigest, blobSlicer).
+			Return(buffer.NewValidatedBufferFromByteSlice([]byte("ll")))
+
+		data, err := blobAccess.GetFromComposite(ctx, helloDigest, llDigest, blobSlicer).ToByteSlice(10000)
+		require.NoError(t, err)
+		require.Equal(t, []byte("ll"), data)
+	})
 
 	t.Run("FindMissingNonRetriableError", func(t *testing.T) {
 		// Errors for codes other than INTERNAL, UNAVAILABLE and

@@ -71,28 +71,15 @@ type directoryContext struct {
 	digest digest.Digest
 }
 
-func (dc *directoryContext) GetDirectoryContents() (*remoteexecution.Directory, cd_vfs.DirectoryContentsContext, re_vfs.Status) {
+func (dc *directoryContext) GetDirectoryContents() (*remoteexecution.Directory, re_vfs.Status) {
 	directory, err := dc.directoryFetcher.GetDirectory(dc.context, dc.digest)
 	if err != nil {
 		dc.LogError(err)
-		return nil, nil, re_vfs.StatusErrIO
+		return nil, re_vfs.StatusErrIO
 	}
-	return directory, &directoryContentsContext{
-		directoryContext: dc,
-	}, re_vfs.StatusOK
+	return directory, re_vfs.StatusOK
 }
 
 func (dc *directoryContext) LogError(err error) {
 	dc.errorLogger.Log(util.StatusWrapf(err, "Directory %#v", dc.digest.String()))
-}
-
-// directoryContentsContext contains the state associated with an
-// instance of ContentAddressableStorageDirectory, within the context of
-// a VirtualLookup() or VirtualReadDir() call.
-type directoryContentsContext struct {
-	directoryContext *directoryContext
-}
-
-func (dcc *directoryContentsContext) LookupDirectory(blobDigest digest.Digest) (re_vfs.Directory, re_vfs.Status) {
-	return dcc.directoryContext.LookupDirectory(blobDigest), re_vfs.StatusOK
 }

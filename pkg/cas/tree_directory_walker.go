@@ -7,13 +7,10 @@ import (
 	remoteexecution "github.com/bazelbuild/remote-apis/build/bazel/remote/execution/v2"
 	"github.com/buildbarn/bb-remote-execution/pkg/cas"
 	"github.com/buildbarn/bb-storage/pkg/digest"
-
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 type treeDirectoryWalker struct {
-	fetcher    IndexedTreeFetcher
+	fetcher    cas.DirectoryFetcher
 	treeDigest digest.Digest
 }
 
@@ -21,7 +18,7 @@ type treeDirectoryWalker struct {
 // all Directory messages are stored in a single Tree object in the
 // Content Addressable Storage (CAS). This is the case for output
 // directories of build actions.
-func NewTreeDirectoryWalker(fetcher IndexedTreeFetcher, treeDigest digest.Digest) cas.DirectoryWalker {
+func NewTreeDirectoryWalker(fetcher cas.DirectoryFetcher, treeDigest digest.Digest) cas.DirectoryWalker {
 	return &treeRootDirectoryWalker{
 		treeDirectoryWalker: treeDirectoryWalker{
 			fetcher:    fetcher,
@@ -33,7 +30,7 @@ func NewTreeDirectoryWalker(fetcher IndexedTreeFetcher, treeDigest digest.Digest
 func (dw *treeDirectoryWalker) GetChild(childDigest digest.Digest) cas.DirectoryWalker {
 	return &treeChildDirectoryWalker{
 		treeDirectoryWalker: dw,
-		childDigest:         childDigest.GetKey(digest.KeyWithoutInstance),
+		childDigest:         childDigest,
 	}
 }
 
@@ -46,14 +43,7 @@ type treeRootDirectoryWalker struct {
 }
 
 func (dw *treeRootDirectoryWalker) GetDirectory(ctx context.Context) (*remoteexecution.Directory, error) {
-	indexedTree, err := dw.fetcher.GetIndexedTree(ctx, dw.treeDigest)
-	if err != nil {
-		return nil, err
-	}
-	if indexedTree.Tree.Root == nil {
-		return nil, status.Error(codes.InvalidArgument, "Tree does not contain a root directory")
-	}
-	return indexedTree.Tree.Root, nil
+	return dw.fetcher.GetTreeRootDirectory(ctx, dw.treeDigest)
 }
 
 func (dw *treeRootDirectoryWalker) GetDescription() string {
@@ -62,21 +52,13 @@ func (dw *treeRootDirectoryWalker) GetDescription() string {
 
 type treeChildDirectoryWalker struct {
 	*treeDirectoryWalker
-	childDigest string
+	childDigest digest.Digest
 }
 
 func (dw *treeChildDirectoryWalker) GetDirectory(ctx context.Context) (*remoteexecution.Directory, error) {
-	indexedTree, err := dw.fetcher.GetIndexedTree(ctx, dw.treeDigest)
-	if err != nil {
-		return nil, err
-	}
-	index, ok := indexedTree.Index[dw.childDigest]
-	if !ok {
-		return nil, status.Error(codes.InvalidArgument, "Child directory not found in tree")
-	}
-	return indexedTree.Tree.Children[index], nil
+	return dw.fetcher.GetTreeChildDirectory(ctx, dw.treeDigest, dw.childDigest)
 }
 
 func (dw *treeChildDirectoryWalker) GetDescription() string {
-	return fmt.Sprintf("Tree %#v child directory %#v", dw.treeDigest.String(), dw.childDigest)
+	return fmt.Sprintf("Tree %#v child directory %#v", dw.treeDigest.String(), dw.childDigest.String())
 }

@@ -5,6 +5,7 @@ package buildbarn.configuration.bb_clientd;
 import "google/protobuf/duration.proto";
 import "pkg/proto/configuration/blobstore/blobstore.proto";
 import "pkg/proto/configuration/builder/builder.proto";
+import "pkg/proto/configuration/cas/cas.proto";
 import "pkg/proto/configuration/filesystem/filesystem.proto";
 import "pkg/proto/configuration/filesystem/virtual/virtual.proto";
 import "pkg/proto/configuration/global/global.proto";
@@ -79,6 +80,12 @@ message ApplicationConfiguration {
   // codes INTERNAL, UNAVAILABLE or UNKNOWN. The duration specifies the
   // maximum delay that may be caused by performing these retries.
   google.protobuf.Duration maximum_fuse_retry_delay = 9;
+
+  // If set, cache REv2 Directory objects in memory. These objects need
+  // to be loaded from the Content Addressable Storage when accessed
+  // through "cas", but also when instantiated under "outputs".
+  buildbarn.configuration.cas.CachingDirectoryFetcherConfiguration
+      directory_cache = 10;
 }
 
 message OutputPathPersistencyConfiguration {

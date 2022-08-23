@@ -7,6 +7,7 @@ import (
 	remoteexecution "github.com/bazelbuild/remote-apis/build/bazel/remote/execution/v2"
 	"github.com/buildbarn/bb-storage/pkg/blobstore"
 	"github.com/buildbarn/bb-storage/pkg/blobstore/buffer"
+	"github.com/buildbarn/bb-storage/pkg/blobstore/slicing"
 	"github.com/buildbarn/bb-storage/pkg/clock"
 	"github.com/buildbarn/bb-storage/pkg/digest"
 	"github.com/buildbarn/bb-storage/pkg/random"
@@ -100,11 +101,25 @@ func (ba *errorRetryingBlobAccess) Get(ctx context.Context, digest digest.Digest
 	retryState := ba.getRetryState(ctx)
 	return buffer.WithErrorHandler(
 		ba.BlobAccess.Get(ctx, digest),
-		&retryingErrorHandler{
+		&retryingGetErrorHandler{
 			blobAccess: ba,
 			context:    ctx,
 			digest:     digest,
 			retryState: retryState,
+		})
+}
+
+func (ba *errorRetryingBlobAccess) GetFromComposite(ctx context.Context, parentDigest, childDigest digest.Digest, slicer slicing.BlobSlicer) buffer.Buffer {
+	retryState := ba.getRetryState(ctx)
+	return buffer.WithErrorHandler(
+		ba.BlobAccess.GetFromComposite(ctx, parentDigest, childDigest, slicer),
+		&retryingGetFromCompositeErrorHandler{
+			blobAccess:   ba,
+			context:      ctx,
+			parentDigest: parentDigest,
+			childDigest:  childDigest,
+			slicer:       slicer,
+			retryState:   retryState,
 		})
 }
 
@@ -134,20 +149,40 @@ func (ba *errorRetryingBlobAccess) GetCapabilities(ctx context.Context, instance
 	}
 }
 
-// RetryingErrorHandler is an ErrorHandler that is used by Get() to
+// RetryingGetErrorHandler is an ErrorHandler that is used by Get() to
 // perform retries.
-type retryingErrorHandler struct {
+type retryingGetErrorHandler struct {
 	blobAccess *errorRetryingBlobAccess
 	context    context.Context
 	digest     digest.Digest
 	retryState retryState
 }
 
-func (eh *retryingErrorHandler) OnError(err error) (buffer.Buffer, error) {
+func (eh *retryingGetErrorHandler) OnError(err error) (buffer.Buffer, error) {
 	if eh.blobAccess.maybeSleep(eh.context, &eh.retryState, err) {
 		return nil, err
 	}
 	return eh.blobAccess.BlobAccess.Get(eh.context, eh.digest), nil
 }
 
-func (eh *retryingErrorHandler) Done() {}
+func (eh *retryingGetErrorHandler) Done() {}
+
+// RetryingGetFromCompositeErrorHandler is an ErrorHandler that is used
+// by GetFromComposite() to perform retries.
+type retryingGetFromCompositeErrorHandler struct {
+	blobAccess   *errorRetryingBlobAccess
+	context      context.Context
+	parentDigest digest.Digest
+	childDigest  digest.Digest
+	slicer       slicing.BlobSlicer
+	retryState   retryState
+}
+
+func (eh *retryingGetFromCompositeErrorHandler) OnError(err error) (buffer.Buffer, error) {
+	if eh.blobAccess.maybeSleep(eh.context, &eh.retryState, err) {
+		return nil, err
+	}
+	return eh.blobAccess.BlobAccess.GetFromComposite(eh.context, eh.parentDigest, eh.childDigest, eh.slicer), nil
+}
+
+func (eh *retryingGetFromCompositeErrorHandler) Done() {}

@@ -17,22 +17,12 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-// DirectoryContentsContext can be used by
-// ContentAddressableStorageDirectory's VirtualLookup() and
-// VirtualReaddir() to resolve one of its child directories.
-//
-// This object is returned together with
-// DirectoryContext.GetDirectoryContents(), allowing DirectoryContext to
-// preserve state between that call and child directory lookups.
-type DirectoryContentsContext interface {
-	LookupDirectory(digest digest.Digest) (virtual.Directory, virtual.Status)
-}
-
 // DirectoryContext contains all of the methods that the directory
 // created by NewContentAddressableStorageDirectory uses to obtain its
 // contents and instantiate inodes for its children.
 type DirectoryContext interface {
-	GetDirectoryContents() (*remoteexecution.Directory, DirectoryContentsContext, virtual.Status)
+	GetDirectoryContents() (*remoteexecution.Directory, virtual.Status)
+	LookupDirectory(digest digest.Digest) virtual.Directory
 	LogError(err error)
 
 	// Same as the above, but for regular files.
@@ -87,7 +77,7 @@ func (d *contentAddressableStorageDirectory) resolveHandle(r io.ByteReader) (vir
 	// If a suffix is provided, it corresponds to a symbolic link
 	// inside this directory. Files and directories will be
 	// resolvable through other means.
-	directory, _, s := d.directoryContext.GetDirectoryContents()
+	directory, s := d.directoryContext.GetDirectoryContents()
 	if s != virtual.StatusOK {
 		return nil, nil, s
 	}
@@ -109,7 +99,7 @@ func (d *contentAddressableStorageDirectory) VirtualGetAttributes(requested virt
 }
 
 func (d *contentAddressableStorageDirectory) VirtualLookup(name path.Component, requested virtual.AttributesMask, out *virtual.Attributes) (virtual.Directory, virtual.Leaf, virtual.Status) {
-	directory, contentsContext, s := d.directoryContext.GetDirectoryContents()
+	directory, s := d.directoryContext.GetDirectoryContents()
 	if s != virtual.StatusOK {
 		return nil, nil, s
 	}
@@ -126,10 +116,7 @@ func (d *contentAddressableStorageDirectory) VirtualLookup(name path.Component, 
 			d.directoryContext.LogError(util.StatusWrapf(err, "Failed to parse digest for directory %#v", n))
 			return nil, nil, virtual.StatusErrIO
 		}
-		child, s := contentsContext.LookupDirectory(entryDigest)
-		if s != virtual.StatusOK {
-			return nil, nil, s
-		}
+		child := d.directoryContext.LookupDirectory(entryDigest)
 		child.VirtualGetAttributes(requested, out)
 		return child, nil, virtual.StatusOK
 	}
@@ -158,7 +145,7 @@ func (d *contentAddressableStorageDirectory) VirtualLookup(name path.Component, 
 }
 
 func (d *contentAddressableStorageDirectory) VirtualOpenChild(name path.Component, shareAccess virtual.ShareMask, createAttributes *virtual.Attributes, existingOptions *virtual.OpenExistingOptions, requested virtual.AttributesMask, openedFileAttributes *virtual.Attributes) (virtual.Leaf, virtual.AttributesMask, virtual.ChangeInfo, virtual.Status) {
-	directory, _, s := d.directoryContext.GetDirectoryContents()
+	directory, s := d.directoryContext.GetDirectoryContents()
 	if s != virtual.StatusOK {
 		return nil, 0, virtual.ChangeInfo{}, s
 	}
@@ -195,7 +182,7 @@ func (d *contentAddressableStorageDirectory) VirtualOpenChild(name path.Componen
 }
 
 func (d *contentAddressableStorageDirectory) VirtualReadDir(firstCookie uint64, requested virtual.AttributesMask, reporter virtual.DirectoryEntryReporter) virtual.Status {
-	directory, contentsContext, s := d.directoryContext.GetDirectoryContents()
+	directory, s := d.directoryContext.GetDirectoryContents()
 	if s != virtual.StatusOK {
 		return s
 	}
@@ -215,10 +202,7 @@ func (d *contentAddressableStorageDirectory) VirtualReadDir(firstCookie uint64, 
 			d.directoryContext.LogError(util.StatusWrapf(err, "Failed to parse digest for directory %#v", entry.Name))
 			return virtual.StatusErrIO
 		}
-		child, s := contentsContext.LookupDirectory(entryDigest)
-		if s != virtual.StatusOK {
-			return s
-		}
+		child := d.directoryContext.LookupDirectory(entryDigest)
 		var attributes virtual.Attributes
 		child.VirtualGetAttributes(requested, &attributes)
 		if !reporter.ReportDirectory(nextCookieOffset+i, name, child, &attributes) {

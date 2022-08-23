@@ -6,6 +6,8 @@ load("@rules_pkg//:pkg.bzl", "pkg_deb", "pkg_tar")
 # gazelle:resolve proto go pkg/proto/configuration/blobstore/blobstore.proto @com_github_buildbarn_bb_storage//pkg/proto/configuration/blobstore
 # gazelle:resolve proto pkg/proto/configuration/builder/builder.proto @com_github_buildbarn_bb_storage//pkg/proto/configuration/builder:builder_proto
 # gazelle:resolve proto go pkg/proto/configuration/builder/builder.proto @com_github_buildbarn_bb_storage//pkg/proto/configuration/builder
+# gazelle:resolve proto pkg/proto/configuration/cas/cas.proto @com_github_buildbarn_bb_remote_execution//pkg/proto/configuration/cas:cas_proto
+# gazelle:resolve proto go pkg/proto/configuration/cas/cas.proto @com_github_buildbarn_bb_remote_execution//pkg/proto/configuration/cas
 # gazelle:resolve proto pkg/proto/configuration/filesystem/filesystem.proto @com_github_buildbarn_bb_remote_execution//pkg/proto/configuration/filesystem:filesystem_proto
 # gazelle:resolve proto go pkg/proto/configuration/filesystem/filesystem.proto @com_github_buildbarn_bb_remote_execution//pkg/proto/configuration/filesystem
 # gazelle:resolve proto pkg/proto/configuration/filesystem/virtual/virtual.proto @com_github_buildbarn_bb_remote_execution//pkg/proto/configuration/filesystem/virtual:virtual_proto

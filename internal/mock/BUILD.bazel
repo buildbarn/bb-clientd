@@ -23,10 +23,10 @@ gomock(
 )
 
 gomock(
-    name = "cas",
-    out = "cas.go",
-    interfaces = ["IndexedTreeFetcher"],
-    library = "//pkg/cas",
+    name = "blobstore_slicing",
+    out = "blobstore_slicing.go",
+    interfaces = ["BlobSlicer"],
+    library = "@com_github_buildbarn_bb_storage//pkg/blobstore/slicing",
     package = "mock",
 )
 
@@ -58,7 +58,6 @@ gomock(
     out = "filesystem_virtual.go",
     interfaces = [
         "DigestLookupFunc",
-        "DirectoryContentsContext",
         "DirectoryContext",
         "InstanceNameLookupFunc",
         "OutputPath",
@@ -152,7 +151,7 @@ go_library(
     srcs = [
         ":aliases.go",
         ":blobstore.go",
-        ":cas.go",
+        ":blobstore_slicing.go",
         ":clock.go",
         ":filesystem.go",
         ":filesystem_virtual.go",
@@ -175,6 +174,7 @@ go_library(
         "@com_github_buildbarn_bb_remote_execution//pkg/proto/remoteoutputservice",
         "@com_github_buildbarn_bb_storage//pkg/blobstore",
         "@com_github_buildbarn_bb_storage//pkg/blobstore/buffer",
+        "@com_github_buildbarn_bb_storage//pkg/blobstore/slicing",
         "@com_github_buildbarn_bb_storage//pkg/clock",
         "@com_github_buildbarn_bb_storage//pkg/digest",
         "@com_github_buildbarn_bb_storage//pkg/filesystem",
