@@ -1,6 +1,4 @@
-# gazelle:ignore
-
-load("@bazel_gomock//:gomock.bzl", "gomock")
+load("@io_bazel_rules_go//extras:gomock.bzl", "gomock")
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 gomock(
@@ -149,21 +147,22 @@ gomock(
 go_library(
     name = "mock",
     srcs = [
-        ":aliases.go",
-        ":blobstore.go",
-        ":blobstore_slicing.go",
-        ":clock.go",
-        ":filesystem.go",
-        ":filesystem_virtual.go",
-        ":outputpathpersistency.go",
-        ":random.go",
-        ":re_cas.go",
-        ":re_filesystem.go",
-        ":re_filesystem_virtual.go",
-        ":storage_util.go",
+        "aliases.go",
+        "blobstore.go",
+        "blobstore_slicing.go",
+        "clock.go",
+        "filesystem.go",
+        "filesystem_virtual.go",
+        "outputpathpersistency.go",
+        "random.go",
+        "re_cas.go",
+        "re_filesystem.go",
+        "re_filesystem_virtual.go",
+        "storage_util.go",
     ],
     importpath = "github.com/buildbarn/bb-clientd/internal/mock",
     visibility = ["//:__subpackages__"],
+    # keep
     deps = [
         "//pkg/cas",
         "//pkg/filesystem/virtual",
