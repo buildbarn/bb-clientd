@@ -108,7 +108,7 @@ func TestGlobalDirectoryContextLookupDirectory(t *testing.T) {
 
 	d := globalDirectoryContext.LookupDirectory(directoryDigest)
 	var out virtual.Attributes
-	d.VirtualGetAttributes(attributesMask, &out)
+	d.VirtualGetAttributes(ctx, attributesMask, &out)
 	require.Equal(
 		t,
 		(&virtual.Attributes{}).
@@ -129,7 +129,7 @@ func TestGlobalDirectoryContextLookupDirectory(t *testing.T) {
 		errorLogger.EXPECT().Log(testutil.EqStatus(t, status.Error(codes.Internal, "Directory \"e0f28d311a9b2deff103e32f6105b2b29d636c287797ca72077a648cd736cd36-123-hello\": Server on fire")))
 		reporter := mock.NewMockDirectoryEntryReporter(ctrl)
 
-		require.Equal(t, virtual.StatusErrIO, d.VirtualReadDir(0, 0, reporter))
+		require.Equal(t, virtual.StatusErrIO, d.VirtualReadDir(ctx, 0, 0, reporter))
 	})
 
 	t.Run("MalformedDirectory", func(t *testing.T) {
@@ -147,7 +147,7 @@ func TestGlobalDirectoryContextLookupDirectory(t *testing.T) {
 		errorLogger.EXPECT().Log(testutil.EqStatus(t, status.Error(codes.InvalidArgument, "Directory \"e0f28d311a9b2deff103e32f6105b2b29d636c287797ca72077a648cd736cd36-123-hello\": Failed to parse digest for file \"broken\": Unknown digest hash length: 24 characters")))
 		reporter := mock.NewMockDirectoryEntryReporter(ctrl)
 
-		require.Equal(t, virtual.StatusErrIO, d.VirtualReadDir(0, 0, reporter))
+		require.Equal(t, virtual.StatusErrIO, d.VirtualReadDir(ctx, 0, 0, reporter))
 	})
 
 	t.Run("Success", func(t *testing.T) {
@@ -174,12 +174,12 @@ func TestGlobalDirectoryContextLookupDirectory(t *testing.T) {
 		casFileFactory.EXPECT().
 			LookupFile(digest.MustNewDigest("hello", "32d757ab2b5c09e11daf0b0c04a3ba9da78e96fd24f9f838be0333f093354c82", 42), true).
 			Return(executable)
-		executable.EXPECT().VirtualGetAttributes(virtual.AttributesMask(0), gomock.Any())
+		executable.EXPECT().VirtualGetAttributes(ctx, virtual.AttributesMask(0), gomock.Any())
 		file := mock.NewMockNativeLeaf(ctrl)
 		casFileFactory.EXPECT().
 			LookupFile(digest.MustNewDigest("hello", "64ec88ca00b268e5ba1a35678a1b5316d212f4f366b2477232534a8aeca37f3c", 11), false).
 			Return(file)
-		file.EXPECT().VirtualGetAttributes(virtual.AttributesMask(0), gomock.Any())
+		file.EXPECT().VirtualGetAttributes(ctx, virtual.AttributesMask(0), gomock.Any())
 
 		directoryFetcher.EXPECT().GetDirectory(ctx, directoryDigest).Return(&remoteexecution.Directory{
 			Directories: []*remoteexecution.DirectoryNode{
@@ -210,10 +210,10 @@ func TestGlobalDirectoryContextLookupDirectory(t *testing.T) {
 			},
 		}, nil)
 		reporter := mock.NewMockDirectoryEntryReporter(ctrl)
-		reporter.EXPECT().ReportDirectory(uint64(1), path.MustNewComponent("directory"), gomock.Any(), gomock.Any()).Return(true)
-		reporter.EXPECT().ReportLeaf(uint64(2), path.MustNewComponent("executable"), executable, gomock.Any()).Return(true)
-		reporter.EXPECT().ReportLeaf(uint64(3), path.MustNewComponent("file"), file, gomock.Any()).Return(true)
+		reporter.EXPECT().ReportEntry(uint64(1), path.MustNewComponent("directory"), gomock.Any(), gomock.Any()).Return(true)
+		reporter.EXPECT().ReportEntry(uint64(2), path.MustNewComponent("executable"), virtual.DirectoryChild{}.FromLeaf(executable), gomock.Any()).Return(true)
+		reporter.EXPECT().ReportEntry(uint64(3), path.MustNewComponent("file"), virtual.DirectoryChild{}.FromLeaf(file), gomock.Any()).Return(true)
 
-		require.Equal(t, virtual.StatusOK, d.VirtualReadDir(0, 0, reporter))
+		require.Equal(t, virtual.StatusOK, d.VirtualReadDir(ctx, 0, 0, reporter))
 	})
 }

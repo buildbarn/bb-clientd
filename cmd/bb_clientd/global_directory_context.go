@@ -58,7 +58,7 @@ func (gdc *GlobalDirectoryContext) createDirectory(blobDigest digest.Digest) (re
 		uint64(blobDigest.GetSizeBytes()))
 }
 
-func (gdc *GlobalDirectoryContext) resolve(blobDigest digest.Digest, r io.ByteReader) (re_vfs.Directory, re_vfs.Leaf, re_vfs.Status) {
+func (gdc *GlobalDirectoryContext) resolve(blobDigest digest.Digest, r io.ByteReader) (re_vfs.DirectoryChild, re_vfs.Status) {
 	_, handleResolver := gdc.createDirectory(blobDigest)
 	return handleResolver(r)
 }

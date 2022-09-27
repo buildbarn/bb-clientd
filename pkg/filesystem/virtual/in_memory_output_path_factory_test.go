@@ -1,6 +1,7 @@
 package virtual_test
 
 import (
+	"context"
 	"sort"
 	"testing"
 	"time"
@@ -15,7 +16,7 @@ import (
 )
 
 func TestInMemoryOutputPathFactory(t *testing.T) {
-	ctrl := gomock.NewController(t)
+	ctrl, ctx := gomock.WithContext(context.Background(), t)
 
 	filePool := mock.NewMockFilePool(ctrl)
 	symlinkFactory := mock.NewMockSymlinkFactory(ctrl)
@@ -43,7 +44,7 @@ func TestInMemoryOutputPathFactory(t *testing.T) {
 	directoryHandle.EXPECT().GetAttributes(re_vfs.AttributesMaskLastDataModificationTime, gomock.Any())
 
 	var attributes re_vfs.Attributes
-	outputPath.VirtualGetAttributes(re_vfs.AttributesMaskLastDataModificationTime, &attributes)
+	outputPath.VirtualGetAttributes(ctx, re_vfs.AttributesMaskLastDataModificationTime, &attributes)
 	lastDataModificationTime, ok := attributes.GetLastDataModificationTime()
 	require.True(t, ok)
 	require.Equal(t, time.Unix(1000, 0), lastDataModificationTime)

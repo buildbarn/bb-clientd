@@ -57,7 +57,7 @@ func (gtc *GlobalTreeContext) createTreeContext(blobDigest digest.Digest) *treeC
 	return tc
 }
 
-func (gtc *GlobalTreeContext) resolve(blobDigest digest.Digest, r io.ByteReader) (re_vfs.Directory, re_vfs.Leaf, re_vfs.Status) {
+func (gtc *GlobalTreeContext) resolve(blobDigest digest.Digest, r io.ByteReader) (re_vfs.DirectoryChild, re_vfs.Status) {
 	tc := gtc.createTreeContext(blobDigest)
 	return tc.resolve(r)
 }
@@ -97,10 +97,10 @@ func (tc *treeContext) createChildDirectory(childDigest digest.Digest) (re_vfs.D
 		uint64(tc.treeDigest.GetSizeBytes()))
 }
 
-func (tc *treeContext) resolve(r io.ByteReader) (re_vfs.Directory, re_vfs.Leaf, re_vfs.Status) {
+func (tc *treeContext) resolve(r io.ByteReader) (re_vfs.DirectoryChild, re_vfs.Status) {
 	isChild, err := r.ReadByte()
 	if err != nil {
-		return nil, nil, re_vfs.StatusErrBadHandle
+		return re_vfs.DirectoryChild{}, re_vfs.StatusErrBadHandle
 	}
 	switch isChild {
 	case 0:
@@ -109,12 +109,12 @@ func (tc *treeContext) resolve(r io.ByteReader) (re_vfs.Directory, re_vfs.Leaf, 
 	case 1:
 		childDigest, err := tc.treeDigest.GetInstanceName().NewDigestFromCompactBinary(r)
 		if err != nil {
-			return nil, nil, re_vfs.StatusErrBadHandle
+			return re_vfs.DirectoryChild{}, re_vfs.StatusErrBadHandle
 		}
 		_, handleResolver := tc.createChildDirectory(childDigest)
 		return handleResolver(r)
 	default:
-		return nil, nil, re_vfs.StatusErrBadHandle
+		return re_vfs.DirectoryChild{}, re_vfs.StatusErrBadHandle
 	}
 }
 

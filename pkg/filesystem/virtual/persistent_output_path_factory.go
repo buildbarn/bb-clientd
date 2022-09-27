@@ -70,7 +70,8 @@ func (sr *stateRestorer) restoreDirectoryRecursive(reader outputpathpersistency.
 	initialNodes := map[path.Component]virtual.InitialNode{}
 	defer func() {
 		for _, initialNode := range initialNodes {
-			initialNode.Leaf.Unlink()
+			_, leaf := initialNode.GetPair()
+			leaf.Unlink()
 		}
 	}()
 
@@ -88,9 +89,7 @@ func (sr *stateRestorer) restoreDirectoryRecursive(reader outputpathpersistency.
 		if err != nil {
 			return util.StatusWrapf(err, "Failed to obtain digest for file %#v", childPath.String())
 		}
-		initialNodes[component] = virtual.InitialNode{
-			Leaf: sr.casFileFactory.LookupFile(childDigest, entry.IsExecutable),
-		}
+		initialNodes[component] = virtual.InitialNode{}.FromLeaf(sr.casFileFactory.LookupFile(childDigest, entry.IsExecutable))
 	}
 	for _, entry := range contents.Symlinks {
 		component, ok := path.NewComponent(entry.Name)
@@ -101,9 +100,7 @@ func (sr *stateRestorer) restoreDirectoryRecursive(reader outputpathpersistency.
 			return status.Errorf(codes.InvalidArgument, "Directory contains multiple children named %#v", entry.Name)
 		}
 
-		initialNodes[component] = virtual.InitialNode{
-			Leaf: sr.symlinkFactory.LookupSymlink([]byte(entry.Target)),
-		}
+		initialNodes[component] = virtual.InitialNode{}.FromLeaf(sr.symlinkFactory.LookupSymlink([]byte(entry.Target)))
 	}
 	if err := d.CreateChildren(initialNodes, true); err != nil {
 		return util.StatusWrap(err, "Failed to create files and symbolic links")

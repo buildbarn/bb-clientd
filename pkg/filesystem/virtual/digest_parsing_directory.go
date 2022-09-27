@@ -1,6 +1,7 @@
 package virtual
 
 import (
+	"context"
 	"strconv"
 	"strings"
 
@@ -13,11 +14,11 @@ import (
 // DigestLookupFunc is called by directories created using
 // NewDigestParsingDirectory to complete the parsing of a digest. The
 // callback can yield a directory or file corresponding with the digest.
-type DigestLookupFunc func(digest digest.Digest) (virtual.Directory, virtual.Leaf, virtual.Status)
+type DigestLookupFunc func(digest digest.Digest) (virtual.DirectoryChild, virtual.Status)
 
 type digestParsingDirectory struct {
 	nonIterableDirectory
-	readOnlyDirectory
+	virtual.ReadOnlyDirectory
 
 	instanceName digest.InstanceName
 	lookupFunc   DigestLookupFunc
@@ -37,7 +38,7 @@ func NewDigestParsingDirectory(instanceName digest.InstanceName, lookupFunc Dige
 	}
 }
 
-func (d *digestParsingDirectory) VirtualGetAttributes(requested virtual.AttributesMask, attributes *virtual.Attributes) {
+func (d *digestParsingDirectory) VirtualGetAttributes(ctx context.Context, requested virtual.AttributesMask, attributes *virtual.Attributes) {
 	attributes.SetChangeID(0)
 	attributes.SetFileType(filesystem.FileTypeDirectory)
 	attributes.SetLinkCount(virtual.ImplicitDirectoryLinkCount)
@@ -62,39 +63,36 @@ func (d *digestParsingDirectory) parseFilename(name path.Component) (digest.Dige
 	return fileDigest, true
 }
 
-func (d *digestParsingDirectory) VirtualLookup(name path.Component, requested virtual.AttributesMask, out *virtual.Attributes) (virtual.Directory, virtual.Leaf, virtual.Status) {
+func (d *digestParsingDirectory) VirtualLookup(ctx context.Context, name path.Component, requested virtual.AttributesMask, out *virtual.Attributes) (virtual.DirectoryChild, virtual.Status) {
 	digest, ok := d.parseFilename(name)
 	if !ok {
-		return nil, nil, virtual.StatusErrNoEnt
+		return virtual.DirectoryChild{}, virtual.StatusErrNoEnt
 	}
-	directory, leaf, s := d.lookupFunc(digest)
+	child, s := d.lookupFunc(digest)
 	if s != virtual.StatusOK {
-		return nil, nil, s
+		return virtual.DirectoryChild{}, s
 	}
-	if directory != nil {
-		directory.VirtualGetAttributes(requested, out)
-	} else {
-		leaf.VirtualGetAttributes(requested, out)
-	}
-	return directory, leaf, s
+	child.GetNode().VirtualGetAttributes(ctx, requested, out)
+	return child, s
 }
 
-func (d *digestParsingDirectory) VirtualOpenChild(name path.Component, shareAccess virtual.ShareMask, createAttributes *virtual.Attributes, existingOptions *virtual.OpenExistingOptions, requested virtual.AttributesMask, openedFileAttributes *virtual.Attributes) (virtual.Leaf, virtual.AttributesMask, virtual.ChangeInfo, virtual.Status) {
+func (d *digestParsingDirectory) VirtualOpenChild(ctx context.Context, name path.Component, shareAccess virtual.ShareMask, createAttributes *virtual.Attributes, existingOptions *virtual.OpenExistingOptions, requested virtual.AttributesMask, openedFileAttributes *virtual.Attributes) (virtual.Leaf, virtual.AttributesMask, virtual.ChangeInfo, virtual.Status) {
 	digest, ok := d.parseFilename(name)
 	if !ok {
-		return virtualOpenChildDoesntExist(createAttributes)
+		return virtual.ReadOnlyDirectoryOpenChildDoesntExist(createAttributes)
 	}
 	if existingOptions == nil {
 		return nil, 0, virtual.ChangeInfo{}, virtual.StatusErrExist
 	}
 
-	_, leaf, s := d.lookupFunc(digest)
+	child, s := d.lookupFunc(digest)
 	if s != virtual.StatusOK {
 		return nil, 0, virtual.ChangeInfo{}, s
 	}
-	if leaf == nil {
+	directory, leaf := child.GetPair()
+	if directory != nil {
 		return nil, 0, virtual.ChangeInfo{}, virtual.StatusErrIsDir
 	}
-	s = leaf.VirtualOpenSelf(shareAccess, existingOptions, requested, openedFileAttributes)
+	s = leaf.VirtualOpenSelf(ctx, shareAccess, existingOptions, requested, openedFileAttributes)
 	return leaf, existingOptions.ToAttributesMask(), virtual.ChangeInfo{}, s
 }

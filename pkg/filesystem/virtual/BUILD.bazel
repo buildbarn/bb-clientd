@@ -14,9 +14,7 @@ go_library(
         "non_iterable_directory.go",
         "output_path_factory.go",
         "persistent_output_path_factory.go",
-        "read_only_directory.go",
         "remote_output_service_directory.go",
-        "static_directory.go",
     ],
     importpath = "github.com/buildbarn/bb-clientd/pkg/filesystem/virtual",
     visibility = ["//visibility:public"],
@@ -55,7 +53,6 @@ go_test(
         "local_file_uploading_output_path_factory_test.go",
         "persistent_output_path_factory_test.go",
         "remote_output_service_directory_test.go",
-        "static_directory_test.go",
     ],
     deps = [
         ":virtual",

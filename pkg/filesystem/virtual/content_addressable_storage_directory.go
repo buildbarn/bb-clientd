@@ -2,6 +2,7 @@ package virtual
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
 	"io"
 	"sort"
@@ -30,7 +31,7 @@ type DirectoryContext interface {
 }
 
 type contentAddressableStorageDirectory struct {
-	readOnlyDirectory
+	virtual.ReadOnlyDirectory
 
 	directoryContext DirectoryContext
 	instanceName     digest.InstanceName
@@ -66,29 +67,29 @@ func (d *contentAddressableStorageDirectory) createSymlink(index uint64, target 
 		AsNativeLeaf(virtual.BaseSymlinkFactory.LookupSymlink([]byte(target)))
 }
 
-func (d *contentAddressableStorageDirectory) resolveHandle(r io.ByteReader) (virtual.Directory, virtual.Leaf, virtual.Status) {
+func (d *contentAddressableStorageDirectory) resolveHandle(r io.ByteReader) (virtual.DirectoryChild, virtual.Status) {
 	index, err := binary.ReadUvarint(r)
 	if err != nil {
-		return nil, nil, virtual.StatusErrBadHandle
+		return virtual.DirectoryChild{}, virtual.StatusErrBadHandle
 	}
 	if index == 0 {
-		return d.createSelf(), nil, virtual.StatusOK
+		return virtual.DirectoryChild{}.FromDirectory(d.createSelf()), virtual.StatusOK
 	}
 	// If a suffix is provided, it corresponds to a symbolic link
 	// inside this directory. Files and directories will be
 	// resolvable through other means.
 	directory, s := d.directoryContext.GetDirectoryContents()
 	if s != virtual.StatusOK {
-		return nil, nil, s
+		return virtual.DirectoryChild{}, s
 	}
 	index--
 	if index >= uint64(len(directory.Symlinks)) {
-		return nil, nil, virtual.StatusErrBadHandle
+		return virtual.DirectoryChild{}, virtual.StatusErrBadHandle
 	}
-	return nil, d.createSymlink(index, directory.Symlinks[index].Target), virtual.StatusOK
+	return virtual.DirectoryChild{}.FromLeaf(d.createSymlink(index, directory.Symlinks[index].Target)), virtual.StatusOK
 }
 
-func (d *contentAddressableStorageDirectory) VirtualGetAttributes(requested virtual.AttributesMask, attributes *virtual.Attributes) {
+func (d *contentAddressableStorageDirectory) VirtualGetAttributes(ctx context.Context, requested virtual.AttributesMask, attributes *virtual.Attributes) {
 	attributes.SetChangeID(0)
 	// This should be 2 + nDirectories, but that requires us to load
 	// the directory. This is highly inefficient and error prone.
@@ -98,10 +99,10 @@ func (d *contentAddressableStorageDirectory) VirtualGetAttributes(requested virt
 	attributes.SetSizeBytes(d.sizeBytes)
 }
 
-func (d *contentAddressableStorageDirectory) VirtualLookup(name path.Component, requested virtual.AttributesMask, out *virtual.Attributes) (virtual.Directory, virtual.Leaf, virtual.Status) {
+func (d *contentAddressableStorageDirectory) VirtualLookup(ctx context.Context, name path.Component, requested virtual.AttributesMask, out *virtual.Attributes) (virtual.DirectoryChild, virtual.Status) {
 	directory, s := d.directoryContext.GetDirectoryContents()
 	if s != virtual.StatusOK {
-		return nil, nil, s
+		return virtual.DirectoryChild{}, s
 	}
 
 	// The Remote Execution protocol requires that entries stored in
@@ -114,11 +115,11 @@ func (d *contentAddressableStorageDirectory) VirtualLookup(name path.Component, 
 		entryDigest, err := d.instanceName.NewDigestFromProto(directories[i].Digest)
 		if err != nil {
 			d.directoryContext.LogError(util.StatusWrapf(err, "Failed to parse digest for directory %#v", n))
-			return nil, nil, virtual.StatusErrIO
+			return virtual.DirectoryChild{}, virtual.StatusErrIO
 		}
 		child := d.directoryContext.LookupDirectory(entryDigest)
-		child.VirtualGetAttributes(requested, out)
-		return child, nil, virtual.StatusOK
+		child.VirtualGetAttributes(ctx, requested, out)
+		return virtual.DirectoryChild{}.FromDirectory(child), virtual.StatusOK
 	}
 
 	files := directory.Files
@@ -127,24 +128,24 @@ func (d *contentAddressableStorageDirectory) VirtualLookup(name path.Component, 
 		entryDigest, err := d.instanceName.NewDigestFromProto(entry.Digest)
 		if err != nil {
 			d.directoryContext.LogError(util.StatusWrapf(err, "Failed to parse digest for file %#v", n))
-			return nil, nil, virtual.StatusErrIO
+			return virtual.DirectoryChild{}, virtual.StatusErrIO
 		}
 		child := d.directoryContext.LookupFile(entryDigest, entry.IsExecutable)
-		child.VirtualGetAttributes(requested, out)
-		return nil, child, virtual.StatusOK
+		child.VirtualGetAttributes(ctx, requested, out)
+		return virtual.DirectoryChild{}.FromLeaf(child), virtual.StatusOK
 	}
 
 	symlinks := directory.Symlinks
 	if i := sort.Search(len(symlinks), func(i int) bool { return symlinks[i].Name >= n }); i < len(symlinks) && symlinks[i].Name == n {
 		f := d.createSymlink(uint64(i), symlinks[i].Target)
-		f.VirtualGetAttributes(requested, out)
-		return nil, f, virtual.StatusOK
+		f.VirtualGetAttributes(ctx, requested, out)
+		return virtual.DirectoryChild{}.FromLeaf(f), virtual.StatusOK
 	}
 
-	return nil, nil, virtual.StatusErrNoEnt
+	return virtual.DirectoryChild{}, virtual.StatusErrNoEnt
 }
 
-func (d *contentAddressableStorageDirectory) VirtualOpenChild(name path.Component, shareAccess virtual.ShareMask, createAttributes *virtual.Attributes, existingOptions *virtual.OpenExistingOptions, requested virtual.AttributesMask, openedFileAttributes *virtual.Attributes) (virtual.Leaf, virtual.AttributesMask, virtual.ChangeInfo, virtual.Status) {
+func (d *contentAddressableStorageDirectory) VirtualOpenChild(ctx context.Context, name path.Component, shareAccess virtual.ShareMask, createAttributes *virtual.Attributes, existingOptions *virtual.OpenExistingOptions, requested virtual.AttributesMask, openedFileAttributes *virtual.Attributes) (virtual.Leaf, virtual.AttributesMask, virtual.ChangeInfo, virtual.Status) {
 	directory, s := d.directoryContext.GetDirectoryContents()
 	if s != virtual.StatusOK {
 		return nil, 0, virtual.ChangeInfo{}, s
@@ -153,7 +154,7 @@ func (d *contentAddressableStorageDirectory) VirtualOpenChild(name path.Componen
 	n := name.String()
 	directories := directory.Directories
 	if i := sort.Search(len(directories), func(i int) bool { return directories[i].Name >= n }); i < len(directories) && directories[i].Name == n {
-		return virtualOpenChildWrongFileType(existingOptions, virtual.StatusErrIsDir)
+		return virtual.ReadOnlyDirectoryOpenChildWrongFileType(existingOptions, virtual.StatusErrIsDir)
 	}
 
 	files := directory.Files
@@ -169,19 +170,19 @@ func (d *contentAddressableStorageDirectory) VirtualOpenChild(name path.Componen
 			return nil, 0, virtual.ChangeInfo{}, virtual.StatusErrIO
 		}
 		leaf := d.directoryContext.LookupFile(entryDigest, entry.IsExecutable)
-		s := leaf.VirtualOpenSelf(shareAccess, existingOptions, requested, openedFileAttributes)
+		s := leaf.VirtualOpenSelf(ctx, shareAccess, existingOptions, requested, openedFileAttributes)
 		return leaf, existingOptions.ToAttributesMask(), virtual.ChangeInfo{}, s
 	}
 
 	symlinks := directory.Symlinks
 	if i := sort.Search(len(symlinks), func(i int) bool { return symlinks[i].Name >= n }); i < len(symlinks) && symlinks[i].Name == n {
-		return virtualOpenChildWrongFileType(existingOptions, virtual.StatusErrSymlink)
+		return virtual.ReadOnlyDirectoryOpenChildWrongFileType(existingOptions, virtual.StatusErrSymlink)
 	}
 
-	return virtualOpenChildDoesntExist(createAttributes)
+	return virtual.ReadOnlyDirectoryOpenChildDoesntExist(createAttributes)
 }
 
-func (d *contentAddressableStorageDirectory) VirtualReadDir(firstCookie uint64, requested virtual.AttributesMask, reporter virtual.DirectoryEntryReporter) virtual.Status {
+func (d *contentAddressableStorageDirectory) VirtualReadDir(ctx context.Context, firstCookie uint64, requested virtual.AttributesMask, reporter virtual.DirectoryEntryReporter) virtual.Status {
 	directory, s := d.directoryContext.GetDirectoryContents()
 	if s != virtual.StatusOK {
 		return s
@@ -204,8 +205,8 @@ func (d *contentAddressableStorageDirectory) VirtualReadDir(firstCookie uint64, 
 		}
 		child := d.directoryContext.LookupDirectory(entryDigest)
 		var attributes virtual.Attributes
-		child.VirtualGetAttributes(requested, &attributes)
-		if !reporter.ReportDirectory(nextCookieOffset+i, name, child, &attributes) {
+		child.VirtualGetAttributes(ctx, requested, &attributes)
+		if !reporter.ReportEntry(nextCookieOffset+i, name, virtual.DirectoryChild{}.FromDirectory(child), &attributes) {
 			return virtual.StatusOK
 		}
 	}
@@ -226,8 +227,8 @@ func (d *contentAddressableStorageDirectory) VirtualReadDir(firstCookie uint64, 
 		}
 		child := d.directoryContext.LookupFile(entryDigest, entry.IsExecutable)
 		var attributes virtual.Attributes
-		child.VirtualGetAttributes(requested, &attributes)
-		if !reporter.ReportLeaf(nextCookieOffset+i, name, child, &attributes) {
+		child.VirtualGetAttributes(ctx, requested, &attributes)
+		if !reporter.ReportEntry(nextCookieOffset+i, name, virtual.DirectoryChild{}.FromLeaf(child), &attributes) {
 			return virtual.StatusOK
 		}
 	}
@@ -243,8 +244,8 @@ func (d *contentAddressableStorageDirectory) VirtualReadDir(firstCookie uint64, 
 		}
 		child := d.createSymlink(i, entry.Target)
 		var attributes virtual.Attributes
-		child.VirtualGetAttributes(requested, &attributes)
-		if !reporter.ReportLeaf(nextCookieOffset+i, name, child, &attributes) {
+		child.VirtualGetAttributes(ctx, requested, &attributes)
+		if !reporter.ReportEntry(nextCookieOffset+i, name, virtual.DirectoryChild{}.FromLeaf(child), &attributes) {
 			return virtual.StatusOK
 		}
 	}

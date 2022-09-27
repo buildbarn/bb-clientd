@@ -219,9 +219,9 @@ func TestPersistentOutputPathFactoryStartInitialBuild(t *testing.T) {
 		symlink1 := mock.NewMockNativeLeaf(ctrl)
 		symlinkFactory.EXPECT().LookupSymlink([]byte("target1")).Return(symlink1)
 		baseOutputPath.EXPECT().CreateChildren(map[path.Component]re_vfs.InitialNode{
-			path.MustNewComponent("file1"):    {Leaf: file1},
-			path.MustNewComponent("file2"):    {Leaf: file2},
-			path.MustNewComponent("symlink1"): {Leaf: symlink1},
+			path.MustNewComponent("file1"):    re_vfs.InitialNode{}.FromLeaf(file1),
+			path.MustNewComponent("file2"):    re_vfs.InitialNode{}.FromLeaf(file2),
+			path.MustNewComponent("symlink1"): re_vfs.InitialNode{}.FromLeaf(symlink1),
 		}, true)
 		reader.EXPECT().Close()
 		clock.EXPECT().Now().Return(time.Unix(1000, 0))

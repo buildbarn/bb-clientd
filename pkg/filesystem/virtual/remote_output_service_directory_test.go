@@ -251,7 +251,7 @@ func TestRemoteOutputServiceDirectoryStartBuild(t *testing.T) {
 				child := mock.NewMockInitialContentsFetcher(ctrl)
 				child.EXPECT().GetContainingDigests(ctx).Return(digest.EmptySet, status.Error(codes.Unavailable, "Tree \"4fb75adebd02251c9663125582e51102\": CAS unavailable"))
 				remover := mock.NewMockChildRemover(ctrl)
-				require.False(t, childFilter(re_vfs.InitialNode{Directory: child}, remover.Call))
+				require.False(t, childFilter(re_vfs.InitialNode{}.FromDirectory(child), remover.Call))
 				return nil
 			})
 
@@ -278,7 +278,7 @@ func TestRemoteOutputServiceDirectoryStartBuild(t *testing.T) {
 				child.EXPECT().GetContainingDigests(ctx).Return(digest.EmptySet, status.Error(codes.NotFound, "Tree \"4fb75adebd02251c9663125582e51102\": Object not found"))
 				remover := mock.NewMockChildRemover(ctrl)
 				remover.EXPECT().Call().Return(status.Error(codes.Internal, "Disk on fire"))
-				require.False(t, childFilter(re_vfs.InitialNode{Directory: child}, remover.Call))
+				require.False(t, childFilter(re_vfs.InitialNode{}.FromDirectory(child), remover.Call))
 				return nil
 			})
 
@@ -306,7 +306,7 @@ func TestRemoteOutputServiceDirectoryStartBuild(t *testing.T) {
 					Return(digest.MustNewDigest("some-other-cluster", "338db227a0de09b4309e928cdbb7d40a", 42).ToSingletonSet())
 				remover := mock.NewMockChildRemover(ctrl)
 				remover.EXPECT().Call().Return(status.Error(codes.Internal, "Disk on fire"))
-				require.False(t, childFilter(re_vfs.InitialNode{Leaf: child}, remover.Call))
+				require.False(t, childFilter(re_vfs.InitialNode{}.FromLeaf(child), remover.Call))
 				return nil
 			})
 
@@ -332,7 +332,7 @@ func TestRemoteOutputServiceDirectoryStartBuild(t *testing.T) {
 				child := mock.NewMockNativeLeaf(ctrl)
 				child.EXPECT().GetContainingDigests().Return(digests)
 				remover := mock.NewMockChildRemover(ctrl)
-				require.True(t, childFilter(re_vfs.InitialNode{Leaf: child}, remover.Call))
+				require.True(t, childFilter(re_vfs.InitialNode{}.FromLeaf(child), remover.Call))
 				return nil
 			})
 			bareContentAddressableStorage.EXPECT().FindMissing(ctx, digests).
@@ -360,7 +360,7 @@ func TestRemoteOutputServiceDirectoryStartBuild(t *testing.T) {
 			outputPath.EXPECT().FilterChildren(gomock.Any()).DoAndReturn(func(childFilter re_vfs.ChildFilter) error {
 				child := mock.NewMockNativeLeaf(ctrl)
 				child.EXPECT().GetContainingDigests().Return(digests)
-				require.True(t, childFilter(re_vfs.InitialNode{Leaf: child}, remover.Call))
+				require.True(t, childFilter(re_vfs.InitialNode{}.FromLeaf(child), remover.Call))
 				return nil
 			})
 			bareContentAddressableStorage.EXPECT().FindMissing(ctx, digests).Return(digests, nil)
@@ -390,7 +390,7 @@ func TestRemoteOutputServiceDirectoryStartBuild(t *testing.T) {
 					Return(digest.MustNewDigest("other-instance-name", "3ec839e3d5d0af404c6dc6bf3ff7f2eb", 1).ToSingletonSet())
 				remover1 := mock.NewMockChildRemover(ctrl)
 				remover1.EXPECT().Call()
-				require.True(t, childFilter(re_vfs.InitialNode{Leaf: child1}, remover1.Call))
+				require.True(t, childFilter(re_vfs.InitialNode{}.FromLeaf(child1), remover1.Call))
 
 				// Serve a file that uses a different
 				// hashing algorithm. It should also get
@@ -400,20 +400,20 @@ func TestRemoteOutputServiceDirectoryStartBuild(t *testing.T) {
 					Return(digest.MustNewDigest("my-cluster", "f11999245771a5c184b62dc5380e0d8b42df67b4", 2).ToSingletonSet())
 				remover2 := mock.NewMockChildRemover(ctrl)
 				remover2.EXPECT().Call()
-				require.True(t, childFilter(re_vfs.InitialNode{Leaf: child2}, remover2.Call))
+				require.True(t, childFilter(re_vfs.InitialNode{}.FromLeaf(child2), remover2.Call))
 
 				// A file which we'll later report as present.
 				child3 := mock.NewMockNativeLeaf(ctrl)
 				child3.EXPECT().GetContainingDigests().
 					Return(digest.MustNewDigest("my-cluster", "a32ea15346cf1848ab49e0913ff07531", 3).ToSingletonSet())
 				remover3 := mock.NewMockChildRemover(ctrl)
-				require.True(t, childFilter(re_vfs.InitialNode{Leaf: child3}, remover3.Call))
+				require.True(t, childFilter(re_vfs.InitialNode{}.FromLeaf(child3), remover3.Call))
 
 				// A file which we'll later report as missing.
 				child4 := mock.NewMockNativeLeaf(ctrl)
 				child4.EXPECT().GetContainingDigests().
 					Return(digest.MustNewDigest("my-cluster", "9435918583fd2e37882751bbc51f4085", 4).ToSingletonSet())
-				require.True(t, childFilter(re_vfs.InitialNode{Leaf: child4}, remover4.Call))
+				require.True(t, childFilter(re_vfs.InitialNode{}.FromLeaf(child4), remover4.Call))
 
 				// A directory that no longer exists. It
 				// should be removed immediately.
@@ -421,7 +421,7 @@ func TestRemoteOutputServiceDirectoryStartBuild(t *testing.T) {
 				child5.EXPECT().GetContainingDigests(ctx).Return(digest.EmptySet, status.Error(codes.NotFound, "Tree \"4fb75adebd02251c9663125582e51102\": Object not found"))
 				remover5 := mock.NewMockChildRemover(ctrl)
 				remover5.EXPECT().Call()
-				require.True(t, childFilter(re_vfs.InitialNode{Directory: child5}, remover5.Call))
+				require.True(t, childFilter(re_vfs.InitialNode{}.FromDirectory(child5), remover5.Call))
 
 				// A directory for which all files exist.
 				child6 := mock.NewMockInitialContentsFetcher(ctrl)
@@ -432,7 +432,7 @@ func TestRemoteOutputServiceDirectoryStartBuild(t *testing.T) {
 						Build(),
 					nil)
 				remover6 := mock.NewMockChildRemover(ctrl)
-				require.True(t, childFilter(re_vfs.InitialNode{Directory: child6}, remover6.Call))
+				require.True(t, childFilter(re_vfs.InitialNode{}.FromDirectory(child6), remover6.Call))
 
 				// A directory for which one file does not
 				// exist. It should be removed later on.
@@ -443,7 +443,7 @@ func TestRemoteOutputServiceDirectoryStartBuild(t *testing.T) {
 						Add(digest.MustNewDigest("my-cluster", "6b9105a7125cb9f190a3e44ab5f22663", 8)).
 						Build(),
 					nil)
-				require.True(t, childFilter(re_vfs.InitialNode{Directory: child7}, remover7.Call))
+				require.True(t, childFilter(re_vfs.InitialNode{}.FromDirectory(child7), remover7.Call))
 				return nil
 			})
 
@@ -618,7 +618,7 @@ func TestRemoteOutputServiceDirectoryBatchCreate(t *testing.T) {
 		symlink := mock.NewMockNativeLeaf(ctrl)
 		symlinkFactory.EXPECT().LookupSymlink([]byte("target")).Return(symlink)
 		outputPath.EXPECT().CreateChildren(map[path.Component]re_vfs.InitialNode{
-			path.MustNewComponent("foo"): {Leaf: symlink},
+			path.MustNewComponent("foo"): re_vfs.InitialNode{}.FromLeaf(symlink),
 		}, true).Return(status.Error(codes.Internal, "I/O error"))
 		symlink.EXPECT().Unlink()
 
@@ -673,7 +673,7 @@ func TestRemoteOutputServiceDirectoryBatchCreate(t *testing.T) {
 		file := mock.NewMockNativeLeaf(ctrl)
 		casFileHandleAllocation.EXPECT().AsNativeLeaf(gomock.Any()).Return(file)
 		child2.EXPECT().CreateChildren(map[path.Component]re_vfs.InitialNode{
-			path.MustNewComponent("file"): {Leaf: file},
+			path.MustNewComponent("file"): re_vfs.InitialNode{}.FromLeaf(file),
 		}, true)
 
 		// Creation of "directory".
@@ -683,7 +683,7 @@ func TestRemoteOutputServiceDirectoryBatchCreate(t *testing.T) {
 		symlink := mock.NewMockNativeLeaf(ctrl)
 		symlinkFactory.EXPECT().LookupSymlink([]byte("file")).Return(symlink)
 		child2.EXPECT().CreateChildren(map[path.Component]re_vfs.InitialNode{
-			path.MustNewComponent("symlink"): {Leaf: symlink},
+			path.MustNewComponent("symlink"): re_vfs.InitialNode{}.FromLeaf(symlink),
 		}, true)
 
 		_, err := d.BatchCreate(ctx, &remoteoutputservice.BatchCreateRequest{
@@ -784,7 +784,7 @@ func TestRemoteOutputServiceDirectoryBatchStat(t *testing.T) {
 	})
 
 	t.Run("OnDirectoryLookupFailure", func(t *testing.T) {
-		outputPath.EXPECT().LookupChild(path.MustNewComponent("stdio")).Return(nil, nil, status.Error(codes.Internal, "Disk failure"))
+		outputPath.EXPECT().LookupChild(path.MustNewComponent("stdio")).Return(re_vfs.PrepopulatedDirectoryChild{}, status.Error(codes.Internal, "Disk failure"))
 
 		_, err := d.BatchStat(ctx, &remoteoutputservice.BatchStatRequest{
 			BuildId: "37f5dbef-b117-4fb6-bce8-5c147cb603b4",
@@ -795,7 +795,7 @@ func TestRemoteOutputServiceDirectoryBatchStat(t *testing.T) {
 
 	t.Run("OnDirectoryReadlinkFailure", func(t *testing.T) {
 		leaf := mock.NewMockNativeLeaf(ctrl)
-		outputPath.EXPECT().LookupChild(path.MustNewComponent("stdio")).Return(nil, leaf, nil)
+		outputPath.EXPECT().LookupChild(path.MustNewComponent("stdio")).Return(re_vfs.PrepopulatedDirectoryChild{}.FromLeaf(leaf), nil)
 		leaf.EXPECT().Readlink().Return("", status.Error(codes.Internal, "Disk failure"))
 
 		_, err := d.BatchStat(ctx, &remoteoutputservice.BatchStatRequest{
@@ -806,7 +806,7 @@ func TestRemoteOutputServiceDirectoryBatchStat(t *testing.T) {
 	})
 
 	t.Run("OnTerminalLookupFailure", func(t *testing.T) {
-		outputPath.EXPECT().LookupChild(path.MustNewComponent("printf.o")).Return(nil, nil, status.Error(codes.Internal, "Disk failure"))
+		outputPath.EXPECT().LookupChild(path.MustNewComponent("printf.o")).Return(re_vfs.PrepopulatedDirectoryChild{}, status.Error(codes.Internal, "Disk failure"))
 
 		_, err := d.BatchStat(ctx, &remoteoutputservice.BatchStatRequest{
 			BuildId: "37f5dbef-b117-4fb6-bce8-5c147cb603b4",
@@ -817,7 +817,7 @@ func TestRemoteOutputServiceDirectoryBatchStat(t *testing.T) {
 
 	t.Run("OnTerminalReadlinkFailure", func(t *testing.T) {
 		leaf := mock.NewMockNativeLeaf(ctrl)
-		outputPath.EXPECT().LookupChild(path.MustNewComponent("printf.o")).Return(nil, leaf, nil)
+		outputPath.EXPECT().LookupChild(path.MustNewComponent("printf.o")).Return(re_vfs.PrepopulatedDirectoryChild{}.FromLeaf(leaf), nil)
 		leaf.EXPECT().Readlink().Return("", status.Error(codes.Internal, "Disk failure"))
 
 		_, err := d.BatchStat(ctx, &remoteoutputservice.BatchStatRequest{
@@ -830,7 +830,7 @@ func TestRemoteOutputServiceDirectoryBatchStat(t *testing.T) {
 
 	t.Run("OnTerminalGetOutputServiceFileStatusFailure", func(t *testing.T) {
 		leaf := mock.NewMockNativeLeaf(ctrl)
-		outputPath.EXPECT().LookupChild(path.MustNewComponent("printf.o")).Return(nil, leaf, nil)
+		outputPath.EXPECT().LookupChild(path.MustNewComponent("printf.o")).Return(re_vfs.PrepopulatedDirectoryChild{}.FromLeaf(leaf), nil)
 		leaf.EXPECT().GetOutputServiceFileStatus(gomock.Any()).Return(nil, status.Error(codes.Internal, "Disk failure"))
 
 		_, err := d.BatchStat(ctx, &remoteoutputservice.BatchStatRequest{
@@ -843,7 +843,7 @@ func TestRemoteOutputServiceDirectoryBatchStat(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
 		// Lookup of "file", pointing to directly to a file.
 		leaf1 := mock.NewMockNativeLeaf(ctrl)
-		outputPath.EXPECT().LookupChild(path.MustNewComponent("file")).Return(nil, leaf1, nil)
+		outputPath.EXPECT().LookupChild(path.MustNewComponent("file")).Return(re_vfs.PrepopulatedDirectoryChild{}.FromLeaf(leaf1), nil)
 		leaf1.EXPECT().Readlink().Return("", syscall.EINVAL)
 		leaf1.EXPECT().GetOutputServiceFileStatus(gomock.Any()).Return(&remoteoutputservice.FileStatus{
 			FileType: &remoteoutputservice.FileStatus_File_{
@@ -858,21 +858,21 @@ func TestRemoteOutputServiceDirectoryBatchStat(t *testing.T) {
 
 		// Lookup of "directory". pointing directly to a directory.
 		directory1 := mock.NewMockPrepopulatedDirectory(ctrl)
-		outputPath.EXPECT().LookupChild(path.MustNewComponent("directory")).Return(directory1, nil, nil)
-		directory1.EXPECT().VirtualGetAttributes(re_vfs.AttributesMaskLastDataModificationTime, gomock.Any()).
-			Do(func(requested re_vfs.AttributesMask, attributes *re_vfs.Attributes) {
+		outputPath.EXPECT().LookupChild(path.MustNewComponent("directory")).Return(re_vfs.PrepopulatedDirectoryChild{}.FromDirectory(directory1), nil)
+		directory1.EXPECT().VirtualGetAttributes(ctx, re_vfs.AttributesMaskLastDataModificationTime, gomock.Any()).
+			Do(func(ctx context.Context, requested re_vfs.AttributesMask, attributes *re_vfs.Attributes) {
 				attributes.SetLastDataModificationTime(time.Unix(1000, 0))
 			})
 
 		// Lookup of "nested/symlink_internal_relative_file",
 		// being a symlink that points to a file.
 		directory2 := mock.NewMockPrepopulatedDirectory(ctrl)
-		outputPath.EXPECT().LookupChild(path.MustNewComponent("nested")).Return(directory2, nil, nil)
+		outputPath.EXPECT().LookupChild(path.MustNewComponent("nested")).Return(re_vfs.PrepopulatedDirectoryChild{}.FromDirectory(directory2), nil)
 		leaf2 := mock.NewMockNativeLeaf(ctrl)
-		directory2.EXPECT().LookupChild(path.MustNewComponent("symlink_internal_relative_file")).Return(nil, leaf2, nil)
+		directory2.EXPECT().LookupChild(path.MustNewComponent("symlink_internal_relative_file")).Return(re_vfs.PrepopulatedDirectoryChild{}.FromLeaf(leaf2), nil)
 		leaf2.EXPECT().Readlink().Return("../target", nil)
 		leaf3 := mock.NewMockNativeLeaf(ctrl)
-		outputPath.EXPECT().LookupChild(path.MustNewComponent("target")).Return(nil, leaf3, nil)
+		outputPath.EXPECT().LookupChild(path.MustNewComponent("target")).Return(re_vfs.PrepopulatedDirectoryChild{}.FromLeaf(leaf3), nil)
 		leaf3.EXPECT().Readlink().Return("", syscall.EINVAL)
 		leaf3.EXPECT().GetOutputServiceFileStatus(gomock.Any()).Return(&remoteoutputservice.FileStatus{
 			FileType: &remoteoutputservice.FileStatus_File_{
@@ -888,12 +888,12 @@ func TestRemoteOutputServiceDirectoryBatchStat(t *testing.T) {
 		// Lookup of "nested/symlink_internal_relative_directory",
 		// being a symlink that points to a directory.
 		directory3 := mock.NewMockPrepopulatedDirectory(ctrl)
-		outputPath.EXPECT().LookupChild(path.MustNewComponent("nested")).Return(directory3, nil, nil)
+		outputPath.EXPECT().LookupChild(path.MustNewComponent("nested")).Return(re_vfs.PrepopulatedDirectoryChild{}.FromDirectory(directory3), nil)
 		leaf4 := mock.NewMockNativeLeaf(ctrl)
-		directory3.EXPECT().LookupChild(path.MustNewComponent("symlink_internal_relative_directory")).Return(nil, leaf4, nil)
+		directory3.EXPECT().LookupChild(path.MustNewComponent("symlink_internal_relative_directory")).Return(re_vfs.PrepopulatedDirectoryChild{}.FromLeaf(leaf4), nil)
 		leaf4.EXPECT().Readlink().Return("..", nil)
-		outputPath.EXPECT().VirtualGetAttributes(re_vfs.AttributesMaskLastDataModificationTime, gomock.Any()).
-			Do(func(requested re_vfs.AttributesMask, attributes *re_vfs.Attributes) {
+		outputPath.EXPECT().VirtualGetAttributes(ctx, re_vfs.AttributesMaskLastDataModificationTime, gomock.Any()).
+			Do(func(ctx context.Context, requested re_vfs.AttributesMask, attributes *re_vfs.Attributes) {
 				attributes.SetLastDataModificationTime(time.Unix(1001, 0))
 			})
 
@@ -901,14 +901,14 @@ func TestRemoteOutputServiceDirectoryBatchStat(t *testing.T) {
 		// being a symlink containing an absolute path starting
 		// with the output path.
 		directory4 := mock.NewMockPrepopulatedDirectory(ctrl)
-		outputPath.EXPECT().LookupChild(path.MustNewComponent("nested")).Return(directory4, nil, nil)
+		outputPath.EXPECT().LookupChild(path.MustNewComponent("nested")).Return(re_vfs.PrepopulatedDirectoryChild{}.FromDirectory(directory4), nil)
 		leaf5 := mock.NewMockNativeLeaf(ctrl)
-		directory4.EXPECT().LookupChild(path.MustNewComponent("symlink_internal_absolute_path")).Return(nil, leaf5, nil)
+		directory4.EXPECT().LookupChild(path.MustNewComponent("symlink_internal_absolute_path")).Return(re_vfs.PrepopulatedDirectoryChild{}.FromLeaf(leaf5), nil)
 		leaf5.EXPECT().Readlink().Return("/home/bob/bb_clientd/outputs/9da951b8cb759233037166e28f7ea186/hello", nil)
 		directory5 := mock.NewMockPrepopulatedDirectory(ctrl)
-		outputPath.EXPECT().LookupChild(path.MustNewComponent("hello")).Return(directory5, nil, nil)
-		directory5.EXPECT().VirtualGetAttributes(re_vfs.AttributesMaskLastDataModificationTime, gomock.Any()).
-			Do(func(requested re_vfs.AttributesMask, attributes *re_vfs.Attributes) {
+		outputPath.EXPECT().LookupChild(path.MustNewComponent("hello")).Return(re_vfs.PrepopulatedDirectoryChild{}.FromDirectory(directory5), nil)
+		directory5.EXPECT().VirtualGetAttributes(ctx, re_vfs.AttributesMaskLastDataModificationTime, gomock.Any()).
+			Do(func(ctx context.Context, requested re_vfs.AttributesMask, attributes *re_vfs.Attributes) {
 				attributes.SetLastDataModificationTime(time.Unix(1002, 0))
 			})
 
@@ -916,14 +916,14 @@ func TestRemoteOutputServiceDirectoryBatchStat(t *testing.T) {
 		// being a symlink containing an absolute path starting
 		// with one of the output path aliases.
 		directory6 := mock.NewMockPrepopulatedDirectory(ctrl)
-		outputPath.EXPECT().LookupChild(path.MustNewComponent("nested")).Return(directory6, nil, nil)
+		outputPath.EXPECT().LookupChild(path.MustNewComponent("nested")).Return(re_vfs.PrepopulatedDirectoryChild{}.FromDirectory(directory6), nil)
 		leaf6 := mock.NewMockNativeLeaf(ctrl)
-		directory6.EXPECT().LookupChild(path.MustNewComponent("symlink_internal_absolute_alias")).Return(nil, leaf6, nil)
+		directory6.EXPECT().LookupChild(path.MustNewComponent("symlink_internal_absolute_alias")).Return(re_vfs.PrepopulatedDirectoryChild{}.FromLeaf(leaf6), nil)
 		leaf6.EXPECT().Readlink().Return("/home/bob/.cache/bazel/_bazel_bob/9da951b8cb759233037166e28f7ea186/execroot/myproject/bazel-out/hello", nil)
 		directory7 := mock.NewMockPrepopulatedDirectory(ctrl)
-		outputPath.EXPECT().LookupChild(path.MustNewComponent("hello")).Return(directory7, nil, nil)
-		directory7.EXPECT().VirtualGetAttributes(re_vfs.AttributesMaskLastDataModificationTime, gomock.Any()).
-			Do(func(requested re_vfs.AttributesMask, attributes *re_vfs.Attributes) {
+		outputPath.EXPECT().LookupChild(path.MustNewComponent("hello")).Return(re_vfs.PrepopulatedDirectoryChild{}.FromDirectory(directory7), nil)
+		directory7.EXPECT().VirtualGetAttributes(ctx, re_vfs.AttributesMaskLastDataModificationTime, gomock.Any()).
+			Do(func(ctx context.Context, requested re_vfs.AttributesMask, attributes *re_vfs.Attributes) {
 				attributes.SetLastDataModificationTime(time.Unix(1003, 0))
 			})
 
@@ -931,17 +931,17 @@ func TestRemoteOutputServiceDirectoryBatchStat(t *testing.T) {
 		// containing an absolute path that doesn't start with
 		// any known prefix.
 		directory8 := mock.NewMockPrepopulatedDirectory(ctrl)
-		outputPath.EXPECT().LookupChild(path.MustNewComponent("nested")).Return(directory8, nil, nil)
+		outputPath.EXPECT().LookupChild(path.MustNewComponent("nested")).Return(re_vfs.PrepopulatedDirectoryChild{}.FromDirectory(directory8), nil)
 		leaf7 := mock.NewMockNativeLeaf(ctrl)
-		directory8.EXPECT().LookupChild(path.MustNewComponent("symlink_external")).Return(nil, leaf7, nil)
+		directory8.EXPECT().LookupChild(path.MustNewComponent("symlink_external")).Return(re_vfs.PrepopulatedDirectoryChild{}.FromLeaf(leaf7), nil)
 		leaf7.EXPECT().Readlink().Return("/etc/passwd", nil)
 
 		// Lookup of "nonexistent".
-		outputPath.EXPECT().LookupChild(path.MustNewComponent("nonexistent")).Return(nil, nil, syscall.ENOENT)
+		outputPath.EXPECT().LookupChild(path.MustNewComponent("nonexistent")).Return(re_vfs.PrepopulatedDirectoryChild{}, syscall.ENOENT)
 
 		// Lookup of ".".
-		outputPath.EXPECT().VirtualGetAttributes(re_vfs.AttributesMaskLastDataModificationTime, gomock.Any()).
-			Do(func(requested re_vfs.AttributesMask, attributes *re_vfs.Attributes) {
+		outputPath.EXPECT().VirtualGetAttributes(ctx, re_vfs.AttributesMaskLastDataModificationTime, gomock.Any()).
+			Do(func(ctx context.Context, requested re_vfs.AttributesMask, attributes *re_vfs.Attributes) {
 				attributes.SetLastDataModificationTime(time.Unix(1004, 0))
 			})
 
@@ -1103,7 +1103,7 @@ func TestRemoteOutputServiceDirectoryVirtualLookup(t *testing.T) {
 
 	// No output paths exist, so VirtualLookup() should always fail.
 	var out1 re_vfs.Attributes
-	_, _, s := d.VirtualLookup(path.MustNewComponent("eda09135e50ff6e877fe5f8136ddc759"), 0, &out1)
+	_, s := d.VirtualLookup(ctx, path.MustNewComponent("eda09135e50ff6e877fe5f8136ddc759"), 0, &out1)
 	require.Equal(t, re_vfs.StatusErrNoEnt, s)
 
 	// Create an output path.
@@ -1130,18 +1130,18 @@ func TestRemoteOutputServiceDirectoryVirtualLookup(t *testing.T) {
 	}, response)
 
 	outputPath.EXPECT().VirtualGetAttributes(
+		ctx,
 		re_vfs.AttributesMaskInodeNumber,
 		gomock.Any(),
-	).Do(func(requested re_vfs.AttributesMask, out *re_vfs.Attributes) {
+	).Do(func(ctx context.Context, requested re_vfs.AttributesMask, out *re_vfs.Attributes) {
 		out.SetInodeNumber(101)
 	})
 
 	// Call VirtualLookup() again. It should now succeed.
 	var out2 re_vfs.Attributes
-	directory, leaf, s := d.VirtualLookup(path.MustNewComponent("eaf1d65b7ab802934e6b57d0e14b3f30"), re_vfs.AttributesMaskInodeNumber, &out2)
+	child, s := d.VirtualLookup(ctx, path.MustNewComponent("eaf1d65b7ab802934e6b57d0e14b3f30"), re_vfs.AttributesMaskInodeNumber, &out2)
 	require.Equal(t, re_vfs.StatusOK, s)
-	require.Equal(t, outputPath, directory)
-	require.Nil(t, leaf)
+	require.Equal(t, re_vfs.DirectoryChild{}.FromDirectory(outputPath), child)
 	require.Equal(t, *(&re_vfs.Attributes{}).SetInodeNumber(101), out2)
 
 	// Remove the output path.
@@ -1155,7 +1155,7 @@ func TestRemoteOutputServiceDirectoryVirtualLookup(t *testing.T) {
 
 	// VirtualLookup() should fail once again.
 	var out3 re_vfs.Attributes
-	_, _, s = d.VirtualLookup(path.MustNewComponent("eda09135e50ff6e877fe5f8136ddc759"), 0, &out3)
+	_, s = d.VirtualLookup(ctx, path.MustNewComponent("eda09135e50ff6e877fe5f8136ddc759"), 0, &out3)
 	require.Equal(t, re_vfs.StatusErrNoEnt, s)
 }
 
@@ -1188,7 +1188,7 @@ func TestRemoteOutputServiceDirectoryVirtualReadDir(t *testing.T) {
 		require.Equal(
 			t,
 			re_vfs.StatusOK,
-			d.VirtualReadDir(0, re_vfs.AttributesMaskInodeNumber, reporter))
+			d.VirtualReadDir(ctx, 0, re_vfs.AttributesMaskInodeNumber, reporter))
 	})
 
 	// Create two output paths.
@@ -1240,55 +1240,58 @@ func TestRemoteOutputServiceDirectoryVirtualReadDir(t *testing.T) {
 		// The directory listing should contain both output paths.
 		reporter := mock.NewMockDirectoryEntryReporter(ctrl)
 		outputPath1.EXPECT().VirtualGetAttributes(
+			ctx,
 			re_vfs.AttributesMaskInodeNumber,
 			gomock.Any(),
-		).Do(func(requested re_vfs.AttributesMask, out *re_vfs.Attributes) {
+		).Do(func(ctx context.Context, requested re_vfs.AttributesMask, out *re_vfs.Attributes) {
 			out.SetInodeNumber(101)
 		})
-		reporter.EXPECT().ReportDirectory(
+		reporter.EXPECT().ReportEntry(
 			uint64(1),
 			path.MustNewComponent("83f3e6ff93a5403cbfb14682d8165968"),
-			outputPath1,
+			re_vfs.DirectoryChild{}.FromDirectory(outputPath1),
 			(&re_vfs.Attributes{}).SetInodeNumber(101),
 		).Return(true)
 		outputPath2.EXPECT().VirtualGetAttributes(
+			ctx,
 			re_vfs.AttributesMaskInodeNumber,
 			gomock.Any(),
-		).Do(func(requested re_vfs.AttributesMask, out *re_vfs.Attributes) {
+		).Do(func(ctx context.Context, requested re_vfs.AttributesMask, out *re_vfs.Attributes) {
 			out.SetInodeNumber(102)
 		})
-		reporter.EXPECT().ReportDirectory(
+		reporter.EXPECT().ReportEntry(
 			uint64(2),
 			path.MustNewComponent("d4b145a6191c6d8d037d13986274d08d"),
-			outputPath1,
+			re_vfs.DirectoryChild{}.FromDirectory(outputPath1),
 			(&re_vfs.Attributes{}).SetInodeNumber(102),
 		).Return(true)
 
 		require.Equal(
 			t,
 			re_vfs.StatusOK,
-			d.VirtualReadDir(0, re_vfs.AttributesMaskInodeNumber, reporter))
+			d.VirtualReadDir(ctx, 0, re_vfs.AttributesMaskInodeNumber, reporter))
 	})
 
 	t.Run("Partial", func(t *testing.T) {
 		reporter := mock.NewMockDirectoryEntryReporter(ctrl)
 		outputPath2.EXPECT().VirtualGetAttributes(
+			ctx,
 			re_vfs.AttributesMaskInodeNumber,
 			gomock.Any(),
-		).Do(func(requested re_vfs.AttributesMask, out *re_vfs.Attributes) {
+		).Do(func(ctx context.Context, requested re_vfs.AttributesMask, out *re_vfs.Attributes) {
 			out.SetInodeNumber(102)
 		})
-		reporter.EXPECT().ReportDirectory(
+		reporter.EXPECT().ReportEntry(
 			uint64(2),
 			path.MustNewComponent("d4b145a6191c6d8d037d13986274d08d"),
-			outputPath1,
+			re_vfs.DirectoryChild{}.FromDirectory(outputPath1),
 			(&re_vfs.Attributes{}).SetInodeNumber(102),
 		).Return(true)
 
 		require.Equal(
 			t,
 			re_vfs.StatusOK,
-			d.VirtualReadDir(1, re_vfs.AttributesMaskInodeNumber, reporter))
+			d.VirtualReadDir(ctx, 1, re_vfs.AttributesMaskInodeNumber, reporter))
 	})
 
 	t.Run("AtEOF", func(t *testing.T) {
@@ -1296,7 +1299,7 @@ func TestRemoteOutputServiceDirectoryVirtualReadDir(t *testing.T) {
 		require.Equal(
 			t,
 			re_vfs.StatusOK,
-			d.VirtualReadDir(2, re_vfs.AttributesMaskInodeNumber, reporter))
+			d.VirtualReadDir(ctx, 2, re_vfs.AttributesMaskInodeNumber, reporter))
 	})
 
 	t.Run("BeyondEOF", func(t *testing.T) {
@@ -1304,7 +1307,7 @@ func TestRemoteOutputServiceDirectoryVirtualReadDir(t *testing.T) {
 		require.Equal(
 			t,
 			re_vfs.StatusOK,
-			d.VirtualReadDir(3, re_vfs.AttributesMaskInodeNumber, reporter))
+			d.VirtualReadDir(ctx, 3, re_vfs.AttributesMaskInodeNumber, reporter))
 	})
 
 	// Remove all output paths.
@@ -1328,6 +1331,6 @@ func TestRemoteOutputServiceDirectoryVirtualReadDir(t *testing.T) {
 		require.Equal(
 			t,
 			re_vfs.StatusOK,
-			d.VirtualReadDir(0, re_vfs.AttributesMaskInodeNumber, reporter))
+			d.VirtualReadDir(ctx, 0, re_vfs.AttributesMaskInodeNumber, reporter))
 	})
 }

@@ -2,6 +2,7 @@ package virtual_test
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"testing"
 
@@ -49,7 +50,7 @@ func contentAddressableStorageDirectoryExpectLookupSymlink(t *testing.T, ctrl *g
 }
 
 func TestContentAddressableStorageDirectoryVirtualLookup(t *testing.T) {
-	ctrl := gomock.NewController(t)
+	ctrl, ctx := gomock.WithContext(context.Background(), t)
 
 	directoryContext := mock.NewMockDirectoryContext(ctrl)
 	rootHandleAllocation := mock.NewMockResolvableHandleAllocation(ctrl)
@@ -69,7 +70,7 @@ func TestContentAddressableStorageDirectoryVirtualLookup(t *testing.T) {
 		directoryContext.EXPECT().GetDirectoryContents().Return(nil, re_vfs.StatusErrIO)
 
 		var out re_vfs.Attributes
-		_, _, s := d.VirtualLookup(path.MustNewComponent("myfile"), 0, &out)
+		_, s := d.VirtualLookup(ctx, path.MustNewComponent("myfile"), 0, &out)
 		require.Equal(t, re_vfs.StatusErrIO, s)
 	})
 
@@ -130,10 +131,10 @@ func TestContentAddressableStorageDirectoryVirtualLookup(t *testing.T) {
 		// cause the binary searching function to behave
 		// differently.
 		var out re_vfs.Attributes
-		_, _, s := d.VirtualLookup(path.MustNewComponent("aaa"), 0, &out)
+		_, s := d.VirtualLookup(ctx, path.MustNewComponent("aaa"), 0, &out)
 		require.Equal(t, re_vfs.StatusErrNoEnt, s)
 
-		_, _, s = d.VirtualLookup(path.MustNewComponent("zzz"), 0, &out)
+		_, s = d.VirtualLookup(ctx, path.MustNewComponent("zzz"), 0, &out)
 		require.Equal(t, re_vfs.StatusErrNoEnt, s)
 	})
 
@@ -143,7 +144,7 @@ func TestContentAddressableStorageDirectoryVirtualLookup(t *testing.T) {
 		directoryContext.EXPECT().LogError(testutil.EqStatus(t, status.Error(codes.InvalidArgument, "Failed to parse digest for directory \"malformed_directory\": Unknown digest hash length: 41 characters")))
 
 		var out re_vfs.Attributes
-		_, _, s := d.VirtualLookup(path.MustNewComponent("malformed_directory"), 0, &out)
+		_, s := d.VirtualLookup(ctx, path.MustNewComponent("malformed_directory"), 0, &out)
 		require.Equal(t, re_vfs.StatusErrIO, s)
 	})
 
@@ -153,7 +154,7 @@ func TestContentAddressableStorageDirectoryVirtualLookup(t *testing.T) {
 		directoryContext.EXPECT().LogError(testutil.EqStatus(t, status.Error(codes.InvalidArgument, "Failed to parse digest for file \"malformed_file\": Unknown digest hash length: 36 characters")))
 
 		var out re_vfs.Attributes
-		_, _, s := d.VirtualLookup(path.MustNewComponent("malformed_file"), 0, &out)
+		_, s := d.VirtualLookup(ctx, path.MustNewComponent("malformed_file"), 0, &out)
 		require.Equal(t, re_vfs.StatusErrIO, s)
 	})
 
@@ -164,17 +165,17 @@ func TestContentAddressableStorageDirectoryVirtualLookup(t *testing.T) {
 			digest.MustNewDigest("example", "47473788bad5e9991fcd8e8a2b6012745031089ebe6cc7342f78bf92570e4f52", 42),
 		).Return(childDirectory)
 		childDirectory.EXPECT().VirtualGetAttributes(
+			ctx,
 			re_vfs.AttributesMaskInodeNumber,
 			gomock.Any(),
-		).Do(func(requested re_vfs.AttributesMask, out *re_vfs.Attributes) {
+		).Do(func(ctx context.Context, requested re_vfs.AttributesMask, out *re_vfs.Attributes) {
 			out.SetInodeNumber(123)
 		})
 
 		var out re_vfs.Attributes
-		actualDirectory, actualLeaf, s := d.VirtualLookup(path.MustNewComponent("directory"), re_vfs.AttributesMaskInodeNumber, &out)
+		actualChild, s := d.VirtualLookup(ctx, path.MustNewComponent("directory"), re_vfs.AttributesMaskInodeNumber, &out)
 		require.Equal(t, re_vfs.StatusOK, s)
-		require.Equal(t, childDirectory, actualDirectory)
-		require.Nil(t, actualLeaf)
+		require.Equal(t, re_vfs.DirectoryChild{}.FromDirectory(childDirectory), actualChild)
 		require.Equal(t, *(&re_vfs.Attributes{}).SetInodeNumber(123), out)
 	})
 
@@ -186,17 +187,17 @@ func TestContentAddressableStorageDirectoryVirtualLookup(t *testing.T) {
 			true,
 		).Return(childLeaf)
 		childLeaf.EXPECT().VirtualGetAttributes(
+			ctx,
 			re_vfs.AttributesMaskInodeNumber,
 			gomock.Any(),
-		).Do(func(requested re_vfs.AttributesMask, out *re_vfs.Attributes) {
+		).Do(func(ctx context.Context, requested re_vfs.AttributesMask, out *re_vfs.Attributes) {
 			out.SetInodeNumber(123)
 		})
 
 		var out re_vfs.Attributes
-		actualDirectory, actualLeaf, s := d.VirtualLookup(path.MustNewComponent("executable"), re_vfs.AttributesMaskInodeNumber, &out)
+		actualChild, s := d.VirtualLookup(ctx, path.MustNewComponent("executable"), re_vfs.AttributesMaskInodeNumber, &out)
 		require.Equal(t, re_vfs.StatusOK, s)
-		require.Nil(t, actualDirectory)
-		require.Equal(t, childLeaf, actualLeaf)
+		require.Equal(t, re_vfs.DirectoryChild{}.FromLeaf(childLeaf), actualChild)
 		require.Equal(t, *(&re_vfs.Attributes{}).SetInodeNumber(123), out)
 	})
 
@@ -208,17 +209,17 @@ func TestContentAddressableStorageDirectoryVirtualLookup(t *testing.T) {
 			false,
 		).Return(childLeaf)
 		childLeaf.EXPECT().VirtualGetAttributes(
+			ctx,
 			re_vfs.AttributesMaskInodeNumber,
 			gomock.Any(),
-		).Do(func(requested re_vfs.AttributesMask, out *re_vfs.Attributes) {
+		).Do(func(ctx context.Context, requested re_vfs.AttributesMask, out *re_vfs.Attributes) {
 			out.SetInodeNumber(123)
 		})
 
 		var out re_vfs.Attributes
-		actualDirectory, actualLeaf, s := d.VirtualLookup(path.MustNewComponent("file"), re_vfs.AttributesMaskInodeNumber, &out)
+		actualChild, s := d.VirtualLookup(ctx, path.MustNewComponent("file"), re_vfs.AttributesMaskInodeNumber, &out)
 		require.Equal(t, re_vfs.StatusOK, s)
-		require.Nil(t, actualDirectory)
-		require.Equal(t, childLeaf, actualLeaf)
+		require.Equal(t, re_vfs.DirectoryChild{}.FromLeaf(childLeaf), actualChild)
 		require.Equal(t, *(&re_vfs.Attributes{}).SetInodeNumber(123), out)
 	})
 
@@ -227,19 +228,19 @@ func TestContentAddressableStorageDirectoryVirtualLookup(t *testing.T) {
 		contentAddressableStorageDirectoryExpectLookupSymlink(t, ctrl, handleAllocator, []byte{1})
 
 		var out re_vfs.Attributes
-		actualDirectory, actualLeaf, s := d.VirtualLookup(path.MustNewComponent("symlink"), re_vfs.AttributesMaskFileType, &out)
+		actualChild, s := d.VirtualLookup(ctx, path.MustNewComponent("symlink"), re_vfs.AttributesMaskFileType, &out)
 		require.Equal(t, re_vfs.StatusOK, s)
-		require.Nil(t, actualDirectory)
 		require.Equal(t, filesystem.FileTypeSymlink, out.GetFileType())
 
-		target, s := actualLeaf.VirtualReadlink()
+		_, actualLeaf := actualChild.GetPair()
+		target, s := actualLeaf.VirtualReadlink(ctx)
 		require.Equal(t, re_vfs.StatusOK, s)
 		require.Equal(t, []byte("target"), target)
 	})
 }
 
 func TestContentAddressableStorageDirectoryVirtualReadDir(t *testing.T) {
-	ctrl := gomock.NewController(t)
+	ctrl, ctx := gomock.WithContext(context.Background(), t)
 
 	directoryContext := mock.NewMockDirectoryContext(ctrl)
 	rootHandleAllocation := mock.NewMockResolvableHandleAllocation(ctrl)
@@ -262,7 +263,7 @@ func TestContentAddressableStorageDirectoryVirtualReadDir(t *testing.T) {
 		require.Equal(
 			t,
 			re_vfs.StatusErrIO,
-			d.VirtualReadDir(0, re_vfs.AttributesMaskInodeNumber, reporter))
+			d.VirtualReadDir(ctx, 0, re_vfs.AttributesMaskInodeNumber, reporter))
 	})
 
 	t.Run("MalformedDirectory1", func(t *testing.T) {
@@ -284,7 +285,7 @@ func TestContentAddressableStorageDirectoryVirtualReadDir(t *testing.T) {
 		require.Equal(
 			t,
 			re_vfs.StatusErrIO,
-			d.VirtualReadDir(0, re_vfs.AttributesMaskInodeNumber, reporter))
+			d.VirtualReadDir(ctx, 0, re_vfs.AttributesMaskInodeNumber, reporter))
 	})
 
 	t.Run("MalformedDirectory2", func(t *testing.T) {
@@ -306,7 +307,7 @@ func TestContentAddressableStorageDirectoryVirtualReadDir(t *testing.T) {
 		require.Equal(
 			t,
 			re_vfs.StatusErrIO,
-			d.VirtualReadDir(0, re_vfs.AttributesMaskInodeNumber, reporter))
+			d.VirtualReadDir(ctx, 0, re_vfs.AttributesMaskInodeNumber, reporter))
 	})
 
 	t.Run("NoSpaceDirectory", func(t *testing.T) {
@@ -336,22 +337,23 @@ func TestContentAddressableStorageDirectoryVirtualReadDir(t *testing.T) {
 			digest.MustNewDigest("example", "47473788bad5e9991fcd8e8a2b6012745031089ebe6cc7342f78bf92570e4f52", 42),
 		).Return(childDirectory)
 		childDirectory.EXPECT().VirtualGetAttributes(
+			ctx,
 			re_vfs.AttributesMaskInodeNumber,
 			gomock.Any(),
-		).Do(func(requested re_vfs.AttributesMask, out *re_vfs.Attributes) {
+		).Do(func(ctx context.Context, requested re_vfs.AttributesMask, out *re_vfs.Attributes) {
 			out.SetInodeNumber(123)
 		})
-		reporter.EXPECT().ReportDirectory(
+		reporter.EXPECT().ReportEntry(
 			uint64(1),
 			path.MustNewComponent("hello"),
-			childDirectory,
+			re_vfs.DirectoryChild{}.FromDirectory(childDirectory),
 			(&re_vfs.Attributes{}).SetInodeNumber(123),
 		).Return(false)
 
 		require.Equal(
 			t,
 			re_vfs.StatusOK,
-			d.VirtualReadDir(0, re_vfs.AttributesMaskInodeNumber, reporter))
+			d.VirtualReadDir(ctx, 0, re_vfs.AttributesMaskInodeNumber, reporter))
 	})
 
 	directoryContext.EXPECT().GetDirectoryContents().Return(&remoteexecution.Directory{
@@ -396,15 +398,16 @@ func TestContentAddressableStorageDirectoryVirtualReadDir(t *testing.T) {
 			digest.MustNewDigest("example", "f514a041bf7ae6ea7ec82e8296e17e10cffdf799ba565e052af59187936f1865", 123),
 		).Return(childDirectory)
 		childDirectory.EXPECT().VirtualGetAttributes(
+			ctx,
 			re_vfs.AttributesMaskInodeNumber,
 			gomock.Any(),
-		).Do(func(requested re_vfs.AttributesMask, out *re_vfs.Attributes) {
+		).Do(func(ctx context.Context, requested re_vfs.AttributesMask, out *re_vfs.Attributes) {
 			out.SetInodeNumber(123)
 		})
-		reporter.EXPECT().ReportDirectory(
+		reporter.EXPECT().ReportEntry(
 			uint64(1),
 			path.MustNewComponent("directory1"),
-			childDirectory,
+			re_vfs.DirectoryChild{}.FromDirectory(childDirectory),
 			(&re_vfs.Attributes{}).SetInodeNumber(123),
 		).Return(true)
 		childLeaf1 := mock.NewMockNativeLeaf(ctrl)
@@ -413,15 +416,16 @@ func TestContentAddressableStorageDirectoryVirtualReadDir(t *testing.T) {
 			true,
 		).Return(childLeaf1)
 		childLeaf1.EXPECT().VirtualGetAttributes(
+			ctx,
 			re_vfs.AttributesMaskInodeNumber,
 			gomock.Any(),
-		).Do(func(requested re_vfs.AttributesMask, out *re_vfs.Attributes) {
+		).Do(func(ctx context.Context, requested re_vfs.AttributesMask, out *re_vfs.Attributes) {
 			out.SetInodeNumber(100)
 		})
-		reporter.EXPECT().ReportLeaf(
+		reporter.EXPECT().ReportEntry(
 			uint64(2),
 			path.MustNewComponent("executable"),
-			childLeaf1,
+			re_vfs.DirectoryChild{}.FromLeaf(childLeaf1),
 			(&re_vfs.Attributes{}).SetInodeNumber(100),
 		).Return(true)
 		childLeaf2 := mock.NewMockNativeLeaf(ctrl)
@@ -430,19 +434,20 @@ func TestContentAddressableStorageDirectoryVirtualReadDir(t *testing.T) {
 			false,
 		).Return(childLeaf2)
 		childLeaf2.EXPECT().VirtualGetAttributes(
+			ctx,
 			re_vfs.AttributesMaskInodeNumber,
 			gomock.Any(),
-		).Do(func(requested re_vfs.AttributesMask, out *re_vfs.Attributes) {
+		).Do(func(ctx context.Context, requested re_vfs.AttributesMask, out *re_vfs.Attributes) {
 			out.SetInodeNumber(200)
 		})
-		reporter.EXPECT().ReportLeaf(
+		reporter.EXPECT().ReportEntry(
 			uint64(3),
 			path.MustNewComponent("file"),
-			childLeaf2,
+			re_vfs.DirectoryChild{}.FromLeaf(childLeaf2),
 			(&re_vfs.Attributes{}).SetInodeNumber(200),
 		).Return(true)
 		contentAddressableStorageDirectoryExpectLookupSymlink(t, ctrl, handleAllocator, []byte{1})
-		reporter.EXPECT().ReportLeaf(
+		reporter.EXPECT().ReportEntry(
 			uint64(4),
 			path.MustNewComponent("symlink"),
 			gomock.Any(),
@@ -452,7 +457,7 @@ func TestContentAddressableStorageDirectoryVirtualReadDir(t *testing.T) {
 		require.Equal(
 			t,
 			re_vfs.StatusOK,
-			d.VirtualReadDir(0, re_vfs.AttributesMaskInodeNumber, reporter))
+			d.VirtualReadDir(ctx, 0, re_vfs.AttributesMaskInodeNumber, reporter))
 	})
 
 	t.Run("Partial", func(t *testing.T) {
@@ -463,19 +468,20 @@ func TestContentAddressableStorageDirectoryVirtualReadDir(t *testing.T) {
 			false,
 		).Return(childLeaf)
 		childLeaf.EXPECT().VirtualGetAttributes(
+			ctx,
 			re_vfs.AttributesMaskInodeNumber,
 			gomock.Any(),
-		).Do(func(requested re_vfs.AttributesMask, out *re_vfs.Attributes) {
+		).Do(func(ctx context.Context, requested re_vfs.AttributesMask, out *re_vfs.Attributes) {
 			out.SetInodeNumber(200)
 		})
-		reporter.EXPECT().ReportLeaf(
+		reporter.EXPECT().ReportEntry(
 			uint64(3),
 			path.MustNewComponent("file"),
-			childLeaf,
+			re_vfs.DirectoryChild{}.FromLeaf(childLeaf),
 			(&re_vfs.Attributes{}).SetInodeNumber(200),
 		).Return(true)
 		contentAddressableStorageDirectoryExpectLookupSymlink(t, ctrl, handleAllocator, []byte{1})
-		reporter.EXPECT().ReportLeaf(
+		reporter.EXPECT().ReportEntry(
 			uint64(4),
 			path.MustNewComponent("symlink"),
 			gomock.Any(),
@@ -485,7 +491,7 @@ func TestContentAddressableStorageDirectoryVirtualReadDir(t *testing.T) {
 		require.Equal(
 			t,
 			re_vfs.StatusOK,
-			d.VirtualReadDir(2, re_vfs.AttributesMaskInodeNumber, reporter))
+			d.VirtualReadDir(ctx, 2, re_vfs.AttributesMaskInodeNumber, reporter))
 	})
 
 	t.Run("AtEOF", func(t *testing.T) {
@@ -494,7 +500,7 @@ func TestContentAddressableStorageDirectoryVirtualReadDir(t *testing.T) {
 		require.Equal(
 			t,
 			re_vfs.StatusOK,
-			d.VirtualReadDir(4, re_vfs.AttributesMaskInodeNumber, reporter))
+			d.VirtualReadDir(ctx, 4, re_vfs.AttributesMaskInodeNumber, reporter))
 	})
 
 	t.Run("BeyondEOF", func(t *testing.T) {
@@ -503,12 +509,12 @@ func TestContentAddressableStorageDirectoryVirtualReadDir(t *testing.T) {
 		require.Equal(
 			t,
 			re_vfs.StatusOK,
-			d.VirtualReadDir(5, re_vfs.AttributesMaskInodeNumber, reporter))
+			d.VirtualReadDir(ctx, 5, re_vfs.AttributesMaskInodeNumber, reporter))
 	})
 }
 
 func TestContentAddressableStorageDirectoryHandleResolver(t *testing.T) {
-	ctrl := gomock.NewController(t)
+	ctrl, ctx := gomock.WithContext(context.Background(), t)
 
 	directoryContext := mock.NewMockDirectoryContext(ctrl)
 	rootHandleAllocation := mock.NewMockResolvableHandleAllocation(ctrl)
@@ -524,7 +530,7 @@ func TestContentAddressableStorageDirectoryHandleResolver(t *testing.T) {
 	t.Run("EmptyIdentifier", func(t *testing.T) {
 		// A variable length encoded integer should be provided
 		// as an identifier.
-		_, _, s := handleResolver(bytes.NewBuffer(nil))
+		_, s := handleResolver(bytes.NewBuffer(nil))
 		require.Equal(t, re_vfs.StatusErrBadHandle, s)
 	})
 
@@ -533,10 +539,9 @@ func TestContentAddressableStorageDirectoryHandleResolver(t *testing.T) {
 		// directory itself.
 		contentAddressableStorageDirectoryExpectLookupSelf(t, ctrl, handleAllocator)
 
-		directory, leaf, s := handleResolver(bytes.NewBuffer([]byte{0}))
+		child, s := handleResolver(bytes.NewBuffer([]byte{0}))
 		require.Equal(t, re_vfs.StatusOK, s)
-		require.Equal(t, d, directory)
-		require.Nil(t, leaf)
+		require.Equal(t, re_vfs.DirectoryChild{}.FromDirectory(d), child)
 	})
 
 	t.Run("SymlinkIOError", func(t *testing.T) {
@@ -545,7 +550,7 @@ func TestContentAddressableStorageDirectoryHandleResolver(t *testing.T) {
 		// with an I/O error.
 		directoryContext.EXPECT().GetDirectoryContents().Return(nil, re_vfs.StatusErrIO)
 
-		_, _, s := handleResolver(bytes.NewBuffer([]byte{1}))
+		_, s := handleResolver(bytes.NewBuffer([]byte{1}))
 		require.Equal(t, re_vfs.StatusErrIO, s)
 	})
 
@@ -564,7 +569,7 @@ func TestContentAddressableStorageDirectoryHandleResolver(t *testing.T) {
 
 	t.Run("SymlinkOutOfBounds", func(t *testing.T) {
 		// Provide a symlink index that is out of bounds.
-		_, _, s := handleResolver(bytes.NewBuffer([]byte{3}))
+		_, s := handleResolver(bytes.NewBuffer([]byte{3}))
 		require.Equal(t, re_vfs.StatusErrBadHandle, s)
 	})
 
@@ -572,12 +577,11 @@ func TestContentAddressableStorageDirectoryHandleResolver(t *testing.T) {
 		// Successfully resolve a symbolic link.
 		contentAddressableStorageDirectoryExpectLookupSymlink(t, ctrl, handleAllocator, []byte{2})
 
-		directory, leaf, s := handleResolver(bytes.NewBuffer([]byte{2}))
+		child, s := handleResolver(bytes.NewBuffer([]byte{2}))
 		require.Equal(t, re_vfs.StatusOK, s)
-		require.Nil(t, directory)
-		require.NotNil(t, leaf)
 
-		target, s := leaf.VirtualReadlink()
+		_, leaf := child.GetPair()
+		target, s := leaf.VirtualReadlink(ctx)
 		require.Equal(t, re_vfs.StatusOK, s)
 		require.Equal(t, []byte("target2"), target)
 	})

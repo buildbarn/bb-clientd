@@ -67,21 +67,21 @@ type commandFile struct {
 	size       uint64
 }
 
-func (f *commandFile) VirtualGetAttributes(requested virtual.AttributesMask, attributes *virtual.Attributes) {
+func (f *commandFile) VirtualGetAttributes(ctx context.Context, requested virtual.AttributesMask, attributes *virtual.Attributes) {
 	attributes.SetChangeID(0)
 	attributes.SetFileType(filesystem.FileTypeRegularFile)
 	attributes.SetPermissions(virtual.PermissionsRead | virtual.PermissionsExecute)
 	attributes.SetSizeBytes(f.size)
 }
 
-func (f *commandFile) VirtualSetAttributes(in *virtual.Attributes, requested virtual.AttributesMask, out *virtual.Attributes) virtual.Status {
+func (f *commandFile) VirtualSetAttributes(ctx context.Context, in *virtual.Attributes, requested virtual.AttributesMask, out *virtual.Attributes) virtual.Status {
 	if _, ok := in.GetPermissions(); ok {
 		return virtual.StatusErrPerm
 	}
 	if _, ok := in.GetSizeBytes(); ok {
 		return virtual.StatusErrAccess
 	}
-	f.VirtualGetAttributes(requested, out)
+	f.VirtualGetAttributes(ctx, requested, out)
 	return virtual.StatusOK
 }
 
@@ -107,11 +107,11 @@ func (f *commandFile) VirtualSeek(offset uint64, regionType filesystem.RegionTyp
 	}
 }
 
-func (f *commandFile) VirtualOpenSelf(shareAccess virtual.ShareMask, options *virtual.OpenExistingOptions, requested virtual.AttributesMask, attributes *virtual.Attributes) virtual.Status {
+func (f *commandFile) VirtualOpenSelf(ctx context.Context, shareAccess virtual.ShareMask, options *virtual.OpenExistingOptions, requested virtual.AttributesMask, attributes *virtual.Attributes) virtual.Status {
 	if shareAccess&^virtual.ShareMaskRead != 0 || options.Truncate {
 		return virtual.StatusErrAccess
 	}
-	f.VirtualGetAttributes(requested, attributes)
+	f.VirtualGetAttributes(ctx, requested, attributes)
 	return virtual.StatusOK
 }
 
@@ -132,7 +132,7 @@ func (f *commandFile) VirtualRead(buf []byte, offset uint64) (int, bool, virtual
 	return len(buf), eof, virtual.StatusOK
 }
 
-func (f *commandFile) VirtualReadlink() ([]byte, virtual.Status) {
+func (f *commandFile) VirtualReadlink(ctx context.Context) ([]byte, virtual.Status) {
 	return nil, virtual.StatusErrInval
 }
 

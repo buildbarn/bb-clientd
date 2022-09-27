@@ -94,7 +94,10 @@ func main() {
 	}
 
 	// Create the virtual file system.
-	mount, rootHandleAllocator, err := virtual_configuration.NewMountFromConfiguration(configuration.Mount, "bb_clientd")
+	mount, rootHandleAllocator, err := virtual_configuration.NewMountFromConfiguration(
+		configuration.Mount,
+		"bb_clientd",
+		/* containsSelfMutatingSymlinks = */ false)
 	if err != nil {
 		log.Fatal("Failed to create virtual file system mount: ", err)
 	}
@@ -145,44 +148,49 @@ func main() {
 			AsStatelessAllocator()
 		return handleAllocator.
 			New(bytes.NewBuffer([]byte{0})).
-			AsStatelessDirectory(cd_vfs.NewStaticDirectory(
-				map[path.Component]re_vfs.Directory{
-					path.MustNewComponent("command"): handleAllocator.
-						New(bytes.NewBuffer([]byte{1})).
-						AsStatelessDirectory(cd_vfs.NewDigestParsingDirectory(
-							instanceName,
-							func(digest digest.Digest) (re_vfs.Directory, re_vfs.Leaf, re_vfs.Status) {
-								f, s := commandFileFactory.LookupFile(digest)
-								return nil, f, s
-							})),
-					path.MustNewComponent("directory"): handleAllocator.
-						New(bytes.NewBuffer([]byte{2})).
-						AsStatelessDirectory(cd_vfs.NewDigestParsingDirectory(
-							instanceName,
-							func(digest digest.Digest) (re_vfs.Directory, re_vfs.Leaf, re_vfs.Status) {
-								return globalDirectoryContext.LookupDirectory(digest), nil, re_vfs.StatusOK
-							})),
-					path.MustNewComponent("executable"): handleAllocator.
-						New(bytes.NewBuffer([]byte{3})).
-						AsStatelessDirectory(cd_vfs.NewDigestParsingDirectory(
-							instanceName,
-							func(digest digest.Digest) (re_vfs.Directory, re_vfs.Leaf, re_vfs.Status) {
-								return nil, casFileFactory.LookupFile(digest, true), re_vfs.StatusOK
-							})),
-					path.MustNewComponent("file"): handleAllocator.
-						New(bytes.NewBuffer([]byte{4})).
-						AsStatelessDirectory(cd_vfs.NewDigestParsingDirectory(
-							instanceName,
-							func(digest digest.Digest) (re_vfs.Directory, re_vfs.Leaf, re_vfs.Status) {
-								return nil, casFileFactory.LookupFile(digest, false), re_vfs.StatusOK
-							})),
-					path.MustNewComponent("tree"): handleAllocator.
-						New(bytes.NewBuffer([]byte{5})).
-						AsStatelessDirectory(cd_vfs.NewDigestParsingDirectory(
-							instanceName,
-							func(digest digest.Digest) (re_vfs.Directory, re_vfs.Leaf, re_vfs.Status) {
-								return globalTreeContext.LookupTree(digest), nil, re_vfs.StatusOK
-							})),
+			AsStatelessDirectory(re_vfs.NewStaticDirectory(
+				map[path.Component]re_vfs.DirectoryChild{
+					path.MustNewComponent("command"): re_vfs.DirectoryChild{}.FromDirectory(
+						handleAllocator.
+							New(bytes.NewBuffer([]byte{1})).
+							AsStatelessDirectory(cd_vfs.NewDigestParsingDirectory(
+								instanceName,
+								func(digest digest.Digest) (re_vfs.DirectoryChild, re_vfs.Status) {
+									f, s := commandFileFactory.LookupFile(digest)
+									return re_vfs.DirectoryChild{}.FromLeaf(f), s
+								}))),
+					path.MustNewComponent("directory"): re_vfs.DirectoryChild{}.FromDirectory(
+						handleAllocator.
+							New(bytes.NewBuffer([]byte{2})).
+							AsStatelessDirectory(cd_vfs.NewDigestParsingDirectory(
+								instanceName,
+								func(digest digest.Digest) (re_vfs.DirectoryChild, re_vfs.Status) {
+									return re_vfs.DirectoryChild{}.FromDirectory(globalDirectoryContext.LookupDirectory(digest)), re_vfs.StatusOK
+								}))),
+					path.MustNewComponent("executable"): re_vfs.DirectoryChild{}.FromDirectory(
+						handleAllocator.
+							New(bytes.NewBuffer([]byte{3})).
+							AsStatelessDirectory(cd_vfs.NewDigestParsingDirectory(
+								instanceName,
+								func(digest digest.Digest) (re_vfs.DirectoryChild, re_vfs.Status) {
+									return re_vfs.DirectoryChild{}.FromLeaf(casFileFactory.LookupFile(digest, true)), re_vfs.StatusOK
+								}))),
+					path.MustNewComponent("file"): re_vfs.DirectoryChild{}.FromDirectory(
+						handleAllocator.
+							New(bytes.NewBuffer([]byte{4})).
+							AsStatelessDirectory(cd_vfs.NewDigestParsingDirectory(
+								instanceName,
+								func(digest digest.Digest) (re_vfs.DirectoryChild, re_vfs.Status) {
+									return re_vfs.DirectoryChild{}.FromLeaf(casFileFactory.LookupFile(digest, false)), re_vfs.StatusOK
+								}))),
+					path.MustNewComponent("tree"): re_vfs.DirectoryChild{}.FromDirectory(
+						handleAllocator.
+							New(bytes.NewBuffer([]byte{5})).
+							AsStatelessDirectory(cd_vfs.NewDigestParsingDirectory(
+								instanceName,
+								func(digest digest.Digest) (re_vfs.DirectoryChild, re_vfs.Status) {
+									return re_vfs.DirectoryChild{}.FromDirectory(globalTreeContext.LookupTree(digest)), re_vfs.StatusOK
+								}))),
 				}))
 	}
 
@@ -244,26 +252,28 @@ func main() {
 	// - "cas": raw access to the Content Addressable Storage.
 	// - "outputs": outputs of builds performed using Bazel.
 	// - "scratch": a writable directory for testing.
-	rootDirectory := rootHandleAllocator.New().AsStatelessDirectory(cd_vfs.NewStaticDirectory(
-		map[path.Component]re_vfs.Directory{
-			path.MustNewComponent("cas"): cd_vfs.NewInstanceNameParsingDirectory(
-				rootHandleAllocator.New(),
-				map[path.Component]cd_vfs.InstanceNameLookupFunc{
-					path.MustNewComponent("blobs"): blobsDirectoryLookupFunc,
-				}),
-			path.MustNewComponent("outputs"): outputsDirectory,
-			path.MustNewComponent("scratch"): re_vfs.NewInMemoryPrepopulatedDirectory(
-				re_vfs.NewHandleAllocatingFileAllocator(
-					re_vfs.NewPoolBackedFileAllocator(
-						filePool,
-						util.DefaultErrorLogger),
-					rootHandleAllocator),
-				symlinkFactory,
-				util.DefaultErrorLogger,
-				rootHandleAllocator,
-				sort.Sort,
-				/* hiddenFilesMatcher = */ func(string) bool { return false },
-				clock.SystemClock),
+	rootDirectory := rootHandleAllocator.New().AsStatelessDirectory(re_vfs.NewStaticDirectory(
+		map[path.Component]re_vfs.DirectoryChild{
+			path.MustNewComponent("cas"): re_vfs.DirectoryChild{}.FromDirectory(
+				cd_vfs.NewInstanceNameParsingDirectory(
+					rootHandleAllocator.New(),
+					map[path.Component]cd_vfs.InstanceNameLookupFunc{
+						path.MustNewComponent("blobs"): blobsDirectoryLookupFunc,
+					})),
+			path.MustNewComponent("outputs"): re_vfs.DirectoryChild{}.FromDirectory(outputsDirectory),
+			path.MustNewComponent("scratch"): re_vfs.DirectoryChild{}.FromDirectory(
+				re_vfs.NewInMemoryPrepopulatedDirectory(
+					re_vfs.NewHandleAllocatingFileAllocator(
+						re_vfs.NewPoolBackedFileAllocator(
+							filePool,
+							util.DefaultErrorLogger),
+						rootHandleAllocator),
+					symlinkFactory,
+					util.DefaultErrorLogger,
+					rootHandleAllocator,
+					sort.Sort,
+					/* hiddenFilesMatcher = */ func(string) bool { return false },
+					clock.SystemClock)),
 		}))
 
 	if err := mount.Expose(rootDirectory); err != nil {

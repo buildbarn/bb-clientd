@@ -1,6 +1,7 @@
 package virtual_test
 
 import (
+	"context"
 	"testing"
 
 	"github.com/buildbarn/bb-clientd/internal/mock"
@@ -13,7 +14,7 @@ import (
 )
 
 func TestDigestParsingDirectory(t *testing.T) {
-	ctrl := gomock.NewController(t)
+	ctrl, ctx := gomock.WithContext(context.Background(), t)
 
 	lookupFunc := mock.NewMockDigestLookupFunc(ctrl)
 	d := cd_vfs.NewDigestParsingDirectory(
@@ -24,28 +25,28 @@ func TestDigestParsingDirectory(t *testing.T) {
 		// The filename must contain a dash to separate the hash
 		// and size in bytes.
 		var out re_vfs.Attributes
-		_, _, s := d.VirtualLookup(path.MustNewComponent("hello123"), 0, &out)
+		_, s := d.VirtualLookup(ctx, path.MustNewComponent("hello123"), 0, &out)
 		require.Equal(t, re_vfs.StatusErrNoEnt, s)
 	})
 
 	t.Run("InvalidHash", func(t *testing.T) {
 		// "hello" is not a valid cryptographic hash.
 		var out re_vfs.Attributes
-		_, _, s := d.VirtualLookup(path.MustNewComponent("hello-123"), 0, &out)
+		_, s := d.VirtualLookup(ctx, path.MustNewComponent("hello-123"), 0, &out)
 		require.Equal(t, re_vfs.StatusErrNoEnt, s)
 	})
 
 	t.Run("InvalidSizeBytesNotAnInteger", func(t *testing.T) {
 		// The size in bytes must be an integer.
 		var out re_vfs.Attributes
-		_, _, s := d.VirtualLookup(path.MustNewComponent("8b1a9953c4611296a827abf8c47804d7-five"), 0, &out)
+		_, s := d.VirtualLookup(ctx, path.MustNewComponent("8b1a9953c4611296a827abf8c47804d7-five"), 0, &out)
 		require.Equal(t, re_vfs.StatusErrNoEnt, s)
 	})
 
 	t.Run("InvalidSizeBytesNotAnInteger", func(t *testing.T) {
 		// The size in bytes must fit in int64.
 		var out re_vfs.Attributes
-		_, _, s := d.VirtualLookup(path.MustNewComponent("8b1a9953c4611296a827abf8c47804d7-13209483450980482109834"), 0, &out)
+		_, s := d.VirtualLookup(ctx, path.MustNewComponent("8b1a9953c4611296a827abf8c47804d7-13209483450980482109834"), 0, &out)
 		require.Equal(t, re_vfs.StatusErrNoEnt, s)
 	})
 
@@ -55,19 +56,19 @@ func TestDigestParsingDirectory(t *testing.T) {
 		mockChildFile := mock.NewMockVirtualLeaf(ctrl)
 		lookupFunc.EXPECT().Call(
 			digest.MustNewDigest("hello", "8b1a9953c4611296a827abf8c47804d7", 5),
-		).Return(nil, mockChildFile, re_vfs.StatusOK)
+		).Return(re_vfs.DirectoryChild{}.FromLeaf(mockChildFile), re_vfs.StatusOK)
 		mockChildFile.EXPECT().VirtualGetAttributes(
+			ctx,
 			re_vfs.AttributesMaskInodeNumber,
 			gomock.Any(),
-		).Do(func(requested re_vfs.AttributesMask, out *re_vfs.Attributes) {
+		).Do(func(ctx context.Context, requested re_vfs.AttributesMask, out *re_vfs.Attributes) {
 			out.SetInodeNumber(123)
 		})
 
 		var out re_vfs.Attributes
-		childDirectory, childFile, s := d.VirtualLookup(path.MustNewComponent("8b1a9953c4611296a827abf8c47804d7-5"), re_vfs.AttributesMaskInodeNumber, &out)
+		child, s := d.VirtualLookup(ctx, path.MustNewComponent("8b1a9953c4611296a827abf8c47804d7-5"), re_vfs.AttributesMaskInodeNumber, &out)
 		require.Equal(t, re_vfs.StatusOK, s)
-		require.Nil(t, childDirectory)
-		require.Equal(t, mockChildFile, childFile)
+		require.Equal(t, re_vfs.DirectoryChild{}.FromLeaf(mockChildFile), child)
 		require.Equal(t, *(&re_vfs.Attributes{}).SetInodeNumber(123), out)
 	})
 }

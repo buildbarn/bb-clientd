@@ -65,7 +65,7 @@ type outputPathState struct {
 // This implementation should eventually be extended to address the
 // issues listed above.
 type RemoteOutputServiceDirectory struct {
-	readOnlyDirectory
+	virtual.ReadOnlyDirectory
 
 	handleAllocator                   virtual.StatefulHandleAllocator
 	handle                            virtual.StatefulDirectoryHandle
@@ -185,9 +185,9 @@ func (d *RemoteOutputServiceDirectory) filterMissingChildren(ctx context.Context
 		// Obtain the transitive closure of digests on which
 		// this file or directory depends.
 		var digests digest.Set
-		if node.Leaf != nil {
-			digests = node.Leaf.GetContainingDigests()
-		} else if digests, savedErr = node.Directory.GetContainingDigests(ctx); savedErr != nil {
+		if directory, leaf := node.GetPair(); leaf != nil {
+			digests = leaf.GetContainingDigests()
+		} else if digests, savedErr = directory.GetContainingDigests(ctx); savedErr != nil {
 			// Can't compute the set of digests underneath
 			// this directory. Remove the directory
 			// entirely.
@@ -486,7 +486,7 @@ func (d *RemoteOutputServiceDirectory) BatchCreate(ctx context.Context, request 
 			return nil, util.StatusWrapf(err, "Invalid digest for file %#v", entry.Path)
 		}
 		leaf := outputPathState.casFileFactory.LookupFile(childDigest, entry.IsExecutable)
-		if err := prefixCreator.createChild(entry.Path, virtual.InitialNode{Leaf: leaf}); err != nil {
+		if err := prefixCreator.createChild(entry.Path, virtual.InitialNode{}.FromLeaf(leaf)); err != nil {
 			leaf.Unlink()
 			return nil, util.StatusWrapf(err, "Failed to create file %#v", entry.Path)
 		}
@@ -501,14 +501,15 @@ func (d *RemoteOutputServiceDirectory) BatchCreate(ctx context.Context, request 
 		if sizeBytes := childDigest.GetSizeBytes(); sizeBytes > d.maximumMessageSizeBytes {
 			return nil, status.Errorf(codes.InvalidArgument, "Directory %#v is %d bytes in size, which exceeds the permitted maximum of %d bytes", entry.Path, sizeBytes, d.maximumMessageSizeBytes)
 		}
-		if err := prefixCreator.createChild(entry.Path, virtual.InitialNode{
-			Directory: virtual.NewCASInitialContentsFetcher(
-				context.Background(),
-				cd_cas.NewTreeDirectoryWalker(d.directoryFetcher, childDigest),
-				outputPathState.casFileFactory,
-				d.symlinkFactory,
-				instanceName),
-		}); err != nil {
+		if err := prefixCreator.createChild(
+			entry.Path,
+			virtual.InitialNode{}.FromDirectory(
+				virtual.NewCASInitialContentsFetcher(
+					context.Background(),
+					cd_cas.NewTreeDirectoryWalker(d.directoryFetcher, childDigest),
+					outputPathState.casFileFactory,
+					d.symlinkFactory,
+					instanceName))); err != nil {
 			return nil, util.StatusWrapf(err, "Failed to create directory %#v", entry.Path)
 		}
 	}
@@ -516,7 +517,7 @@ func (d *RemoteOutputServiceDirectory) BatchCreate(ctx context.Context, request 
 	// Create requested symbolic links.
 	for _, entry := range request.Symlinks {
 		leaf := d.symlinkFactory.LookupSymlink([]byte(entry.Target))
-		if err := prefixCreator.createChild(entry.Path, virtual.InitialNode{Leaf: leaf}); err != nil {
+		if err := prefixCreator.createChild(entry.Path, virtual.InitialNode{}.FromLeaf(leaf)); err != nil {
 			leaf.Unlink()
 			return nil, util.StatusWrapf(err, "Failed to create symbolic link %#v", entry.Path)
 		}
@@ -549,11 +550,12 @@ func (cw *statWalker) OnScope(absolute bool) (path.ComponentWalker, error) {
 }
 
 func (cw *statWalker) OnDirectory(name path.Component) (path.GotDirectoryOrSymlink, error) {
-	directory, leaf, err := cw.stack.Peek().LookupChild(name)
+	child, err := cw.stack.Peek().LookupChild(name)
 	if err != nil {
 		return nil, err
 	}
 
+	directory, leaf := child.GetPair()
 	if directory != nil {
 		// Got a directory.
 		cw.stack.Push(directory)
@@ -582,11 +584,12 @@ func (cw *statWalker) OnDirectory(name path.Component) (path.GotDirectoryOrSymli
 }
 
 func (cw *statWalker) OnTerminal(name path.Component) (*path.GotSymlink, error) {
-	directory, leaf, err := cw.stack.Peek().LookupChild(name)
+	child, err := cw.stack.Peek().LookupChild(name)
 	if err != nil {
 		return nil, err
 	}
 
+	directory, leaf := child.GetPair()
 	if directory != nil {
 		// Got a directory. The existing FileStatus is sufficient.
 		cw.stack.Push(directory)
@@ -672,7 +675,7 @@ func (d *RemoteOutputServiceDirectory) BatchStat(ctx context.Context, request *r
 				// modification time, as the client uses that to
 				// invalidate cached results.
 				var attributes virtual.Attributes
-				statWalker.stack.Peek().VirtualGetAttributes(virtual.AttributesMaskLastDataModificationTime, &attributes)
+				statWalker.stack.Peek().VirtualGetAttributes(ctx, virtual.AttributesMaskLastDataModificationTime, &attributes)
 				lastModifiedTime, ok := attributes.GetLastDataModificationTime()
 				if !ok {
 					panic("Directory did not provide a last data modification time, even though the Remote Output Service protocol requires it")
@@ -716,7 +719,7 @@ func (d *RemoteOutputServiceDirectory) FinalizeBuild(ctx context.Context, reques
 
 // VirtualGetAttributes returns the attributes of the root directory of
 // the Remote Output Service.
-func (d *RemoteOutputServiceDirectory) VirtualGetAttributes(requested virtual.AttributesMask, attributes *virtual.Attributes) {
+func (d *RemoteOutputServiceDirectory) VirtualGetAttributes(ctx context.Context, requested virtual.AttributesMask, attributes *virtual.Attributes) {
 	attributes.SetFileType(filesystem.FileTypeDirectory)
 	attributes.SetPermissions(virtual.PermissionsRead | virtual.PermissionsExecute)
 	attributes.SetSizeBytes(0)
@@ -731,33 +734,33 @@ func (d *RemoteOutputServiceDirectory) VirtualGetAttributes(requested virtual.At
 
 // VirtualLookup can be used to look up the root directory of an output
 // path for a given output base.
-func (d *RemoteOutputServiceDirectory) VirtualLookup(name path.Component, requested virtual.AttributesMask, out *virtual.Attributes) (virtual.Directory, virtual.Leaf, virtual.Status) {
+func (d *RemoteOutputServiceDirectory) VirtualLookup(ctx context.Context, name path.Component, requested virtual.AttributesMask, out *virtual.Attributes) (virtual.DirectoryChild, virtual.Status) {
 	d.lock.Lock()
 	outputPathState, ok := d.outputBaseIDs[name]
 	d.lock.Unlock()
 	if !ok {
-		return nil, nil, virtual.StatusErrNoEnt
+		return virtual.DirectoryChild{}, virtual.StatusErrNoEnt
 	}
-	outputPathState.rootDirectory.VirtualGetAttributes(requested, out)
-	return outputPathState.rootDirectory, nil, virtual.StatusOK
+	outputPathState.rootDirectory.VirtualGetAttributes(ctx, requested, out)
+	return virtual.DirectoryChild{}.FromDirectory(outputPathState.rootDirectory), virtual.StatusOK
 }
 
 // VirtualOpenChild can be used to open or create a file in the root
 // directory of the Remote Output Service. Because this directory never
 // contains any files, this function is guaranteed to fail.
-func (d *RemoteOutputServiceDirectory) VirtualOpenChild(name path.Component, shareAccess virtual.ShareMask, createAttributes *virtual.Attributes, existingOptions *virtual.OpenExistingOptions, requested virtual.AttributesMask, openedFileAttributes *virtual.Attributes) (virtual.Leaf, virtual.AttributesMask, virtual.ChangeInfo, virtual.Status) {
+func (d *RemoteOutputServiceDirectory) VirtualOpenChild(ctx context.Context, name path.Component, shareAccess virtual.ShareMask, createAttributes *virtual.Attributes, existingOptions *virtual.OpenExistingOptions, requested virtual.AttributesMask, openedFileAttributes *virtual.Attributes) (virtual.Leaf, virtual.AttributesMask, virtual.ChangeInfo, virtual.Status) {
 	d.lock.Lock()
 	_, ok := d.outputBaseIDs[name]
 	d.lock.Unlock()
 	if ok {
-		return virtualOpenChildWrongFileType(existingOptions, virtual.StatusErrIsDir)
+		return virtual.ReadOnlyDirectoryOpenChildWrongFileType(existingOptions, virtual.StatusErrIsDir)
 	}
-	return virtualOpenChildDoesntExist(createAttributes)
+	return virtual.ReadOnlyDirectoryOpenChildDoesntExist(createAttributes)
 }
 
 // VirtualReadDir returns a list of all the output paths managed by this
 // Remote Output Service.
-func (d *RemoteOutputServiceDirectory) VirtualReadDir(firstCookie uint64, requested virtual.AttributesMask, reporter virtual.DirectoryEntryReporter) virtual.Status {
+func (d *RemoteOutputServiceDirectory) VirtualReadDir(ctx context.Context, firstCookie uint64, requested virtual.AttributesMask, reporter virtual.DirectoryEntryReporter) virtual.Status {
 	d.lock.Lock()
 	defer d.lock.Unlock()
 
@@ -777,8 +780,8 @@ func (d *RemoteOutputServiceDirectory) VirtualReadDir(firstCookie uint64, reques
 	for ; outputPathState != &d.outputPaths; outputPathState = outputPathState.next {
 		child := outputPathState.rootDirectory
 		var attributes virtual.Attributes
-		child.VirtualGetAttributes(requested, &attributes)
-		if !reporter.ReportDirectory(outputPathState.cookie+1, outputPathState.outputBaseID, child, &attributes) {
+		child.VirtualGetAttributes(ctx, requested, &attributes)
+		if !reporter.ReportEntry(outputPathState.cookie+1, outputPathState.outputBaseID, virtual.DirectoryChild{}.FromDirectory(child), &attributes) {
 			break
 		}
 	}

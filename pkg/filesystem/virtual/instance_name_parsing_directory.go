@@ -1,6 +1,7 @@
 package virtual
 
 import (
+	"context"
 	"io"
 
 	"github.com/buildbarn/bb-remote-execution/pkg/filesystem/virtual"
@@ -52,7 +53,7 @@ func (o *instanceNameParsingDirectoryOptions) createDirectory(path instanceNameP
 
 type instanceNameParsingDirectory struct {
 	nonIterableDirectory
-	readOnlyDirectory
+	virtual.ReadOnlyDirectory
 
 	options *instanceNameParsingDirectoryOptions
 	path    instanceNameParsingPath
@@ -74,7 +75,7 @@ func NewInstanceNameParsingDirectory(handleAllocation virtual.StatelessHandleAll
 	return options.createDirectory(instanceNameParsingPath{})
 }
 
-func (d *instanceNameParsingDirectory) VirtualGetAttributes(requested virtual.AttributesMask, attributes *virtual.Attributes) {
+func (d *instanceNameParsingDirectory) VirtualGetAttributes(ctx context.Context, requested virtual.AttributesMask, attributes *virtual.Attributes) {
 	attributes.SetChangeID(0)
 	attributes.SetFileType(filesystem.FileTypeDirectory)
 	attributes.SetLinkCount(virtual.ImplicitDirectoryLinkCount)
@@ -82,30 +83,30 @@ func (d *instanceNameParsingDirectory) VirtualGetAttributes(requested virtual.At
 	attributes.SetSizeBytes(0)
 }
 
-func (d *instanceNameParsingDirectory) VirtualLookup(name path.Component, requested virtual.AttributesMask, out *virtual.Attributes) (virtual.Directory, virtual.Leaf, virtual.Status) {
+func (d *instanceNameParsingDirectory) VirtualLookup(ctx context.Context, name path.Component, requested virtual.AttributesMask, out *virtual.Attributes) (virtual.DirectoryChild, virtual.Status) {
 	if lookupFunc, ok := d.options.lookupFuncs[name]; ok {
 		// A reserved keyword that terminates the instance name
 		// has been provided. Instantiate the target.
 		instanceName, err := digest.NewInstanceNameFromComponents(d.path)
 		if err != nil {
-			return nil, nil, virtual.StatusErrNoEnt
+			return virtual.DirectoryChild{}, virtual.StatusErrNoEnt
 		}
 		directory := lookupFunc(instanceName)
-		directory.VirtualGetAttributes(requested, out)
-		return directory, nil, virtual.StatusOK
+		directory.VirtualGetAttributes(ctx, requested, out)
+		return virtual.DirectoryChild{}.FromDirectory(directory), virtual.StatusOK
 	}
 
 	// A regular pathname component of the instance name. Create a
 	// new directory that continues parsing.
 	childPath := append(append(instanceNameParsingPath{}, d.path...), name.String())
 	child := d.options.createDirectory(childPath)
-	child.VirtualGetAttributes(requested, out)
-	return child, nil, virtual.StatusOK
+	child.VirtualGetAttributes(ctx, requested, out)
+	return virtual.DirectoryChild{}.FromDirectory(child), virtual.StatusOK
 }
 
-func (d *instanceNameParsingDirectory) VirtualOpenChild(name path.Component, shareAccess virtual.ShareMask, createAttributes *virtual.Attributes, existingOptions *virtual.OpenExistingOptions, requested virtual.AttributesMask, openedFileAttributes *virtual.Attributes) (virtual.Leaf, virtual.AttributesMask, virtual.ChangeInfo, virtual.Status) {
+func (d *instanceNameParsingDirectory) VirtualOpenChild(ctx context.Context, name path.Component, shareAccess virtual.ShareMask, createAttributes *virtual.Attributes, existingOptions *virtual.OpenExistingOptions, requested virtual.AttributesMask, openedFileAttributes *virtual.Attributes) (virtual.Leaf, virtual.AttributesMask, virtual.ChangeInfo, virtual.Status) {
 	// This directory type resolves all names, and all children are
 	// directories. This means that this should always fail with
 	// either EEXIST or EISDIR.
-	return virtualOpenChildWrongFileType(existingOptions, virtual.StatusErrIsDir)
+	return virtual.ReadOnlyDirectoryOpenChildWrongFileType(existingOptions, virtual.StatusErrIsDir)
 }

@@ -2,6 +2,7 @@ package virtual_test
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"testing"
 
@@ -30,7 +31,7 @@ func instanceNameParsingDirectoryExpectCreate(t *testing.T, ctrl *gomock.Control
 }
 
 func TestInstanceNameParsingDirectory(t *testing.T) {
-	ctrl := gomock.NewController(t)
+	ctrl, ctx := gomock.WithContext(context.Background(), t)
 
 	lookupFunc := mock.NewMockInstanceNameLookupFunc(ctrl)
 	rootHandleAllocation := mock.NewMockStatelessHandleAllocation(ctrl)
@@ -54,17 +55,17 @@ func TestInstanceNameParsingDirectory(t *testing.T) {
 		mockChildDirectory := mock.NewMockVirtualDirectory(ctrl)
 		lookupFunc.EXPECT().Call(digest.EmptyInstanceName).Return(mockChildDirectory)
 		mockChildDirectory.EXPECT().VirtualGetAttributes(
+			ctx,
 			re_vfs.AttributesMaskInodeNumber,
 			gomock.Any(),
-		).Do(func(requested re_vfs.AttributesMask, out *re_vfs.Attributes) {
+		).Do(func(ctx context.Context, requested re_vfs.AttributesMask, out *re_vfs.Attributes) {
 			out.SetInodeNumber(123)
 		})
 
 		var out re_vfs.Attributes
-		childDirectory, childFile, s := d.VirtualLookup(path.MustNewComponent("blobs"), re_vfs.AttributesMaskInodeNumber, &out)
+		child, s := d.VirtualLookup(ctx, path.MustNewComponent("blobs"), re_vfs.AttributesMaskInodeNumber, &out)
 		require.Equal(t, re_vfs.StatusOK, s)
-		require.Equal(t, mockChildDirectory, childDirectory)
-		require.Nil(t, childFile)
+		require.Equal(t, re_vfs.DirectoryChild{}.FromDirectory(mockChildDirectory), child)
 		require.Equal(t, *(&re_vfs.Attributes{}).SetInodeNumber(123), out)
 	})
 
@@ -74,9 +75,8 @@ func TestInstanceNameParsingDirectory(t *testing.T) {
 		instanceNameParsingDirectoryExpectCreate(t, ctrl, handleAllocator, []byte("hello//"))
 
 		var out1 re_vfs.Attributes
-		childDirectory1, childFile1, s := d.VirtualLookup(path.MustNewComponent("hello"), attributesMask, &out1)
+		child1, s := d.VirtualLookup(ctx, path.MustNewComponent("hello"), attributesMask, &out1)
 		require.Equal(t, re_vfs.StatusOK, s)
-		require.Nil(t, childFile1)
 		require.Equal(
 			t,
 			*(&re_vfs.Attributes{}).
@@ -90,17 +90,18 @@ func TestInstanceNameParsingDirectory(t *testing.T) {
 		mockChildDirectory := mock.NewMockVirtualDirectory(ctrl)
 		lookupFunc.EXPECT().Call(digest.MustNewInstanceName("hello")).Return(mockChildDirectory)
 		mockChildDirectory.EXPECT().VirtualGetAttributes(
+			ctx,
 			re_vfs.AttributesMaskInodeNumber,
 			gomock.Any(),
-		).Do(func(requested re_vfs.AttributesMask, out *re_vfs.Attributes) {
+		).Do(func(ctx context.Context, requested re_vfs.AttributesMask, out *re_vfs.Attributes) {
 			out.SetInodeNumber(123)
 		})
 
+		childDirectory1, _ := child1.GetPair()
 		var out2 re_vfs.Attributes
-		childDirectory2, childFile2, s := childDirectory1.VirtualLookup(path.MustNewComponent("blobs"), re_vfs.AttributesMaskInodeNumber, &out2)
+		child2, s := childDirectory1.VirtualLookup(ctx, path.MustNewComponent("blobs"), re_vfs.AttributesMaskInodeNumber, &out2)
 		require.Equal(t, re_vfs.StatusOK, s)
-		require.Equal(t, mockChildDirectory, childDirectory2)
-		require.Nil(t, childFile2)
+		require.Equal(t, re_vfs.DirectoryChild{}.FromDirectory(mockChildDirectory), child2)
 		require.Equal(t, *(&re_vfs.Attributes{}).SetInodeNumber(123), out2)
 	})
 
@@ -110,9 +111,8 @@ func TestInstanceNameParsingDirectory(t *testing.T) {
 		instanceNameParsingDirectoryExpectCreate(t, ctrl, handleAllocator, []byte("hello//"))
 
 		var out1 re_vfs.Attributes
-		childDirectory1, childFile1, s := d.VirtualLookup(path.MustNewComponent("hello"), attributesMask, &out1)
+		child1, s := d.VirtualLookup(ctx, path.MustNewComponent("hello"), attributesMask, &out1)
 		require.Equal(t, re_vfs.StatusOK, s)
-		require.Nil(t, childFile1)
 		require.Equal(
 			t,
 			*(&re_vfs.Attributes{}).
@@ -125,10 +125,10 @@ func TestInstanceNameParsingDirectory(t *testing.T) {
 
 		instanceNameParsingDirectoryExpectCreate(t, ctrl, handleAllocator, []byte("hello/world//"))
 
+		childDirectory1, _ := child1.GetPair()
 		var out2 re_vfs.Attributes
-		childDirectory2, childFile2, s := childDirectory1.VirtualLookup(path.MustNewComponent("world"), attributesMask, &out2)
+		child2, s := childDirectory1.VirtualLookup(ctx, path.MustNewComponent("world"), attributesMask, &out2)
 		require.Equal(t, re_vfs.StatusOK, s)
-		require.Nil(t, childFile2)
 		require.Equal(
 			t,
 			*(&re_vfs.Attributes{}).
@@ -142,17 +142,18 @@ func TestInstanceNameParsingDirectory(t *testing.T) {
 		mockChildDirectory := mock.NewMockVirtualDirectory(ctrl)
 		lookupFunc.EXPECT().Call(digest.MustNewInstanceName("hello/world")).Return(mockChildDirectory)
 		mockChildDirectory.EXPECT().VirtualGetAttributes(
+			ctx,
 			re_vfs.AttributesMaskInodeNumber,
 			gomock.Any(),
-		).Do(func(requested re_vfs.AttributesMask, out *re_vfs.Attributes) {
+		).Do(func(ctx context.Context, requested re_vfs.AttributesMask, out *re_vfs.Attributes) {
 			out.SetInodeNumber(123)
 		})
 
+		childDirectory2, _ := child2.GetPair()
 		var out3 re_vfs.Attributes
-		childDirectory3, childFile3, s := childDirectory2.VirtualLookup(path.MustNewComponent("blobs"), re_vfs.AttributesMaskInodeNumber, &out3)
+		child3, s := childDirectory2.VirtualLookup(ctx, path.MustNewComponent("blobs"), re_vfs.AttributesMaskInodeNumber, &out3)
 		require.Equal(t, re_vfs.StatusOK, s)
-		require.Equal(t, mockChildDirectory, childDirectory3)
-		require.Nil(t, childFile3)
+		require.Equal(t, re_vfs.DirectoryChild{}.FromDirectory(mockChildDirectory), child3)
 		require.Equal(t, *(&re_vfs.Attributes{}).SetInodeNumber(123), out3)
 	})
 
@@ -164,9 +165,8 @@ func TestInstanceNameParsingDirectory(t *testing.T) {
 		instanceNameParsingDirectoryExpectCreate(t, ctrl, handleAllocator, []byte("operations//"))
 
 		var out1 re_vfs.Attributes
-		childDirectory1, childFile1, s := d.VirtualLookup(path.MustNewComponent("operations"), attributesMask, &out1)
+		child1, s := d.VirtualLookup(ctx, path.MustNewComponent("operations"), attributesMask, &out1)
 		require.Equal(t, re_vfs.StatusOK, s)
-		require.Nil(t, childFile1)
 		require.Equal(
 			t,
 			*(&re_vfs.Attributes{}).
@@ -177,8 +177,9 @@ func TestInstanceNameParsingDirectory(t *testing.T) {
 				SetSizeBytes(0),
 			out1)
 
+		childDirectory1, _ := child1.GetPair()
 		var out2 re_vfs.Attributes
-		_, _, s = childDirectory1.VirtualLookup(path.MustNewComponent("blobs"), 0, &out2)
+		_, s = childDirectory1.VirtualLookup(ctx, path.MustNewComponent("blobs"), 0, &out2)
 		require.Equal(t, re_vfs.StatusErrNoEnt, s)
 	})
 }

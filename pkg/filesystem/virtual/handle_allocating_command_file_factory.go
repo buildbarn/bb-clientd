@@ -32,7 +32,7 @@ func (cff *handleAllocatingCommandFileFactory) LookupFile(blobDigest digest.Dige
 	return cff.allocator.New(blobDigest).AsLeaf(leaf), virtual.StatusOK
 }
 
-func (cff *handleAllocatingCommandFileFactory) resolve(blobDigest digest.Digest, remainder io.ByteReader) (virtual.Directory, virtual.Leaf, virtual.Status) {
+func (cff *handleAllocatingCommandFileFactory) resolve(blobDigest digest.Digest, remainder io.ByteReader) (virtual.DirectoryChild, virtual.Status) {
 	leaf, s := cff.LookupFile(blobDigest)
-	return nil, leaf, s
+	return virtual.DirectoryChild{}.FromLeaf(leaf), s
 }
