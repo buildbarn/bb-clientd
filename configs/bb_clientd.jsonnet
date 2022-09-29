@@ -46,6 +46,7 @@ local cacheDirectory = homeDirectory + '/.cache/bb_clientd';
 
   // Maximum supported Protobuf message size.
   maximumMessageSizeBytes: 16 * 1024 * 1024,
+  maximumTreeSizeBytes: 256 * 1024 * 1024,
 
   // When set, don't forward credentials from Bazel to clusters and
   // office caches. Instead, use a static credentials in the form of a

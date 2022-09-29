@@ -21,6 +21,10 @@ message ApplicationConfiguration {
   // Maximum Protobuf message size to unmarshal.
   int64 maximum_message_size_bytes = 2;
 
+  // The maximum size in bytes a Tree object may have for it to be
+  // accessible through the virtual file system.
+  int64 maximum_tree_size_bytes = 11;
+
   // Common configuration options that apply to all Buildbarn binaries.
   buildbarn.configuration.global.Configuration global = 3;
 

@@ -42,7 +42,7 @@ func TestRemoteOutputServiceDirectoryClean(t *testing.T) {
 		retryingContentAddressableStorage,
 		directoryFetcher,
 		symlinkFactory,
-		/* maximumMessageSizeBytes = */ 10000)
+		/* maximumTreeSizeBytes = */ 10000)
 
 	t.Run("InvalidOutputBaseID", func(t *testing.T) {
 		// The output base ID must be a valid directory name.

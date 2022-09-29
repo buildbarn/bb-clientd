@@ -10,8 +10,8 @@ replace github.com/gordonklaus/ineffassign => github.com/gordonklaus/ineffassign
 
 require (
 	github.com/bazelbuild/remote-apis v0.0.0-20220727181745-aa29b91f336b
-	github.com/buildbarn/bb-remote-execution v0.0.0-20220927164831-b42508b8a258
-	github.com/buildbarn/bb-storage v0.0.0-20220927144232-462adbbf619f
+	github.com/buildbarn/bb-remote-execution v0.0.0-20220929051301-85954ef84d8c
+	github.com/buildbarn/bb-storage v0.0.0-20220929042553-11ebd0c33037
 	golang.org/x/sync v0.0.0-20220923202941-7f9b1623fab7
 	google.golang.org/genproto v0.0.0-20220927151529-dcaddaf36704
 	google.golang.org/grpc v1.49.0
@@ -74,7 +74,7 @@ require (
 	go.opentelemetry.io/proto/otlp v0.19.0 // indirect
 	golang.org/x/net v0.0.0-20220909164309-bea034e7d591 // indirect
 	golang.org/x/oauth2 v0.0.0-20220223155221-ee480838109b // indirect
-	golang.org/x/sys v0.0.0-20220926163933-8cfa568d3c25 // indirect
+	golang.org/x/sys v0.0.0-20220928140112-f11e5e49a4ec // indirect
 	golang.org/x/text v0.3.7 // indirect
 	google.golang.org/appengine v1.6.6 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect

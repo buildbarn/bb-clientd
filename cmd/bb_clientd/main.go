@@ -112,7 +112,8 @@ func main() {
 		configuration.DirectoryCache,
 		re_cas.NewBlobAccessDirectoryFetcher(
 			retryingContentAddressableStorage,
-			int(configuration.MaximumMessageSizeBytes)))
+			int(configuration.MaximumMessageSizeBytes),
+			configuration.MaximumTreeSizeBytes))
 	casFileFactory := re_vfs.NewResolvableHandleAllocatingCASFileFactory(
 		re_vfs.NewBlobAccessCASFileFactory(
 			context.Background(),
@@ -244,7 +245,7 @@ func main() {
 		retryingContentAddressableStorage,
 		directoryFetcher,
 		symlinkFactory,
-		configuration.MaximumMessageSizeBytes)
+		configuration.MaximumTreeSizeBytes)
 
 	// Construct the top-level directory of the FUSE mount. It contains
 	// three subdirectories:
