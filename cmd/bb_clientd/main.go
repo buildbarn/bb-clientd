@@ -114,6 +114,9 @@ func main() {
 			retryingContentAddressableStorage,
 			int(configuration.MaximumMessageSizeBytes),
 			configuration.MaximumTreeSizeBytes))
+	if err != nil {
+		log.Fatal("Failed to create caching directory fetcher: ", err)
+	}
 	casFileFactory := re_vfs.NewResolvableHandleAllocatingCASFileFactory(
 		re_vfs.NewBlobAccessCASFileFactory(
 			context.Background(),
