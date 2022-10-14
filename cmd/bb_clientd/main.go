@@ -285,40 +285,38 @@ func main() {
 	}
 
 	// Create a gRPC server that forwards requests to backend clusters.
-	go func() {
-		log.Fatal(
-			"gRPC server failure: ",
-			bb_grpc.NewServersFromConfigurationAndServe(
-				configuration.GrpcServers,
-				func(s grpc.ServiceRegistrar) {
-					remoteexecution.RegisterActionCacheServer(
-						s,
-						grpcservers.NewActionCacheServer(
-							actionCache,
-							int(configuration.MaximumMessageSizeBytes)))
-					remoteexecution.RegisterContentAddressableStorageServer(
-						s,
-						grpcservers.NewContentAddressableStorageServer(
-							bareContentAddressableStorage,
-							configuration.MaximumMessageSizeBytes))
-					bytestream.RegisterByteStreamServer(
-						s,
-						grpcservers.NewByteStreamServer(
-							bareContentAddressableStorage,
-							1<<16))
-					remoteexecution.RegisterCapabilitiesServer(
-						s,
-						capabilities.NewServer(
-							capabilities.NewMergingProvider([]capabilities.Provider{
-								bareContentAddressableStorage,
-								actionCache,
-								buildQueue,
-							})))
-					remoteexecution.RegisterExecutionServer(s, buildQueue)
+	if err := bb_grpc.NewServersFromConfigurationAndServe(
+		configuration.GrpcServers,
+		func(s grpc.ServiceRegistrar) {
+			remoteexecution.RegisterActionCacheServer(
+				s,
+				grpcservers.NewActionCacheServer(
+					actionCache,
+					int(configuration.MaximumMessageSizeBytes)))
+			remoteexecution.RegisterContentAddressableStorageServer(
+				s,
+				grpcservers.NewContentAddressableStorageServer(
+					bareContentAddressableStorage,
+					configuration.MaximumMessageSizeBytes))
+			bytestream.RegisterByteStreamServer(
+				s,
+				grpcservers.NewByteStreamServer(
+					bareContentAddressableStorage,
+					1<<16))
+			remoteexecution.RegisterCapabilitiesServer(
+				s,
+				capabilities.NewServer(
+					capabilities.NewMergingProvider([]capabilities.Provider{
+						bareContentAddressableStorage,
+						actionCache,
+						buildQueue,
+					})))
+			remoteexecution.RegisterExecutionServer(s, buildQueue)
 
-					remoteoutputservice.RegisterRemoteOutputServiceServer(s, outputsDirectory)
-				}))
-	}()
+			remoteoutputservice.RegisterRemoteOutputServiceServer(s, outputsDirectory)
+		}); err != nil {
+		log.Fatal("gRPC server failure: ", err)
+	}
 
 	lifecycleState.MarkReadyAndWait()
 }
