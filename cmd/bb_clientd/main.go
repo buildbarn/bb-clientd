@@ -280,7 +280,7 @@ func main() {
 					clock.SystemClock)),
 		}))
 
-	if err := mount.Expose(rootDirectory); err != nil {
+	if err := mount.Expose(terminationContext, terminationGroup, rootDirectory); err != nil {
 		log.Fatal("Failed to expose virtual file system mount: ", err)
 	}
 
