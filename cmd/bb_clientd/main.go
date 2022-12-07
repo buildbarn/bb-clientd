@@ -68,7 +68,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	// Storage of files created through the FUSE file system.
+	// Storage of files created through the virtual file system.
 	filePool, err := re_filesystem.NewFilePoolFromConfiguration(configuration.FilePool)
 	if err != nil {
 		log.Fatal("Failed to create file pool: ", err)
@@ -76,12 +76,12 @@ func main() {
 
 	// Separate BlobAccess that does retries in case of read errors.
 	// This is necessary, because it isn't always possible to
-	// directly propagate I/O errors returned by the FUSE file
+	// directly propagate I/O errors returned by the virtual file
 	// system to clients.
 	retryingContentAddressableStorage := bareContentAddressableStorage
-	if maximumDelay := configuration.MaximumFuseRetryDelay; maximumDelay != nil {
+	if maximumDelay := configuration.MaximumFileSystemRetryDelay; maximumDelay != nil {
 		if err := maximumDelay.CheckValid(); err != nil {
-			log.Fatal("Invalid maximum FUSE retry delay: ", err)
+			log.Fatal("Invalid maximum file system retry delay: ", err)
 		}
 		retryingContentAddressableStorage = cd_blobstore.NewErrorRetryingBlobAccess(
 			bareContentAddressableStorage,
@@ -102,8 +102,8 @@ func main() {
 		log.Fatal("Failed to create virtual file system mount: ", err)
 	}
 
-	// Factories for FUSE nodes corresponding to plain files,
-	// executable files, directories and trees.
+	// Factories for virtual file system nodes corresponding to
+	// plain files, executable files, directories and trees.
 	//
 	// We create a CachingDirectoryFetcher for REv2 Directory nodes,
 	// as these tend to be loaded repeatedly when traversing a
@@ -200,8 +200,8 @@ func main() {
 
 	// Implementation of the Remote Output Service. The Remote
 	// Output Service allows Bazel to place its bazel-out/
-	// directories on a FUSE file system, thereby allowing data to
-	// be loaded lazily.
+	// directories on a virtual file system, thereby allowing data
+	// to be loaded lazily.
 	symlinkFactory := re_vfs.NewHandleAllocatingSymlinkFactory(
 		re_vfs.BaseSymlinkFactory,
 		rootHandleAllocator.New())
@@ -250,8 +250,8 @@ func main() {
 		symlinkFactory,
 		configuration.MaximumTreeSizeBytes)
 
-	// Construct the top-level directory of the FUSE mount. It contains
-	// three subdirectories:
+	// Construct the top-level directory of the virtual file system
+	// mount. It contains three subdirectories:
 	//
 	// - "cas": raw access to the Content Addressable Storage.
 	// - "outputs": outputs of builds performed using Bazel.

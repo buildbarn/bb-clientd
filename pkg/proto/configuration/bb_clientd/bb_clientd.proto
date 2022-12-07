@@ -83,7 +83,7 @@ message ApplicationConfiguration {
   // When set, retry file system operations that failed with gRPC status
   // codes INTERNAL, UNAVAILABLE or UNKNOWN. The duration specifies the
   // maximum delay that may be caused by performing these retries.
-  google.protobuf.Duration maximum_fuse_retry_delay = 9;
+  google.protobuf.Duration maximum_file_system_retry_delay = 9;
 
   // If set, cache REv2 Directory objects in memory. These objects need
   // to be loaded from the Content Addressable Storage when accessed

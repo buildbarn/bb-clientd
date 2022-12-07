@@ -232,6 +232,10 @@ local cacheDirectory = homeDirectory + '/.cache/bb_clientd';
     cacheReplacementPolicy: 'LEAST_RECENTLY_USED',
   },
 
+  // Retry read operations performed through the virtual file system.
+  // This prevents EIO errors in case of transient network issues.
+  maximumFileSystemRetryDelay: '300s',
+
   global: {
     // Multiplex logs into a file. That way they remain accessible, even
     // if bb_clientd is run through a system that doesn't maintain logs
