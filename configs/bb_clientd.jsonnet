@@ -191,6 +191,7 @@ local cacheDirectory = homeDirectory + '/.cache/bb_clientd';
       darwin: {
         minimumDirectoriesAttributeCacheTimeout: '0s',
         maximumDirectoriesAttributeCacheTimeout: '0s',
+        socketPath: cacheDirectory + '/nfsv4',
       },
     },
   } else {
