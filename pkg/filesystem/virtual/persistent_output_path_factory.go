@@ -41,7 +41,7 @@ func NewPersistentOutputPathFactory(base OutputPathFactory, store outputpathpers
 type stateRestorer struct {
 	casFileFactory virtual.CASFileFactory
 	symlinkFactory virtual.SymlinkFactory
-	instanceName   digest.InstanceName
+	digestFunction digest.Function
 }
 
 func (sr *stateRestorer) restoreDirectoryRecursive(reader outputpathpersistency.Reader, contents *outputpathpersistency_pb.Directory, d virtual.PrepopulatedDirectory, dPath *path.Trace) error {
@@ -85,7 +85,7 @@ func (sr *stateRestorer) restoreDirectoryRecursive(reader outputpathpersistency.
 		}
 
 		childPath := dPath.Append(component)
-		childDigest, err := sr.instanceName.NewDigestFromProto(entry.Digest)
+		childDigest, err := sr.digestFunction.NewDigestFromProto(entry.Digest)
 		if err != nil {
 			return util.StatusWrapf(err, "Failed to obtain digest for file %#v", childPath.String())
 		}
@@ -110,8 +110,8 @@ func (sr *stateRestorer) restoreDirectoryRecursive(reader outputpathpersistency.
 	return nil
 }
 
-func (opf *persistentOutputPathFactory) StartInitialBuild(outputBaseID path.Component, casFileFactory virtual.CASFileFactory, instanceName digest.InstanceName, errorLogger util.ErrorLogger) OutputPath {
-	d := opf.base.StartInitialBuild(outputBaseID, casFileFactory, instanceName, errorLogger)
+func (opf *persistentOutputPathFactory) StartInitialBuild(outputBaseID path.Component, casFileFactory virtual.CASFileFactory, digestFunction digest.Function, errorLogger util.ErrorLogger) OutputPath {
+	d := opf.base.StartInitialBuild(outputBaseID, casFileFactory, digestFunction, errorLogger)
 
 	var initialCreationTime *timestamppb.Timestamp
 	if reader, rootDirectory, err := opf.store.Read(outputBaseID); err != nil {
@@ -123,7 +123,7 @@ func (opf *persistentOutputPathFactory) StartInitialBuild(outputBaseID path.Comp
 		initialCreationTime = rootDirectory.InitialCreationTime
 		sr := stateRestorer{
 			casFileFactory: casFileFactory,
-			instanceName:   instanceName,
+			digestFunction: digestFunction,
 			symlinkFactory: opf.symlinkFactory,
 		}
 		err = sr.restoreDirectoryRecursive(reader, rootDirectory.Contents, d, nil)

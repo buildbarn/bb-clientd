@@ -28,7 +28,7 @@ type OutputPathFactory interface {
 	// StartInitialBuild() is called when a build is started that
 	// uses an output base ID that hasn't been observed before, or
 	// was cleaned previously.
-	StartInitialBuild(outputBaseID path.Component, casFileFactory virtual.CASFileFactory, instanceName digest.InstanceName, errorLogger util.ErrorLogger) OutputPath
+	StartInitialBuild(outputBaseID path.Component, casFileFactory virtual.CASFileFactory, digestFunction digest.Function, errorLogger util.ErrorLogger) OutputPath
 
 	// Clean() is called when the RemoteOutputServiceDirectory
 	// service is instructed to clean an output path that is not yet

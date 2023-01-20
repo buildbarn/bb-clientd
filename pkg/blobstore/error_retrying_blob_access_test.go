@@ -34,9 +34,9 @@ func TestErrorRetryingBlobAccessGet(t *testing.T) {
 		3*time.Second,
 		5*time.Minute)
 
-	helloDigest := digest.MustNewDigest("instance_name", "8b1a9953c4611296a827abf8c47804d7", 5)
+	helloDigest := digest.MustNewDigest("instance_name", remoteexecution.DigestFunction_MD5, "8b1a9953c4611296a827abf8c47804d7", 5)
 	helloDigestSet := helloDigest.ToSingletonSet()
-	llDigest := digest.MustNewDigest("instance_name", "5b54c0a045f179bcbbbc9abcb8b5cd4c", 2)
+	llDigest := digest.MustNewDigest("instance_name", remoteexecution.DigestFunction_MD5, "5b54c0a045f179bcbbbc9abcb8b5cd4c", 2)
 	instanceName := digest.MustNewInstanceName("instance_name")
 
 	t.Run("GetNonRetriableError", func(t *testing.T) {

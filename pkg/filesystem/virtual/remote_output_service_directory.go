@@ -280,7 +280,7 @@ func (d *RemoteOutputServiceDirectory) StartBuild(ctx context.Context, request *
 	if err != nil {
 		return nil, util.StatusWrapf(err, "Failed to parse instance name %#v", request.InstanceName)
 	}
-	digestFunction, err := instanceName.GetDigestFunction(request.DigestFunction)
+	digestFunction, err := instanceName.GetDigestFunction(request.DigestFunction, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -314,7 +314,7 @@ func (d *RemoteOutputServiceDirectory) StartBuild(ctx context.Context, request *
 					errorLogger),
 				d.handleAllocator.New())
 			state = &outputPathState{
-				rootDirectory:  d.outputPathFactory.StartInitialBuild(outputBaseID, casFileFactory, instanceName, errorLogger),
+				rootDirectory:  d.outputPathFactory.StartInitialBuild(outputBaseID, casFileFactory, digestFunction, errorLogger),
 				casFileFactory: casFileFactory,
 
 				previous:     d.outputPaths.previous,
@@ -479,9 +479,8 @@ func (d *RemoteOutputServiceDirectory) BatchCreate(ctx context.Context, request 
 	}
 
 	// Create requested files.
-	instanceName := buildState.digestFunction.GetInstanceName()
 	for _, entry := range request.Files {
-		childDigest, err := instanceName.NewDigestFromProto(entry.Digest)
+		childDigest, err := buildState.digestFunction.NewDigestFromProto(entry.Digest)
 		if err != nil {
 			return nil, util.StatusWrapf(err, "Invalid digest for file %#v", entry.Path)
 		}
@@ -494,7 +493,7 @@ func (d *RemoteOutputServiceDirectory) BatchCreate(ctx context.Context, request 
 
 	// Create requested directories.
 	for _, entry := range request.Directories {
-		childDigest, err := instanceName.NewDigestFromProto(entry.TreeDigest)
+		childDigest, err := buildState.digestFunction.NewDigestFromProto(entry.TreeDigest)
 		if err != nil {
 			return nil, util.StatusWrapf(err, "Invalid digest for directory %#v", entry.Path)
 		}
@@ -509,7 +508,7 @@ func (d *RemoteOutputServiceDirectory) BatchCreate(ctx context.Context, request 
 					cd_cas.NewTreeDirectoryWalker(d.directoryFetcher, childDigest),
 					outputPathState.casFileFactory,
 					d.symlinkFactory,
-					instanceName))); err != nil {
+					buildState.digestFunction))); err != nil {
 			return nil, util.StatusWrapf(err, "Failed to create directory %#v", entry.Path)
 		}
 	}

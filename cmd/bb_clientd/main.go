@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"sort"
+	"strings"
 	"time"
 
 	remoteexecution "github.com/bazelbuild/remote-apis/build/bazel/remote/execution/v2"
@@ -150,52 +151,54 @@ func main() {
 		handleAllocator := blobsDirectoryHandleAllocator.
 			New(re_vfs.ByteSliceID([]byte(instanceName.String()))).
 			AsStatelessAllocator()
-		return handleAllocator.
-			New(bytes.NewBuffer([]byte{0})).
-			AsStatelessDirectory(re_vfs.NewStaticDirectory(
-				map[path.Component]re_vfs.DirectoryChild{
-					path.MustNewComponent("command"): re_vfs.DirectoryChild{}.FromDirectory(
-						handleAllocator.
-							New(bytes.NewBuffer([]byte{1})).
-							AsStatelessDirectory(cd_vfs.NewDigestParsingDirectory(
-								instanceName,
+		var allocationCounter byte
+		allocateHandle := func() re_vfs.StatelessHandleAllocation {
+			allocationCounter++
+			return handleAllocator.New(bytes.NewBuffer([]byte{allocationCounter}))
+		}
+		blobsDirectoryContents := map[path.Component]re_vfs.DirectoryChild{}
+		for _, digestFunctionValue := range digest.SupportedDigestFunctions {
+			digestFunction, err := instanceName.GetDigestFunction(digestFunctionValue, 0)
+			if err != nil {
+				panic("Using a supported digest function should always succeed")
+			}
+			blobsDirectoryContents[path.MustNewComponent(strings.ToLower(digestFunctionValue.String()))] = re_vfs.DirectoryChild{}.FromDirectory(
+				allocateHandle().AsStatelessDirectory(re_vfs.NewStaticDirectory(
+					map[path.Component]re_vfs.DirectoryChild{
+						path.MustNewComponent("command"): re_vfs.DirectoryChild{}.FromDirectory(
+							allocateHandle().AsStatelessDirectory(cd_vfs.NewDigestParsingDirectory(
+								digestFunction,
 								func(digest digest.Digest) (re_vfs.DirectoryChild, re_vfs.Status) {
 									f, s := commandFileFactory.LookupFile(digest)
 									return re_vfs.DirectoryChild{}.FromLeaf(f), s
 								}))),
-					path.MustNewComponent("directory"): re_vfs.DirectoryChild{}.FromDirectory(
-						handleAllocator.
-							New(bytes.NewBuffer([]byte{2})).
-							AsStatelessDirectory(cd_vfs.NewDigestParsingDirectory(
-								instanceName,
+						path.MustNewComponent("directory"): re_vfs.DirectoryChild{}.FromDirectory(
+							allocateHandle().AsStatelessDirectory(cd_vfs.NewDigestParsingDirectory(
+								digestFunction,
 								func(digest digest.Digest) (re_vfs.DirectoryChild, re_vfs.Status) {
 									return re_vfs.DirectoryChild{}.FromDirectory(globalDirectoryContext.LookupDirectory(digest)), re_vfs.StatusOK
 								}))),
-					path.MustNewComponent("executable"): re_vfs.DirectoryChild{}.FromDirectory(
-						handleAllocator.
-							New(bytes.NewBuffer([]byte{3})).
-							AsStatelessDirectory(cd_vfs.NewDigestParsingDirectory(
-								instanceName,
+						path.MustNewComponent("executable"): re_vfs.DirectoryChild{}.FromDirectory(
+							allocateHandle().AsStatelessDirectory(cd_vfs.NewDigestParsingDirectory(
+								digestFunction,
 								func(digest digest.Digest) (re_vfs.DirectoryChild, re_vfs.Status) {
 									return re_vfs.DirectoryChild{}.FromLeaf(casFileFactory.LookupFile(digest, true)), re_vfs.StatusOK
 								}))),
-					path.MustNewComponent("file"): re_vfs.DirectoryChild{}.FromDirectory(
-						handleAllocator.
-							New(bytes.NewBuffer([]byte{4})).
-							AsStatelessDirectory(cd_vfs.NewDigestParsingDirectory(
-								instanceName,
+						path.MustNewComponent("file"): re_vfs.DirectoryChild{}.FromDirectory(
+							allocateHandle().AsStatelessDirectory(cd_vfs.NewDigestParsingDirectory(
+								digestFunction,
 								func(digest digest.Digest) (re_vfs.DirectoryChild, re_vfs.Status) {
 									return re_vfs.DirectoryChild{}.FromLeaf(casFileFactory.LookupFile(digest, false)), re_vfs.StatusOK
 								}))),
-					path.MustNewComponent("tree"): re_vfs.DirectoryChild{}.FromDirectory(
-						handleAllocator.
-							New(bytes.NewBuffer([]byte{5})).
-							AsStatelessDirectory(cd_vfs.NewDigestParsingDirectory(
-								instanceName,
+						path.MustNewComponent("tree"): re_vfs.DirectoryChild{}.FromDirectory(
+							allocateHandle().AsStatelessDirectory(cd_vfs.NewDigestParsingDirectory(
+								digestFunction,
 								func(digest digest.Digest) (re_vfs.DirectoryChild, re_vfs.Status) {
 									return re_vfs.DirectoryChild{}.FromDirectory(globalTreeContext.LookupTree(digest)), re_vfs.StatusOK
 								}))),
-				}))
+					})))
+		}
+		return allocateHandle().AsStatelessDirectory(re_vfs.NewStaticDirectory(blobsDirectoryContents))
 	}
 
 	// Implementation of the Remote Output Service. The Remote

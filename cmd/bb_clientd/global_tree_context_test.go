@@ -101,8 +101,8 @@ func TestGlobalTreeContextLookupTree(t *testing.T) {
 		// Instance name.
 		[]byte("\x05hello"),
 		[]byte{
-			// Hash size.
-			0x20,
+			// Digest function: remoteexecution.DigestFunction_SHA256.
+			0x01,
 			// Hash.
 			0xe0, 0xf2, 0x8d, 0x31, 0x1a, 0x9b, 0x2d, 0xef,
 			0xf1, 0x03, 0xe3, 0x2f, 0x61, 0x05, 0xb2, 0xb2,
@@ -120,7 +120,7 @@ func TestGlobalTreeContextLookupTree(t *testing.T) {
 		// Directory itself.
 		[]byte{0})
 
-	treeDigest := digest.MustNewDigest("hello", "e0f28d311a9b2deff103e32f6105b2b29d636c287797ca72077a648cd736cd36", 123)
+	treeDigest := digest.MustNewDigest("hello", remoteexecution.DigestFunction_SHA256, "e0f28d311a9b2deff103e32f6105b2b29d636c287797ca72077a648cd736cd36", 123)
 	attributesMask := virtual.AttributesMaskFileType |
 		virtual.AttributesMaskInodeNumber |
 		virtual.AttributesMaskLinkCount |
@@ -143,7 +143,7 @@ func TestGlobalTreeContextLookupTree(t *testing.T) {
 		// of the tree should be prepended, included the fact
 		// that this applied to loading the root directory.
 		directoryFetcher.EXPECT().GetTreeRootDirectory(ctx, treeDigest).Return(nil, status.Error(codes.Internal, "Server on fire"))
-		errorLogger.EXPECT().Log(testutil.EqStatus(t, status.Error(codes.Internal, "Tree \"e0f28d311a9b2deff103e32f6105b2b29d636c287797ca72077a648cd736cd36-123-hello\" root directory: Server on fire")))
+		errorLogger.EXPECT().Log(testutil.EqStatus(t, status.Error(codes.Internal, "Tree \"1-e0f28d311a9b2deff103e32f6105b2b29d636c287797ca72077a648cd736cd36-123-hello\" root directory: Server on fire")))
 		reporter := mock.NewMockDirectoryEntryReporter(ctrl)
 
 		require.Equal(t, virtual.StatusErrIO, dRoot.VirtualReadDir(ctx, 0, 0, reporter))
@@ -152,12 +152,12 @@ func TestGlobalTreeContextLookupTree(t *testing.T) {
 	t.Run("RootSuccess", func(t *testing.T) {
 		executable := mock.NewMockNativeLeaf(ctrl)
 		casFileFactory.EXPECT().
-			LookupFile(digest.MustNewDigest("hello", "32d757ab2b5c09e11daf0b0c04a3ba9da78e96fd24f9f838be0333f093354c82", 42), true).
+			LookupFile(digest.MustNewDigest("hello", remoteexecution.DigestFunction_SHA256, "32d757ab2b5c09e11daf0b0c04a3ba9da78e96fd24f9f838be0333f093354c82", 42), true).
 			Return(executable)
 		executable.EXPECT().VirtualGetAttributes(ctx, virtual.AttributesMask(0), gomock.Any())
 		file := mock.NewMockNativeLeaf(ctrl)
 		casFileFactory.EXPECT().
-			LookupFile(digest.MustNewDigest("hello", "64ec88ca00b268e5ba1a35678a1b5316d212f4f366b2477232534a8aeca37f3c", 11), false).
+			LookupFile(digest.MustNewDigest("hello", remoteexecution.DigestFunction_SHA256, "64ec88ca00b268e5ba1a35678a1b5316d212f4f366b2477232534a8aeca37f3c", 11), false).
 			Return(file)
 		file.EXPECT().VirtualGetAttributes(ctx, virtual.AttributesMask(0), gomock.Any())
 
@@ -206,8 +206,8 @@ func TestGlobalTreeContextLookupTree(t *testing.T) {
 		[]byte{
 			// Child directory.
 			0x01,
-			// Length of hash.
-			0x20,
+			// Digest function: remoteexecution.DigestFunction_SHA256.
+			0x01,
 			// Hash.
 			0xcd, 0xe6, 0xe0, 0x0a, 0x0f, 0x20, 0x7b, 0x21,
 			0x8b, 0x57, 0xfe, 0x1a, 0x34, 0x3c, 0x9b, 0xad,
@@ -228,7 +228,7 @@ func TestGlobalTreeContextLookupTree(t *testing.T) {
 	require.True(t, ok)
 	require.Equal(t, virtual.PermissionsRead|virtual.PermissionsExecute, permissions)
 
-	childDigest := digest.MustNewDigest("hello", "cde6e00a0f207b218b57fe1a343c9bad353ad93a1cdacce29846acbf3c227842", 112)
+	childDigest := digest.MustNewDigest("hello", remoteexecution.DigestFunction_SHA256, "cde6e00a0f207b218b57fe1a343c9bad353ad93a1cdacce29846acbf3c227842", 112)
 	dChildDirectory, _ := dChild.GetPair()
 
 	t.Run("ChildIOError", func(t *testing.T) {
@@ -236,7 +236,7 @@ func TestGlobalTreeContextLookupTree(t *testing.T) {
 		// be captured. The error string should make it explicit
 		// which child was being accessed.
 		directoryFetcher.EXPECT().GetTreeChildDirectory(ctx, treeDigest, childDigest).Return(nil, status.Error(codes.Internal, "Server on fire"))
-		errorLogger.EXPECT().Log(testutil.EqStatus(t, status.Error(codes.Internal, "Tree \"e0f28d311a9b2deff103e32f6105b2b29d636c287797ca72077a648cd736cd36-123-hello\" child directory \"cde6e00a0f207b218b57fe1a343c9bad353ad93a1cdacce29846acbf3c227842-112-hello\": Server on fire")))
+		errorLogger.EXPECT().Log(testutil.EqStatus(t, status.Error(codes.Internal, "Tree \"1-e0f28d311a9b2deff103e32f6105b2b29d636c287797ca72077a648cd736cd36-123-hello\" child directory \"1-cde6e00a0f207b218b57fe1a343c9bad353ad93a1cdacce29846acbf3c227842-112-hello\": Server on fire")))
 		reporter := mock.NewMockDirectoryEntryReporter(ctrl)
 
 		require.Equal(t, virtual.StatusErrIO, dChildDirectory.VirtualReadDir(ctx, 0, 0, reporter))
@@ -245,7 +245,7 @@ func TestGlobalTreeContextLookupTree(t *testing.T) {
 	t.Run("ChildSuccess", func(t *testing.T) {
 		file := mock.NewMockNativeLeaf(ctrl)
 		casFileFactory.EXPECT().
-			LookupFile(digest.MustNewDigest("hello", "64ec88ca00b268e5ba1a35678a1b5316d212f4f366b2477232534a8aeca37f3c", 11), false).
+			LookupFile(digest.MustNewDigest("hello", remoteexecution.DigestFunction_SHA256, "64ec88ca00b268e5ba1a35678a1b5316d212f4f366b2477232534a8aeca37f3c", 11), false).
 			Return(file)
 		file.EXPECT().VirtualGetAttributes(ctx, virtual.AttributesMask(0), gomock.Any())
 

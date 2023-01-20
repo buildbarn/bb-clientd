@@ -78,7 +78,7 @@ func TestGlobalDirectoryContextLookupDirectory(t *testing.T) {
 		rootHandleAllocation,
 		errorLogger)
 
-	directoryDigest := digest.MustNewDigest("hello", "e0f28d311a9b2deff103e32f6105b2b29d636c287797ca72077a648cd736cd36", 123)
+	directoryDigest := digest.MustNewDigest("hello", remoteexecution.DigestFunction_SHA256, "e0f28d311a9b2deff103e32f6105b2b29d636c287797ca72077a648cd736cd36", 123)
 	attributesMask := virtual.AttributesMaskChangeID |
 		virtual.AttributesMaskFileType |
 		virtual.AttributesMaskInodeNumber |
@@ -93,8 +93,8 @@ func TestGlobalDirectoryContextLookupDirectory(t *testing.T) {
 		// Instance name.
 		[]byte("\x05hello"),
 		[]byte{
-			// Hash size.
-			0x20,
+			// Digest function: remoteexecution.DigestFunction_SHA256.
+			0x01,
 			// Hash.
 			0xe0, 0xf2, 0x8d, 0x31, 0x1a, 0x9b, 0x2d, 0xef,
 			0xf1, 0x03, 0xe3, 0x2f, 0x61, 0x05, 0xb2, 0xb2,
@@ -126,7 +126,7 @@ func TestGlobalDirectoryContextLookupDirectory(t *testing.T) {
 		// of the directory should be prepended to the error
 		// message.
 		directoryFetcher.EXPECT().GetDirectory(ctx, directoryDigest).Return(nil, status.Error(codes.Internal, "Server on fire"))
-		errorLogger.EXPECT().Log(testutil.EqStatus(t, status.Error(codes.Internal, "Directory \"e0f28d311a9b2deff103e32f6105b2b29d636c287797ca72077a648cd736cd36-123-hello\": Server on fire")))
+		errorLogger.EXPECT().Log(testutil.EqStatus(t, status.Error(codes.Internal, "Directory \"1-e0f28d311a9b2deff103e32f6105b2b29d636c287797ca72077a648cd736cd36-123-hello\": Server on fire")))
 		reporter := mock.NewMockDirectoryEntryReporter(ctrl)
 
 		require.Equal(t, virtual.StatusErrIO, d.VirtualReadDir(ctx, 0, 0, reporter))
@@ -144,7 +144,7 @@ func TestGlobalDirectoryContextLookupDirectory(t *testing.T) {
 				},
 			},
 		}, nil)
-		errorLogger.EXPECT().Log(testutil.EqStatus(t, status.Error(codes.InvalidArgument, "Directory \"e0f28d311a9b2deff103e32f6105b2b29d636c287797ca72077a648cd736cd36-123-hello\": Failed to parse digest for file \"broken\": Unknown digest hash length: 24 characters")))
+		errorLogger.EXPECT().Log(testutil.EqStatus(t, status.Error(codes.InvalidArgument, "Directory \"1-e0f28d311a9b2deff103e32f6105b2b29d636c287797ca72077a648cd736cd36-123-hello\": Failed to parse digest for file \"broken\": Hash has length 24, while 64 characters were expected")))
 		reporter := mock.NewMockDirectoryEntryReporter(ctrl)
 
 		require.Equal(t, virtual.StatusErrIO, d.VirtualReadDir(ctx, 0, 0, reporter))
@@ -159,8 +159,8 @@ func TestGlobalDirectoryContextLookupDirectory(t *testing.T) {
 			rootHandleAllocator,
 			[]byte("\x05hello"),
 			[]byte{
-				// Hash size.
-				0x20,
+				// Digest function: remoteexecution.DigestFunction_SHA256.
+				0x01,
 				// Hash.
 				0xcd, 0xe6, 0xe0, 0x0a, 0x0f, 0x20, 0x7b, 0x21,
 				0x8b, 0x57, 0xfe, 0x1a, 0x34, 0x3c, 0x9b, 0xad,
@@ -172,12 +172,12 @@ func TestGlobalDirectoryContextLookupDirectory(t *testing.T) {
 			[]byte{0})
 		executable := mock.NewMockNativeLeaf(ctrl)
 		casFileFactory.EXPECT().
-			LookupFile(digest.MustNewDigest("hello", "32d757ab2b5c09e11daf0b0c04a3ba9da78e96fd24f9f838be0333f093354c82", 42), true).
+			LookupFile(digest.MustNewDigest("hello", remoteexecution.DigestFunction_SHA256, "32d757ab2b5c09e11daf0b0c04a3ba9da78e96fd24f9f838be0333f093354c82", 42), true).
 			Return(executable)
 		executable.EXPECT().VirtualGetAttributes(ctx, virtual.AttributesMask(0), gomock.Any())
 		file := mock.NewMockNativeLeaf(ctrl)
 		casFileFactory.EXPECT().
-			LookupFile(digest.MustNewDigest("hello", "64ec88ca00b268e5ba1a35678a1b5316d212f4f366b2477232534a8aeca37f3c", 11), false).
+			LookupFile(digest.MustNewDigest("hello", remoteexecution.DigestFunction_SHA256, "64ec88ca00b268e5ba1a35678a1b5316d212f4f366b2477232534a8aeca37f3c", 11), false).
 			Return(file)
 		file.EXPECT().VirtualGetAttributes(ctx, virtual.AttributesMask(0), gomock.Any())
 

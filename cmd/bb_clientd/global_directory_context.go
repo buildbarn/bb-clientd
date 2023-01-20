@@ -53,7 +53,7 @@ func (gdc *GlobalDirectoryContext) createDirectory(blobDigest digest.Digest) (re
 			GlobalDirectoryContext: gdc,
 			digest:                 blobDigest,
 		},
-		blobDigest.GetInstanceName(),
+		blobDigest.GetDigestFunction(),
 		gdc.handleAllocator.New(blobDigest),
 		uint64(blobDigest.GetSizeBytes()))
 }

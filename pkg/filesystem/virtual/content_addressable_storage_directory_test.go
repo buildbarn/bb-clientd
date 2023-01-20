@@ -59,7 +59,7 @@ func TestContentAddressableStorageDirectoryVirtualLookup(t *testing.T) {
 	contentAddressableStorageDirectoryExpectLookupSelf(t, ctrl, handleAllocator)
 	d, _ := cd_vfs.NewContentAddressableStorageDirectory(
 		directoryContext,
-		digest.MustNewInstanceName("example"),
+		digest.MustNewFunction("example", remoteexecution.DigestFunction_SHA256),
 		rootHandleAllocation,
 		/* sizeBytes = */ 42)
 
@@ -141,7 +141,7 @@ func TestContentAddressableStorageDirectoryVirtualLookup(t *testing.T) {
 	t.Run("MalformedDirectory", func(t *testing.T) {
 		// Attempting to look up a directory for which the
 		// digest is malformed.
-		directoryContext.EXPECT().LogError(testutil.EqStatus(t, status.Error(codes.InvalidArgument, "Failed to parse digest for directory \"malformed_directory\": Unknown digest hash length: 41 characters")))
+		directoryContext.EXPECT().LogError(testutil.EqStatus(t, status.Error(codes.InvalidArgument, "Failed to parse digest for directory \"malformed_directory\": Hash has length 41, while 64 characters were expected")))
 
 		var out re_vfs.Attributes
 		_, s := d.VirtualLookup(ctx, path.MustNewComponent("malformed_directory"), 0, &out)
@@ -151,7 +151,7 @@ func TestContentAddressableStorageDirectoryVirtualLookup(t *testing.T) {
 	t.Run("MalformedFile", func(t *testing.T) {
 		// Attempting to look up a file for which the digest is
 		// malformed.
-		directoryContext.EXPECT().LogError(testutil.EqStatus(t, status.Error(codes.InvalidArgument, "Failed to parse digest for file \"malformed_file\": Unknown digest hash length: 36 characters")))
+		directoryContext.EXPECT().LogError(testutil.EqStatus(t, status.Error(codes.InvalidArgument, "Failed to parse digest for file \"malformed_file\": Hash has length 36, while 64 characters were expected")))
 
 		var out re_vfs.Attributes
 		_, s := d.VirtualLookup(ctx, path.MustNewComponent("malformed_file"), 0, &out)
@@ -162,7 +162,7 @@ func TestContentAddressableStorageDirectoryVirtualLookup(t *testing.T) {
 		// Successfully looking up a directory.
 		childDirectory := mock.NewMockVirtualDirectory(ctrl)
 		directoryContext.EXPECT().LookupDirectory(
-			digest.MustNewDigest("example", "47473788bad5e9991fcd8e8a2b6012745031089ebe6cc7342f78bf92570e4f52", 42),
+			digest.MustNewDigest("example", remoteexecution.DigestFunction_SHA256, "47473788bad5e9991fcd8e8a2b6012745031089ebe6cc7342f78bf92570e4f52", 42),
 		).Return(childDirectory)
 		childDirectory.EXPECT().VirtualGetAttributes(
 			ctx,
@@ -183,7 +183,7 @@ func TestContentAddressableStorageDirectoryVirtualLookup(t *testing.T) {
 		// Successfully looking up an executable file.
 		childLeaf := mock.NewMockNativeLeaf(ctrl)
 		directoryContext.EXPECT().LookupFile(
-			digest.MustNewDigest("example", "d3dda0e30611a0b3e98ee84a6c64d3eb7f174cd197a3713d0c44a35228bb33a7", 12),
+			digest.MustNewDigest("example", remoteexecution.DigestFunction_SHA256, "d3dda0e30611a0b3e98ee84a6c64d3eb7f174cd197a3713d0c44a35228bb33a7", 12),
 			true,
 		).Return(childLeaf)
 		childLeaf.EXPECT().VirtualGetAttributes(
@@ -205,7 +205,7 @@ func TestContentAddressableStorageDirectoryVirtualLookup(t *testing.T) {
 		// Successfully looking up a non-executable file.
 		childLeaf := mock.NewMockNativeLeaf(ctrl)
 		directoryContext.EXPECT().LookupFile(
-			digest.MustNewDigest("example", "059458af6543753150ceb7bcd4cc215e8aaabd61934ff6c67acdd9e7fb4cc96d", 34),
+			digest.MustNewDigest("example", remoteexecution.DigestFunction_SHA256, "059458af6543753150ceb7bcd4cc215e8aaabd61934ff6c67acdd9e7fb4cc96d", 34),
 			false,
 		).Return(childLeaf)
 		childLeaf.EXPECT().VirtualGetAttributes(
@@ -249,7 +249,7 @@ func TestContentAddressableStorageDirectoryVirtualReadDir(t *testing.T) {
 	contentAddressableStorageDirectoryExpectLookupSelf(t, ctrl, handleAllocator)
 	d, _ := cd_vfs.NewContentAddressableStorageDirectory(
 		directoryContext,
-		digest.MustNewInstanceName("example"),
+		digest.MustNewFunction("example", remoteexecution.DigestFunction_SHA256),
 		rootHandleAllocation,
 		/* sizeBytes = */ 42)
 
@@ -301,7 +301,7 @@ func TestContentAddressableStorageDirectoryVirtualReadDir(t *testing.T) {
 				},
 			},
 		}, re_vfs.StatusOK)
-		directoryContext.EXPECT().LogError(testutil.EqStatus(t, status.Error(codes.InvalidArgument, "Failed to parse digest for directory \"hello\": Unknown digest hash length: 41 characters")))
+		directoryContext.EXPECT().LogError(testutil.EqStatus(t, status.Error(codes.InvalidArgument, "Failed to parse digest for directory \"hello\": Hash has length 41, while 64 characters were expected")))
 		reporter := mock.NewMockDirectoryEntryReporter(ctrl)
 
 		require.Equal(
@@ -334,7 +334,7 @@ func TestContentAddressableStorageDirectoryVirtualReadDir(t *testing.T) {
 		reporter := mock.NewMockDirectoryEntryReporter(ctrl)
 		childDirectory := mock.NewMockVirtualDirectory(ctrl)
 		directoryContext.EXPECT().LookupDirectory(
-			digest.MustNewDigest("example", "47473788bad5e9991fcd8e8a2b6012745031089ebe6cc7342f78bf92570e4f52", 42),
+			digest.MustNewDigest("example", remoteexecution.DigestFunction_SHA256, "47473788bad5e9991fcd8e8a2b6012745031089ebe6cc7342f78bf92570e4f52", 42),
 		).Return(childDirectory)
 		childDirectory.EXPECT().VirtualGetAttributes(
 			ctx,
@@ -395,7 +395,7 @@ func TestContentAddressableStorageDirectoryVirtualReadDir(t *testing.T) {
 		reporter := mock.NewMockDirectoryEntryReporter(ctrl)
 		childDirectory := mock.NewMockVirtualDirectory(ctrl)
 		directoryContext.EXPECT().LookupDirectory(
-			digest.MustNewDigest("example", "f514a041bf7ae6ea7ec82e8296e17e10cffdf799ba565e052af59187936f1865", 123),
+			digest.MustNewDigest("example", remoteexecution.DigestFunction_SHA256, "f514a041bf7ae6ea7ec82e8296e17e10cffdf799ba565e052af59187936f1865", 123),
 		).Return(childDirectory)
 		childDirectory.EXPECT().VirtualGetAttributes(
 			ctx,
@@ -412,7 +412,7 @@ func TestContentAddressableStorageDirectoryVirtualReadDir(t *testing.T) {
 		).Return(true)
 		childLeaf1 := mock.NewMockNativeLeaf(ctrl)
 		directoryContext.EXPECT().LookupFile(
-			digest.MustNewDigest("example", "473b6cb5358c3f8a086db591259ac33eac875d1ae3e37737bce210c1e9ea3503", 100),
+			digest.MustNewDigest("example", remoteexecution.DigestFunction_SHA256, "473b6cb5358c3f8a086db591259ac33eac875d1ae3e37737bce210c1e9ea3503", 100),
 			true,
 		).Return(childLeaf1)
 		childLeaf1.EXPECT().VirtualGetAttributes(
@@ -430,7 +430,7 @@ func TestContentAddressableStorageDirectoryVirtualReadDir(t *testing.T) {
 		).Return(true)
 		childLeaf2 := mock.NewMockNativeLeaf(ctrl)
 		directoryContext.EXPECT().LookupFile(
-			digest.MustNewDigest("example", "0ac567103ab10e4b6bfca9b1d3387baad93dee899be5e5cbc3859e01363fbdaa", 200),
+			digest.MustNewDigest("example", remoteexecution.DigestFunction_SHA256, "0ac567103ab10e4b6bfca9b1d3387baad93dee899be5e5cbc3859e01363fbdaa", 200),
 			false,
 		).Return(childLeaf2)
 		childLeaf2.EXPECT().VirtualGetAttributes(
@@ -464,7 +464,7 @@ func TestContentAddressableStorageDirectoryVirtualReadDir(t *testing.T) {
 		reporter := mock.NewMockDirectoryEntryReporter(ctrl)
 		childLeaf := mock.NewMockNativeLeaf(ctrl)
 		directoryContext.EXPECT().LookupFile(
-			digest.MustNewDigest("example", "0ac567103ab10e4b6bfca9b1d3387baad93dee899be5e5cbc3859e01363fbdaa", 200),
+			digest.MustNewDigest("example", remoteexecution.DigestFunction_SHA256, "0ac567103ab10e4b6bfca9b1d3387baad93dee899be5e5cbc3859e01363fbdaa", 200),
 			false,
 		).Return(childLeaf)
 		childLeaf.EXPECT().VirtualGetAttributes(
@@ -523,7 +523,7 @@ func TestContentAddressableStorageDirectoryHandleResolver(t *testing.T) {
 	contentAddressableStorageDirectoryExpectLookupSelf(t, ctrl, handleAllocator)
 	d, handleResolver := cd_vfs.NewContentAddressableStorageDirectory(
 		directoryContext,
-		digest.MustNewInstanceName("example"),
+		digest.MustNewFunction("example", remoteexecution.DigestFunction_SHA256),
 		rootHandleAllocation,
 		/* sizeBytes = */ 42)
 

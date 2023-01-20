@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	remoteexecution "github.com/bazelbuild/remote-apis/build/bazel/remote/execution/v2"
 	"github.com/buildbarn/bb-clientd/internal/mock"
 	cd_vfs "github.com/buildbarn/bb-clientd/pkg/filesystem/virtual"
 	re_vfs "github.com/buildbarn/bb-remote-execution/pkg/filesystem/virtual"
@@ -18,7 +19,7 @@ func TestDigestParsingDirectory(t *testing.T) {
 
 	lookupFunc := mock.NewMockDigestLookupFunc(ctrl)
 	d := cd_vfs.NewDigestParsingDirectory(
-		digest.MustNewInstanceName("hello"),
+		digest.MustNewFunction("hello", remoteexecution.DigestFunction_MD5),
 		lookupFunc.Call)
 
 	t.Run("NoDash", func(t *testing.T) {
@@ -55,7 +56,7 @@ func TestDigestParsingDirectory(t *testing.T) {
 		// filename is a valid digest.
 		mockChildFile := mock.NewMockVirtualLeaf(ctrl)
 		lookupFunc.EXPECT().Call(
-			digest.MustNewDigest("hello", "8b1a9953c4611296a827abf8c47804d7", 5),
+			digest.MustNewDigest("hello", remoteexecution.DigestFunction_MD5, "8b1a9953c4611296a827abf8c47804d7", 5),
 		).Return(re_vfs.DirectoryChild{}.FromLeaf(mockChildFile), re_vfs.StatusOK)
 		mockChildFile.EXPECT().VirtualGetAttributes(
 			ctx,

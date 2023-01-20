@@ -81,7 +81,7 @@ func (tc *treeContext) createRootDirectory() (re_vfs.Directory, re_vfs.HandleRes
 		treeRootContext{
 			treeContext: tc,
 		},
-		tc.treeDigest.GetInstanceName(),
+		tc.treeDigest.GetDigestFunction(),
 		tc.handleAllocator.New(bytes.NewBuffer([]byte{0})),
 		uint64(tc.treeDigest.GetSizeBytes()))
 }
@@ -92,7 +92,7 @@ func (tc *treeContext) createChildDirectory(childDigest digest.Digest) (re_vfs.D
 			treeContext: tc,
 			childDigest: childDigest,
 		},
-		tc.treeDigest.GetInstanceName(),
+		tc.treeDigest.GetDigestFunction(),
 		tc.handleAllocator.New(bytes.NewBuffer(append([]byte{1}, childDigest.GetCompactBinary()...))),
 		uint64(tc.treeDigest.GetSizeBytes()))
 }

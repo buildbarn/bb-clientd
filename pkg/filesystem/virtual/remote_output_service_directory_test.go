@@ -73,7 +73,12 @@ func TestRemoteOutputServiceDirectoryClean(t *testing.T) {
 		casFileHandleAllocator := mock.NewMockStatelessHandleAllocator(ctrl)
 		casFileHandleAllocation.EXPECT().AsStatelessAllocator().Return(casFileHandleAllocator)
 		outputPath := mock.NewMockOutputPath(ctrl)
-		outputPathFactory.EXPECT().StartInitialBuild(path.MustNewComponent("a448da900e7bd4b025ab91da2aba6244"), gomock.Any(), digest.EmptyInstanceName, gomock.Any()).Return(outputPath)
+		outputPathFactory.EXPECT().StartInitialBuild(
+			path.MustNewComponent("a448da900e7bd4b025ab91da2aba6244"),
+			gomock.Any(),
+			digest.MustNewFunction("", remoteexecution.DigestFunction_SHA256),
+			gomock.Any(),
+		).Return(outputPath)
 		outputPath.EXPECT().FilterChildren(gomock.Any())
 
 		response, err := d.StartBuild(ctx, &remoteoutputservice.StartBuildRequest{
@@ -203,7 +208,12 @@ func TestRemoteOutputServiceDirectoryStartBuild(t *testing.T) {
 		casFileHandleAllocator := mock.NewMockStatelessHandleAllocator(ctrl)
 		casFileHandleAllocation.EXPECT().AsStatelessAllocator().Return(casFileHandleAllocator)
 		outputPath := mock.NewMockOutputPath(ctrl)
-		outputPathFactory.EXPECT().StartInitialBuild(path.MustNewComponent("9da951b8cb759233037166e28f7ea186"), gomock.Any(), digest.MustNewInstanceName("my-cluster"), gomock.Any()).Return(outputPath)
+		outputPathFactory.EXPECT().StartInitialBuild(
+			path.MustNewComponent("9da951b8cb759233037166e28f7ea186"),
+			gomock.Any(),
+			digest.MustNewFunction("my-cluster", remoteexecution.DigestFunction_SHA256),
+			gomock.Any(),
+		).Return(outputPath)
 		outputPath.EXPECT().FilterChildren(gomock.Any())
 
 		response, err := d.StartBuild(ctx, &remoteoutputservice.StartBuildRequest{
@@ -303,7 +313,7 @@ func TestRemoteOutputServiceDirectoryStartBuild(t *testing.T) {
 			outputPath.EXPECT().FilterChildren(gomock.Any()).DoAndReturn(func(childFilter re_vfs.ChildFilter) error {
 				child := mock.NewMockNativeLeaf(ctrl)
 				child.EXPECT().GetContainingDigests().
-					Return(digest.MustNewDigest("some-other-cluster", "338db227a0de09b4309e928cdbb7d40a", 42).ToSingletonSet())
+					Return(digest.MustNewDigest("some-other-cluster", remoteexecution.DigestFunction_MD5, "338db227a0de09b4309e928cdbb7d40a", 42).ToSingletonSet())
 				remover := mock.NewMockChildRemover(ctrl)
 				remover.EXPECT().Call().Return(status.Error(codes.Internal, "Disk on fire"))
 				require.False(t, childFilter(re_vfs.InitialNode{}.FromLeaf(child), remover.Call))
@@ -320,14 +330,14 @@ func TestRemoteOutputServiceDirectoryStartBuild(t *testing.T) {
 					"/home/bob/.cache/bazel/_bazel_bob/a448da900e7bd4b025ab91da2aba6244/execroot/myproject/bazel-out": ".",
 				},
 			})
-			testutil.RequireEqualStatus(t, status.Error(codes.Internal, "Failed to filter contents of the output path: Failed to remove file with different instance name or digest function with digest \"338db227a0de09b4309e928cdbb7d40a-42-some-other-cluster\": Disk on fire"), err)
+			testutil.RequireEqualStatus(t, status.Error(codes.Internal, "Failed to filter contents of the output path: Failed to remove file with different instance name or digest function with digest \"3-338db227a0de09b4309e928cdbb7d40a-42-some-other-cluster\": Disk on fire"), err)
 		})
 
 		t.Run("FindMissingFailure", func(t *testing.T) {
 			// Successfully gathered digests of files stored
 			// in the output, but failed to check for their
 			// existence remotely.
-			digests := digest.MustNewDigest("my-cluster", "338db227a0de09b4309e928cdbb7d40a", 42).ToSingletonSet()
+			digests := digest.MustNewDigest("my-cluster", remoteexecution.DigestFunction_MD5, "338db227a0de09b4309e928cdbb7d40a", 42).ToSingletonSet()
 			outputPath.EXPECT().FilterChildren(gomock.Any()).DoAndReturn(func(childFilter re_vfs.ChildFilter) error {
 				child := mock.NewMockNativeLeaf(ctrl)
 				child.EXPECT().GetContainingDigests().Return(digests)
@@ -355,7 +365,7 @@ func TestRemoteOutputServiceDirectoryStartBuild(t *testing.T) {
 			// Successfully determined that a file is absent
 			// remotely, but failed to remove it from local
 			// storage.
-			digests := digest.MustNewDigest("my-cluster", "338db227a0de09b4309e928cdbb7d40a", 42).ToSingletonSet()
+			digests := digest.MustNewDigest("my-cluster", remoteexecution.DigestFunction_MD5, "338db227a0de09b4309e928cdbb7d40a", 42).ToSingletonSet()
 			remover := mock.NewMockChildRemover(ctrl)
 			outputPath.EXPECT().FilterChildren(gomock.Any()).DoAndReturn(func(childFilter re_vfs.ChildFilter) error {
 				child := mock.NewMockNativeLeaf(ctrl)
@@ -376,7 +386,7 @@ func TestRemoteOutputServiceDirectoryStartBuild(t *testing.T) {
 					"/home/bob/.cache/bazel/_bazel_bob/a448da900e7bd4b025ab91da2aba6244/execroot/myproject/bazel-out": ".",
 				},
 			})
-			testutil.RequireEqualStatus(t, status.Error(codes.Internal, "Failed to filter contents of the output path: Failed to remove file with digest \"338db227a0de09b4309e928cdbb7d40a-42-my-cluster\": Disk on fire"), err)
+			testutil.RequireEqualStatus(t, status.Error(codes.Internal, "Failed to filter contents of the output path: Failed to remove file with digest \"3-338db227a0de09b4309e928cdbb7d40a-42-my-cluster\": Disk on fire"), err)
 		})
 
 		t.Run("Success", func(t *testing.T) {
@@ -387,7 +397,7 @@ func TestRemoteOutputServiceDirectoryStartBuild(t *testing.T) {
 				// name. It should get removed immediately.
 				child1 := mock.NewMockNativeLeaf(ctrl)
 				child1.EXPECT().GetContainingDigests().
-					Return(digest.MustNewDigest("other-instance-name", "3ec839e3d5d0af404c6dc6bf3ff7f2eb", 1).ToSingletonSet())
+					Return(digest.MustNewDigest("other-instance-name", remoteexecution.DigestFunction_MD5, "3ec839e3d5d0af404c6dc6bf3ff7f2eb", 1).ToSingletonSet())
 				remover1 := mock.NewMockChildRemover(ctrl)
 				remover1.EXPECT().Call()
 				require.True(t, childFilter(re_vfs.InitialNode{}.FromLeaf(child1), remover1.Call))
@@ -397,7 +407,7 @@ func TestRemoteOutputServiceDirectoryStartBuild(t *testing.T) {
 				// removed immediately.
 				child2 := mock.NewMockNativeLeaf(ctrl)
 				child2.EXPECT().GetContainingDigests().
-					Return(digest.MustNewDigest("my-cluster", "f11999245771a5c184b62dc5380e0d8b42df67b4", 2).ToSingletonSet())
+					Return(digest.MustNewDigest("my-cluster", remoteexecution.DigestFunction_SHA1, "f11999245771a5c184b62dc5380e0d8b42df67b4", 2).ToSingletonSet())
 				remover2 := mock.NewMockChildRemover(ctrl)
 				remover2.EXPECT().Call()
 				require.True(t, childFilter(re_vfs.InitialNode{}.FromLeaf(child2), remover2.Call))
@@ -405,14 +415,14 @@ func TestRemoteOutputServiceDirectoryStartBuild(t *testing.T) {
 				// A file which we'll later report as present.
 				child3 := mock.NewMockNativeLeaf(ctrl)
 				child3.EXPECT().GetContainingDigests().
-					Return(digest.MustNewDigest("my-cluster", "a32ea15346cf1848ab49e0913ff07531", 3).ToSingletonSet())
+					Return(digest.MustNewDigest("my-cluster", remoteexecution.DigestFunction_MD5, "a32ea15346cf1848ab49e0913ff07531", 3).ToSingletonSet())
 				remover3 := mock.NewMockChildRemover(ctrl)
 				require.True(t, childFilter(re_vfs.InitialNode{}.FromLeaf(child3), remover3.Call))
 
 				// A file which we'll later report as missing.
 				child4 := mock.NewMockNativeLeaf(ctrl)
 				child4.EXPECT().GetContainingDigests().
-					Return(digest.MustNewDigest("my-cluster", "9435918583fd2e37882751bbc51f4085", 4).ToSingletonSet())
+					Return(digest.MustNewDigest("my-cluster", remoteexecution.DigestFunction_MD5, "9435918583fd2e37882751bbc51f4085", 4).ToSingletonSet())
 				require.True(t, childFilter(re_vfs.InitialNode{}.FromLeaf(child4), remover4.Call))
 
 				// A directory that no longer exists. It
@@ -427,8 +437,8 @@ func TestRemoteOutputServiceDirectoryStartBuild(t *testing.T) {
 				child6 := mock.NewMockInitialContentsFetcher(ctrl)
 				child6.EXPECT().GetContainingDigests(ctx).Return(
 					digest.NewSetBuilder().
-						Add(digest.MustNewDigest("my-cluster", "23fef0c2a3414dd562ca70e4a4717609", 5)).
-						Add(digest.MustNewDigest("my-cluster", "a60ffc49592e5045a61a8c99f3c86b4f", 6)).
+						Add(digest.MustNewDigest("my-cluster", remoteexecution.DigestFunction_MD5, "23fef0c2a3414dd562ca70e4a4717609", 5)).
+						Add(digest.MustNewDigest("my-cluster", remoteexecution.DigestFunction_MD5, "a60ffc49592e5045a61a8c99f3c86b4f", 6)).
 						Build(),
 					nil)
 				remover6 := mock.NewMockChildRemover(ctrl)
@@ -439,8 +449,8 @@ func TestRemoteOutputServiceDirectoryStartBuild(t *testing.T) {
 				child7 := mock.NewMockInitialContentsFetcher(ctrl)
 				child7.EXPECT().GetContainingDigests(ctx).Return(
 					digest.NewSetBuilder().
-						Add(digest.MustNewDigest("my-cluster", "2c0f843d40e00603f0d71e0d11a6e045", 7)).
-						Add(digest.MustNewDigest("my-cluster", "6b9105a7125cb9f190a3e44ab5f22663", 8)).
+						Add(digest.MustNewDigest("my-cluster", remoteexecution.DigestFunction_MD5, "2c0f843d40e00603f0d71e0d11a6e045", 7)).
+						Add(digest.MustNewDigest("my-cluster", remoteexecution.DigestFunction_MD5, "6b9105a7125cb9f190a3e44ab5f22663", 8)).
 						Build(),
 					nil)
 				require.True(t, childFilter(re_vfs.InitialNode{}.FromDirectory(child7), remover7.Call))
@@ -455,17 +465,17 @@ func TestRemoteOutputServiceDirectoryStartBuild(t *testing.T) {
 			bareContentAddressableStorage.EXPECT().FindMissing(
 				ctx,
 				digest.NewSetBuilder().
-					Add(digest.MustNewDigest("my-cluster", "a32ea15346cf1848ab49e0913ff07531", 3)).
-					Add(digest.MustNewDigest("my-cluster", "9435918583fd2e37882751bbc51f4085", 4)).
-					Add(digest.MustNewDigest("my-cluster", "23fef0c2a3414dd562ca70e4a4717609", 5)).
-					Add(digest.MustNewDigest("my-cluster", "a60ffc49592e5045a61a8c99f3c86b4f", 6)).
-					Add(digest.MustNewDigest("my-cluster", "2c0f843d40e00603f0d71e0d11a6e045", 7)).
-					Add(digest.MustNewDigest("my-cluster", "6b9105a7125cb9f190a3e44ab5f22663", 8)).
+					Add(digest.MustNewDigest("my-cluster", remoteexecution.DigestFunction_MD5, "a32ea15346cf1848ab49e0913ff07531", 3)).
+					Add(digest.MustNewDigest("my-cluster", remoteexecution.DigestFunction_MD5, "9435918583fd2e37882751bbc51f4085", 4)).
+					Add(digest.MustNewDigest("my-cluster", remoteexecution.DigestFunction_MD5, "23fef0c2a3414dd562ca70e4a4717609", 5)).
+					Add(digest.MustNewDigest("my-cluster", remoteexecution.DigestFunction_MD5, "a60ffc49592e5045a61a8c99f3c86b4f", 6)).
+					Add(digest.MustNewDigest("my-cluster", remoteexecution.DigestFunction_MD5, "2c0f843d40e00603f0d71e0d11a6e045", 7)).
+					Add(digest.MustNewDigest("my-cluster", remoteexecution.DigestFunction_MD5, "6b9105a7125cb9f190a3e44ab5f22663", 8)).
 					Build(),
 			).Return(
 				digest.NewSetBuilder().
-					Add(digest.MustNewDigest("my-cluster", "9435918583fd2e37882751bbc51f4085", 4)).
-					Add(digest.MustNewDigest("my-cluster", "2c0f843d40e00603f0d71e0d11a6e045", 7)).
+					Add(digest.MustNewDigest("my-cluster", remoteexecution.DigestFunction_MD5, "9435918583fd2e37882751bbc51f4085", 4)).
+					Add(digest.MustNewDigest("my-cluster", remoteexecution.DigestFunction_MD5, "2c0f843d40e00603f0d71e0d11a6e045", 7)).
 					Build(),
 				nil)
 			remover4.EXPECT().Call()
@@ -531,7 +541,12 @@ func TestRemoteOutputServiceDirectoryBatchCreate(t *testing.T) {
 	casFileHandleAllocator := mock.NewMockStatelessHandleAllocator(ctrl)
 	casFileHandleAllocation.EXPECT().AsStatelessAllocator().Return(casFileHandleAllocator)
 	outputPath := mock.NewMockOutputPath(ctrl)
-	outputPathFactory.EXPECT().StartInitialBuild(path.MustNewComponent("c6adef0d5ca1888a4aa847fb51229a8c"), gomock.Any(), digest.MustNewInstanceName("my-cluster"), gomock.Any()).Return(outputPath)
+	outputPathFactory.EXPECT().StartInitialBuild(
+		path.MustNewComponent("c6adef0d5ca1888a4aa847fb51229a8c"),
+		gomock.Any(),
+		digest.MustNewFunction("my-cluster", remoteexecution.DigestFunction_MD5),
+		gomock.Any(),
+	).Return(outputPath)
 	outputPath.EXPECT().FilterChildren(gomock.Any())
 
 	response, err := d.StartBuild(ctx, &remoteoutputservice.StartBuildRequest{
@@ -756,7 +771,12 @@ func TestRemoteOutputServiceDirectoryBatchStat(t *testing.T) {
 	casFileHandleAllocator := mock.NewMockStatelessHandleAllocator(ctrl)
 	casFileHandleAllocation.EXPECT().AsStatelessAllocator().Return(casFileHandleAllocator)
 	outputPath := mock.NewMockOutputPath(ctrl)
-	outputPathFactory.EXPECT().StartInitialBuild(path.MustNewComponent("9da951b8cb759233037166e28f7ea186"), gomock.Any(), digest.MustNewInstanceName("my-cluster"), gomock.Any()).Return(outputPath)
+	outputPathFactory.EXPECT().StartInitialBuild(
+		path.MustNewComponent("9da951b8cb759233037166e28f7ea186"),
+		gomock.Any(),
+		digest.MustNewFunction("my-cluster", remoteexecution.DigestFunction_MD5),
+		gomock.Any(),
+	).Return(outputPath)
 	outputPath.EXPECT().FilterChildren(gomock.Any())
 
 	response, err := d.StartBuild(ctx, &remoteoutputservice.StartBuildRequest{
@@ -1112,13 +1132,18 @@ func TestRemoteOutputServiceDirectoryVirtualLookup(t *testing.T) {
 	casFileHandleAllocator := mock.NewMockStatelessHandleAllocator(ctrl)
 	casFileHandleAllocation.EXPECT().AsStatelessAllocator().Return(casFileHandleAllocator)
 	outputPath := mock.NewMockOutputPath(ctrl)
-	outputPathFactory.EXPECT().StartInitialBuild(path.MustNewComponent("eaf1d65b7ab802934e6b57d0e14b3f30"), gomock.Any(), digest.EmptyInstanceName, gomock.Any()).Return(outputPath)
+	outputPathFactory.EXPECT().StartInitialBuild(
+		path.MustNewComponent("eaf1d65b7ab802934e6b57d0e14b3f30"),
+		gomock.Any(),
+		digest.MustNewFunction("", remoteexecution.DigestFunction_MD5),
+		gomock.Any(),
+	).Return(outputPath)
 	outputPath.EXPECT().FilterChildren(gomock.Any())
 
 	response, err := d.StartBuild(ctx, &remoteoutputservice.StartBuildRequest{
 		OutputBaseId:     "eaf1d65b7ab802934e6b57d0e14b3f30",
 		BuildId:          "2840d789-16ff-4fe4-9639-3245f9bb9106",
-		DigestFunction:   remoteexecution.DigestFunction_SHA1,
+		DigestFunction:   remoteexecution.DigestFunction_MD5,
 		OutputPathPrefix: "/home/bob/bb_clientd/outputs",
 		OutputPathAliases: map[string]string{
 			"/home/bob/.cache/bazel/_bazel_bob/eaf1d65b7ab802934e6b57d0e14b3f30/execroot/myproject/bazel-out": ".",
@@ -1197,13 +1222,18 @@ func TestRemoteOutputServiceDirectoryVirtualReadDir(t *testing.T) {
 	casFileHandleAllocator1 := mock.NewMockStatelessHandleAllocator(ctrl)
 	casFileHandleAllocation1.EXPECT().AsStatelessAllocator().Return(casFileHandleAllocator1)
 	outputPath1 := mock.NewMockOutputPath(ctrl)
-	outputPathFactory.EXPECT().StartInitialBuild(path.MustNewComponent("83f3e6ff93a5403cbfb14682d8165968"), gomock.Any(), digest.EmptyInstanceName, gomock.Any()).Return(outputPath1)
+	outputPathFactory.EXPECT().StartInitialBuild(
+		path.MustNewComponent("83f3e6ff93a5403cbfb14682d8165968"),
+		gomock.Any(),
+		digest.MustNewFunction("", remoteexecution.DigestFunction_MD5),
+		gomock.Any(),
+	).Return(outputPath1)
 	outputPath1.EXPECT().FilterChildren(gomock.Any())
 
 	response, err := d.StartBuild(ctx, &remoteoutputservice.StartBuildRequest{
 		OutputBaseId:     "83f3e6ff93a5403cbfb14682d8165968",
 		BuildId:          "2b2b974f-ed53-40f0-a75a-422c09ba8be8",
-		DigestFunction:   remoteexecution.DigestFunction_SHA384,
+		DigestFunction:   remoteexecution.DigestFunction_MD5,
 		OutputPathPrefix: "/home/bob/bb_clientd/outputs",
 		OutputPathAliases: map[string]string{
 			"/home/bob/.cache/bazel/_bazel_bob/83f3e6ff93a5403cbfb14682d8165968/execroot/project1/bazel-out": ".",
@@ -1219,13 +1249,18 @@ func TestRemoteOutputServiceDirectoryVirtualReadDir(t *testing.T) {
 	casFileHandleAllocator2 := mock.NewMockStatelessHandleAllocator(ctrl)
 	casFileHandleAllocation2.EXPECT().AsStatelessAllocator().Return(casFileHandleAllocator2)
 	outputPath2 := mock.NewMockOutputPath(ctrl)
-	outputPathFactory.EXPECT().StartInitialBuild(path.MustNewComponent("d4b145a6191c6d8d037d13986274d08d"), gomock.Any(), digest.EmptyInstanceName, gomock.Any()).Return(outputPath2)
+	outputPathFactory.EXPECT().StartInitialBuild(
+		path.MustNewComponent("d4b145a6191c6d8d037d13986274d08d"),
+		gomock.Any(),
+		digest.MustNewFunction("", remoteexecution.DigestFunction_MD5),
+		gomock.Any(),
+	).Return(outputPath2)
 	outputPath2.EXPECT().FilterChildren(gomock.Any())
 
 	response, err = d.StartBuild(ctx, &remoteoutputservice.StartBuildRequest{
 		OutputBaseId:     "d4b145a6191c6d8d037d13986274d08d",
 		BuildId:          "2f941206-fb17-460a-a779-10c621bc0d19",
-		DigestFunction:   remoteexecution.DigestFunction_SHA512,
+		DigestFunction:   remoteexecution.DigestFunction_MD5,
 		OutputPathPrefix: "/home/bob/bb_clientd/outputs",
 		OutputPathAliases: map[string]string{
 			"/home/bob/.cache/bazel/_bazel_bob/d4b145a6191c6d8d037d13986274d08d/execroot/project2/bazel-out": ".",

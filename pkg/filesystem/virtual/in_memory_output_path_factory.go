@@ -31,7 +31,7 @@ func NewInMemoryOutputPathFactory(filePool filesystem.FilePool, symlinkFactory v
 	}
 }
 
-func (opf *inMemoryOutputPathFactory) StartInitialBuild(outputBaseID path.Component, casFileFactory virtual.CASFileFactory, instanceName digest.InstanceName, errorLogger util.ErrorLogger) OutputPath {
+func (opf *inMemoryOutputPathFactory) StartInitialBuild(outputBaseID path.Component, casFileFactory virtual.CASFileFactory, digestFunction digest.Function, errorLogger util.ErrorLogger) OutputPath {
 	return inMemoryOutputPath{
 		PrepopulatedDirectory: virtual.NewInMemoryPrepopulatedDirectory(
 			virtual.NewHandleAllocatingFileAllocator(

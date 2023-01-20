@@ -34,7 +34,7 @@ type contentAddressableStorageDirectory struct {
 	virtual.ReadOnlyDirectory
 
 	directoryContext DirectoryContext
-	instanceName     digest.InstanceName
+	digestFunction   digest.Function
 	handleAllocator  virtual.ResolvableHandleAllocator
 	sizeBytes        uint64
 }
@@ -46,10 +46,10 @@ type contentAddressableStorageDirectory struct {
 // DirectoryContext object.
 //
 // TODO: Reimplement this on top of cas.DirectoryWalker.
-func NewContentAddressableStorageDirectory(directoryContext DirectoryContext, instanceName digest.InstanceName, handleAllocation virtual.ResolvableHandleAllocation, sizeBytes uint64) (virtual.Directory, virtual.HandleResolver) {
+func NewContentAddressableStorageDirectory(directoryContext DirectoryContext, digestFunction digest.Function, handleAllocation virtual.ResolvableHandleAllocation, sizeBytes uint64) (virtual.Directory, virtual.HandleResolver) {
 	d := &contentAddressableStorageDirectory{
 		directoryContext: directoryContext,
-		instanceName:     instanceName,
+		digestFunction:   digestFunction,
 		sizeBytes:        sizeBytes,
 	}
 	d.handleAllocator = handleAllocation.AsResolvableAllocator(d.resolveHandle)
@@ -112,7 +112,7 @@ func (d *contentAddressableStorageDirectory) VirtualLookup(ctx context.Context, 
 	n := name.String()
 	directories := directory.Directories
 	if i := sort.Search(len(directories), func(i int) bool { return directories[i].Name >= n }); i < len(directories) && directories[i].Name == n {
-		entryDigest, err := d.instanceName.NewDigestFromProto(directories[i].Digest)
+		entryDigest, err := d.digestFunction.NewDigestFromProto(directories[i].Digest)
 		if err != nil {
 			d.directoryContext.LogError(util.StatusWrapf(err, "Failed to parse digest for directory %#v", n))
 			return virtual.DirectoryChild{}, virtual.StatusErrIO
@@ -125,7 +125,7 @@ func (d *contentAddressableStorageDirectory) VirtualLookup(ctx context.Context, 
 	files := directory.Files
 	if i := sort.Search(len(files), func(i int) bool { return files[i].Name >= n }); i < len(files) && files[i].Name == n {
 		entry := files[i]
-		entryDigest, err := d.instanceName.NewDigestFromProto(entry.Digest)
+		entryDigest, err := d.digestFunction.NewDigestFromProto(entry.Digest)
 		if err != nil {
 			d.directoryContext.LogError(util.StatusWrapf(err, "Failed to parse digest for file %#v", n))
 			return virtual.DirectoryChild{}, virtual.StatusErrIO
@@ -164,7 +164,7 @@ func (d *contentAddressableStorageDirectory) VirtualOpenChild(ctx context.Contex
 		}
 
 		entry := files[i]
-		entryDigest, err := d.instanceName.NewDigestFromProto(entry.Digest)
+		entryDigest, err := d.digestFunction.NewDigestFromProto(entry.Digest)
 		if err != nil {
 			d.directoryContext.LogError(util.StatusWrapf(err, "Failed to parse digest for file %#v", n))
 			return nil, 0, virtual.ChangeInfo{}, virtual.StatusErrIO
@@ -198,7 +198,7 @@ func (d *contentAddressableStorageDirectory) VirtualReadDir(ctx context.Context,
 			d.directoryContext.LogError(status.Errorf(codes.InvalidArgument, "Directory %#v has an invalid name", entry.Name))
 			return virtual.StatusErrIO
 		}
-		entryDigest, err := d.instanceName.NewDigestFromProto(entry.Digest)
+		entryDigest, err := d.digestFunction.NewDigestFromProto(entry.Digest)
 		if err != nil {
 			d.directoryContext.LogError(util.StatusWrapf(err, "Failed to parse digest for directory %#v", entry.Name))
 			return virtual.StatusErrIO
@@ -220,7 +220,7 @@ func (d *contentAddressableStorageDirectory) VirtualReadDir(ctx context.Context,
 			d.directoryContext.LogError(status.Errorf(codes.InvalidArgument, "File %#v has an invalid name", entry.Name))
 			return virtual.StatusErrIO
 		}
-		entryDigest, err := d.instanceName.NewDigestFromProto(entry.Digest)
+		entryDigest, err := d.digestFunction.NewDigestFromProto(entry.Digest)
 		if err != nil {
 			d.directoryContext.LogError(util.StatusWrapf(err, "Failed to parse digest for file %#v", entry.Name))
 			return virtual.StatusErrIO

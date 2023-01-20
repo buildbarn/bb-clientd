@@ -32,16 +32,16 @@ message ApplicationConfiguration {
   // Content Addressable Storage (CAS) are exposed for reading. The
   // following pathname schemes are supported:
   //
-  // - cas/${instance_name}/blobs/command/${hash}-${size_bytes}:
+  // - cas/${instance_name}/blobs/${digest_function}/command/${hash}-${size_bytes}:
   //   An executable Bourne shell script that can be used to run the
   //   command locally.
-  // - cas/${instance_name}/blobs/directory/${hash}-${size_bytes}/:
+  // - cas/${instance_name}/blobs/${digest_function}/directory/${hash}-${size_bytes}/:
   //   View the contents of a Directory object.
-  // - cas/${instance_name}/blobs/executable/${hash}-${size_bytes}:
+  // - cas/${instance_name}/blobs/${digest_function}/executable/${hash}-${size_bytes}:
   //   Access a single file, having the executable bit (+x) set.
-  // - cas/${instance_name}/blobs/file/${hash}-${size_bytes}:
+  // - cas/${instance_name}/blobs/${digest_function}/file/${hash}-${size_bytes}:
   //   Access a single file, having the executable bit (+x) clear.
-  // - cas/${instance_name}/blobs/tree/${hash}-${size_bytes}/:
+  // - cas/${instance_name}/blobs/${digest_function}/tree/${hash}-${size_bytes}/:
   //   View the contents of a Tree object.
   //
   // - outputs/${output_base}/:

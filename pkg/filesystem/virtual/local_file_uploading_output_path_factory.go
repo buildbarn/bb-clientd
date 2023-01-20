@@ -39,9 +39,9 @@ func NewLocalFileUploadingOutputPathFactory(base OutputPathFactory, contentAddre
 	}
 }
 
-func (opf *localFileUploadingOutputPathFactory) StartInitialBuild(outputBaseID path.Component, casFileFactory virtual.CASFileFactory, instanceName digest.InstanceName, errorLogger util.ErrorLogger) OutputPath {
+func (opf *localFileUploadingOutputPathFactory) StartInitialBuild(outputBaseID path.Component, casFileFactory virtual.CASFileFactory, digestFunction digest.Function, errorLogger util.ErrorLogger) OutputPath {
 	return &localFileUploadingOutputPath{
-		OutputPath:   opf.OutputPathFactory.StartInitialBuild(outputBaseID, casFileFactory, instanceName, errorLogger),
+		OutputPath:   opf.OutputPathFactory.StartInitialBuild(outputBaseID, casFileFactory, digestFunction, errorLogger),
 		factory:      opf,
 		outputBaseID: outputBaseID,
 	}

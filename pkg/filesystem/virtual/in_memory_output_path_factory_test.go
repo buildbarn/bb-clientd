@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	remoteexecution "github.com/bazelbuild/remote-apis/build/bazel/remote/execution/v2"
 	"github.com/buildbarn/bb-clientd/internal/mock"
 	cd_vfs "github.com/buildbarn/bb-clientd/pkg/filesystem/virtual"
 	re_vfs "github.com/buildbarn/bb-remote-execution/pkg/filesystem/virtual"
@@ -36,7 +37,7 @@ func TestInMemoryOutputPathFactory(t *testing.T) {
 	outputPath := outputPathFactory.StartInitialBuild(
 		path.MustNewComponent("my-output-path"),
 		casFileFactory,
-		digest.MustNewInstanceName("default-scheduler"),
+		digest.MustNewFunction("default-scheduler", remoteexecution.DigestFunction_SHA256),
 		errorLogger)
 
 	// The last data modification time on the root directory

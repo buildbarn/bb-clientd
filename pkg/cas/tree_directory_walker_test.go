@@ -20,7 +20,7 @@ func TestTreeDirectoryWalker(t *testing.T) {
 	ctrl, ctx := gomock.WithContext(context.Background(), t)
 
 	directoryFetcher := mock.NewMockDirectoryFetcher(ctrl)
-	treeDigest := digest.MustNewDigest("example", "6884a9e20905b512d1122a2b1ad8ba16", 123)
+	treeDigest := digest.MustNewDigest("example", remoteexecution.DigestFunction_MD5, "6884a9e20905b512d1122a2b1ad8ba16", 123)
 	rootDirectoryWalker := cas.NewTreeDirectoryWalker(directoryFetcher, treeDigest)
 
 	exampleRootDirectory := &remoteexecution.Directory{
@@ -67,7 +67,7 @@ func TestTreeDirectoryWalker(t *testing.T) {
 	t.Run("RootGetDescription", func(t *testing.T) {
 		require.Equal(
 			t,
-			"Tree \"6884a9e20905b512d1122a2b1ad8ba16-123-example\" root directory",
+			"Tree \"3-6884a9e20905b512d1122a2b1ad8ba16-123-example\" root directory",
 			rootDirectoryWalker.GetDescription())
 	})
 
@@ -78,7 +78,7 @@ func TestTreeDirectoryWalker(t *testing.T) {
 			rootDirectoryWalker.GetContainingDigest())
 	})
 
-	childDigest := digest.MustNewDigest("example", "4df5f448a5e6b3c41e6aae7a8a9832aa", 456)
+	childDigest := digest.MustNewDigest("example", remoteexecution.DigestFunction_MD5, "4df5f448a5e6b3c41e6aae7a8a9832aa", 456)
 	childDirectoryWalker := rootDirectoryWalker.GetChild(childDigest)
 
 	// Repeat the tests above against a child directory, to make
@@ -103,7 +103,7 @@ func TestTreeDirectoryWalker(t *testing.T) {
 	t.Run("ChildGetDescription", func(t *testing.T) {
 		require.Equal(
 			t,
-			"Tree \"6884a9e20905b512d1122a2b1ad8ba16-123-example\" child directory \"4df5f448a5e6b3c41e6aae7a8a9832aa-456-example\"",
+			"Tree \"3-6884a9e20905b512d1122a2b1ad8ba16-123-example\" child directory \"3-4df5f448a5e6b3c41e6aae7a8a9832aa-456-example\"",
 			childDirectoryWalker.GetDescription())
 	})
 

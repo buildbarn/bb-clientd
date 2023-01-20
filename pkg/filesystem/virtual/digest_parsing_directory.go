@@ -20,8 +20,8 @@ type digestParsingDirectory struct {
 	nonIterableDirectory
 	virtual.ReadOnlyDirectory
 
-	instanceName digest.InstanceName
-	lookupFunc   DigestLookupFunc
+	digestFunction digest.Function
+	lookupFunc     DigestLookupFunc
 }
 
 // NewDigestParsingDirectory creates a directory that can be exposed
@@ -31,10 +31,10 @@ type digestParsingDirectory struct {
 // {hash}/{sizeBytes}, this type uses the format {hash}-{sizeBytes}.
 // This is done to ensure every resulting file only uses a single inode,
 // as opposed to two.
-func NewDigestParsingDirectory(instanceName digest.InstanceName, lookupFunc DigestLookupFunc) virtual.Directory {
+func NewDigestParsingDirectory(digestFunction digest.Function, lookupFunc DigestLookupFunc) virtual.Directory {
 	return &digestParsingDirectory{
-		instanceName: instanceName,
-		lookupFunc:   lookupFunc,
+		digestFunction: digestFunction,
+		lookupFunc:     lookupFunc,
 	}
 }
 
@@ -56,7 +56,7 @@ func (d *digestParsingDirectory) parseFilename(name path.Component) (digest.Dige
 	if err != nil {
 		return digest.BadDigest, false
 	}
-	fileDigest, err := d.instanceName.NewDigest(n[:i], sizeBytes)
+	fileDigest, err := d.digestFunction.NewDigest(n[:i], sizeBytes)
 	if err != nil {
 		return digest.BadDigest, false
 	}
