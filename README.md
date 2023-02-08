@@ -151,10 +151,12 @@ direct access to your cluster's Content Addressable Storage, at least
 until your token expires or bb\_clientd restarts.
 
 The FUSE/NFSv4 file system provided by bb\_clientd automatically
-generates a "blobs" directory for every instance name provided:
+generates a "blobs" directory for every instance name and digest function provided:
 
 ```
-$ ls -l ~/bb_clientd/cas/mycluster-prod.example.com/hello/blobs
+$ ls ~/bb_clientd/cas/mycluster-prod.example.com/hello/blobs/
+md5/  sha1/  sha256/  sha256tree/  sha384/  sha512/
+$ ls -l ~/bb_clientd/cas/mycluster-prod.example.com/hello/blobs/sha256
 total 0
 d--x--x--x  1 root  wheel  0 Jan  1  2000 directory
 d--x--x--x  1 root  wheel  0 Jan  1  2000 executable

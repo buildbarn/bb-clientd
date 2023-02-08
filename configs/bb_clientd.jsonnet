@@ -129,7 +129,7 @@ local cacheDirectory = homeDirectory + '/.cache/bb_clientd';
       } } },
       labels: {
         // Let the local CAS consume up to 100 GiB of disk space. A 64
-        // MiB index is large enough to accomodate approximately one
+        // MiB index is large enough to accommodate approximately one
         // million objects.
         localCAS: { 'local': {
           keyLocationMapOnBlockDevice: { file: {
