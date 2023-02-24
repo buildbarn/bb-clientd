@@ -130,7 +130,7 @@ func (d *contentAddressableStorageDirectory) VirtualLookup(ctx context.Context, 
 			d.directoryContext.LogError(util.StatusWrapf(err, "Failed to parse digest for file %#v", n))
 			return virtual.DirectoryChild{}, virtual.StatusErrIO
 		}
-		child := d.directoryContext.LookupFile(entryDigest, entry.IsExecutable)
+		child := d.directoryContext.LookupFile(entryDigest, entry.IsExecutable, nil)
 		child.VirtualGetAttributes(ctx, requested, out)
 		return virtual.DirectoryChild{}.FromLeaf(child), virtual.StatusOK
 	}
@@ -169,7 +169,7 @@ func (d *contentAddressableStorageDirectory) VirtualOpenChild(ctx context.Contex
 			d.directoryContext.LogError(util.StatusWrapf(err, "Failed to parse digest for file %#v", n))
 			return nil, 0, virtual.ChangeInfo{}, virtual.StatusErrIO
 		}
-		leaf := d.directoryContext.LookupFile(entryDigest, entry.IsExecutable)
+		leaf := d.directoryContext.LookupFile(entryDigest, entry.IsExecutable, nil)
 		s := leaf.VirtualOpenSelf(ctx, shareAccess, existingOptions, requested, openedFileAttributes)
 		return leaf, existingOptions.ToAttributesMask(), virtual.ChangeInfo{}, s
 	}
@@ -225,7 +225,7 @@ func (d *contentAddressableStorageDirectory) VirtualReadDir(ctx context.Context,
 			d.directoryContext.LogError(util.StatusWrapf(err, "Failed to parse digest for file %#v", entry.Name))
 			return virtual.StatusErrIO
 		}
-		child := d.directoryContext.LookupFile(entryDigest, entry.IsExecutable)
+		child := d.directoryContext.LookupFile(entryDigest, entry.IsExecutable, nil)
 		var attributes virtual.Attributes
 		child.VirtualGetAttributes(ctx, requested, &attributes)
 		if !reporter.ReportEntry(nextCookieOffset+i, name, virtual.DirectoryChild{}.FromLeaf(child), &attributes) {

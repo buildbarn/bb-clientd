@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"context"
-	"log"
 	"os"
 	"sort"
 	"strings"
@@ -29,297 +28,303 @@ import (
 	"github.com/buildbarn/bb-storage/pkg/filesystem/path"
 	"github.com/buildbarn/bb-storage/pkg/global"
 	bb_grpc "github.com/buildbarn/bb-storage/pkg/grpc"
+	"github.com/buildbarn/bb-storage/pkg/program"
 	"github.com/buildbarn/bb-storage/pkg/random"
 	"github.com/buildbarn/bb-storage/pkg/util"
 
 	"golang.org/x/sync/semaphore"
 	"google.golang.org/genproto/googleapis/bytestream"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 func main() {
-	if len(os.Args) != 2 {
-		log.Fatal("Usage: bb_clientd bb_clientd.jsonnet")
-	}
-	var configuration bb_clientd.ApplicationConfiguration
-	if err := util.UnmarshalConfigurationFromFile(os.Args[1], &configuration); err != nil {
-		log.Fatalf("Failed to read configuration from %s: %s", os.Args[1], err)
-	}
-	lifecycleState, grpcClientFactory, err := global.ApplyConfiguration(configuration.Global)
-	if err != nil {
-		log.Fatal("Failed to apply global configuration options: ", err)
-	}
-	terminationContext, terminationGroup := global.InstallGracefulTerminationHandler()
-
-	// Storage access.
-	bareContentAddressableStorage, actionCache, err := blobstore_configuration.NewCASAndACBlobAccessFromConfiguration(
-		terminationContext,
-		terminationGroup,
-		configuration.Blobstore,
-		grpcClientFactory,
-		int(configuration.MaximumMessageSizeBytes))
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	// Create a demultiplexing build queue that forwards traffic to
-	// one or more schedulers specified in the configuration file.
-	buildQueue, err := builder.NewDemultiplexingBuildQueueFromConfiguration(configuration.Schedulers, grpcClientFactory)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	// Storage of files created through the virtual file system.
-	filePool, err := re_filesystem.NewFilePoolFromConfiguration(configuration.FilePool)
-	if err != nil {
-		log.Fatal("Failed to create file pool: ", err)
-	}
-
-	// Separate BlobAccess that does retries in case of read errors.
-	// This is necessary, because it isn't always possible to
-	// directly propagate I/O errors returned by the virtual file
-	// system to clients.
-	retryingContentAddressableStorage := bareContentAddressableStorage
-	if maximumDelay := configuration.MaximumFileSystemRetryDelay; maximumDelay != nil {
-		if err := maximumDelay.CheckValid(); err != nil {
-			log.Fatal("Invalid maximum file system retry delay: ", err)
+	program.Run(func(ctx context.Context, siblingsGroup, dependenciesGroup program.Group) error {
+		if len(os.Args) != 2 {
+			return status.Error(codes.InvalidArgument, "Usage: bb_clientd bb_clientd.jsonnet")
 		}
-		retryingContentAddressableStorage = cd_blobstore.NewErrorRetryingBlobAccess(
-			bareContentAddressableStorage,
-			clock.SystemClock,
-			random.FastThreadSafeGenerator,
-			util.DefaultErrorLogger,
-			time.Second,
-			30*time.Second,
-			maximumDelay.AsDuration())
-	}
-
-	// Create the virtual file system.
-	mount, rootHandleAllocator, err := virtual_configuration.NewMountFromConfiguration(
-		configuration.Mount,
-		"bb_clientd",
-		/* containsSelfMutatingSymlinks = */ false)
-	if err != nil {
-		log.Fatal("Failed to create virtual file system mount: ", err)
-	}
-
-	// Factories for virtual file system nodes corresponding to
-	// plain files, executable files, directories and trees.
-	//
-	// We create a CachingDirectoryFetcher for REv2 Directory nodes,
-	// as these tend to be loaded repeatedly when traversing a
-	// directory hierarchy, especially through "outputs/*".
-	directoryFetcher, err := re_cas.NewCachingDirectoryFetcherFromConfiguration(
-		configuration.DirectoryCache,
-		re_cas.NewBlobAccessDirectoryFetcher(
-			retryingContentAddressableStorage,
-			int(configuration.MaximumMessageSizeBytes),
-			configuration.MaximumTreeSizeBytes))
-	if err != nil {
-		log.Fatal("Failed to create caching directory fetcher: ", err)
-	}
-	casFileFactory := re_vfs.NewResolvableHandleAllocatingCASFileFactory(
-		re_vfs.NewBlobAccessCASFileFactory(
-			context.Background(),
-			retryingContentAddressableStorage,
-			util.DefaultErrorLogger),
-		rootHandleAllocator.New())
-	globalDirectoryContext := NewGlobalDirectoryContext(
-		context.Background(),
-		casFileFactory,
-		directoryFetcher,
-		rootHandleAllocator.New(),
-		util.DefaultErrorLogger)
-	globalTreeContext := NewGlobalTreeContext(
-		context.Background(),
-		casFileFactory,
-		directoryFetcher,
-		rootHandleAllocator.New(),
-		util.DefaultErrorLogger)
-
-	// Factory function for per instance name "blobs" directories
-	// that give access to arbitrary files, directories and trees.
-	blobsDirectoryHandleAllocator := rootHandleAllocator.New().AsStatelessAllocator()
-	commandFileFactory := cd_vfs.NewHandleAllocatingCommandFileFactory(
-		cd_vfs.NewBlobAccessCommandFileFactory(
-			context.Background(),
-			retryingContentAddressableStorage,
-			int(configuration.MaximumMessageSizeBytes),
-			util.DefaultErrorLogger),
-		rootHandleAllocator.New())
-	blobsDirectoryLookupFunc := func(instanceName digest.InstanceName) re_vfs.Directory {
-		handleAllocator := blobsDirectoryHandleAllocator.
-			New(re_vfs.ByteSliceID([]byte(instanceName.String()))).
-			AsStatelessAllocator()
-		var allocationCounter byte
-		allocateHandle := func() re_vfs.StatelessHandleAllocation {
-			allocationCounter++
-			return handleAllocator.New(bytes.NewBuffer([]byte{allocationCounter}))
+		var configuration bb_clientd.ApplicationConfiguration
+		if err := util.UnmarshalConfigurationFromFile(os.Args[1], &configuration); err != nil {
+			return util.StatusWrapf(err, "Failed to read configuration from %s", os.Args[1])
 		}
-		blobsDirectoryContents := map[path.Component]re_vfs.DirectoryChild{}
-		for _, digestFunctionValue := range digest.SupportedDigestFunctions {
-			digestFunction, err := instanceName.GetDigestFunction(digestFunctionValue, 0)
-			if err != nil {
-				panic("Using a supported digest function should always succeed")
-			}
-			blobsDirectoryContents[path.MustNewComponent(strings.ToLower(digestFunctionValue.String()))] = re_vfs.DirectoryChild{}.FromDirectory(
-				allocateHandle().AsStatelessDirectory(re_vfs.NewStaticDirectory(
-					map[path.Component]re_vfs.DirectoryChild{
-						path.MustNewComponent("command"): re_vfs.DirectoryChild{}.FromDirectory(
-							allocateHandle().AsStatelessDirectory(cd_vfs.NewDigestParsingDirectory(
-								digestFunction,
-								func(digest digest.Digest) (re_vfs.DirectoryChild, re_vfs.Status) {
-									f, s := commandFileFactory.LookupFile(digest)
-									return re_vfs.DirectoryChild{}.FromLeaf(f), s
-								}))),
-						path.MustNewComponent("directory"): re_vfs.DirectoryChild{}.FromDirectory(
-							allocateHandle().AsStatelessDirectory(cd_vfs.NewDigestParsingDirectory(
-								digestFunction,
-								func(digest digest.Digest) (re_vfs.DirectoryChild, re_vfs.Status) {
-									return re_vfs.DirectoryChild{}.FromDirectory(globalDirectoryContext.LookupDirectory(digest)), re_vfs.StatusOK
-								}))),
-						path.MustNewComponent("executable"): re_vfs.DirectoryChild{}.FromDirectory(
-							allocateHandle().AsStatelessDirectory(cd_vfs.NewDigestParsingDirectory(
-								digestFunction,
-								func(digest digest.Digest) (re_vfs.DirectoryChild, re_vfs.Status) {
-									return re_vfs.DirectoryChild{}.FromLeaf(casFileFactory.LookupFile(digest, true)), re_vfs.StatusOK
-								}))),
-						path.MustNewComponent("file"): re_vfs.DirectoryChild{}.FromDirectory(
-							allocateHandle().AsStatelessDirectory(cd_vfs.NewDigestParsingDirectory(
-								digestFunction,
-								func(digest digest.Digest) (re_vfs.DirectoryChild, re_vfs.Status) {
-									return re_vfs.DirectoryChild{}.FromLeaf(casFileFactory.LookupFile(digest, false)), re_vfs.StatusOK
-								}))),
-						path.MustNewComponent("tree"): re_vfs.DirectoryChild{}.FromDirectory(
-							allocateHandle().AsStatelessDirectory(cd_vfs.NewDigestParsingDirectory(
-								digestFunction,
-								func(digest digest.Digest) (re_vfs.DirectoryChild, re_vfs.Status) {
-									return re_vfs.DirectoryChild{}.FromDirectory(globalTreeContext.LookupTree(digest)), re_vfs.StatusOK
-								}))),
-					})))
-		}
-		return allocateHandle().AsStatelessDirectory(re_vfs.NewStaticDirectory(blobsDirectoryContents))
-	}
-
-	// Implementation of the Remote Output Service. The Remote
-	// Output Service allows Bazel to place its bazel-out/
-	// directories on a virtual file system, thereby allowing data
-	// to be loaded lazily.
-	symlinkFactory := re_vfs.NewHandleAllocatingSymlinkFactory(
-		re_vfs.BaseSymlinkFactory,
-		rootHandleAllocator.New())
-	outputPathFactory := cd_vfs.NewInMemoryOutputPathFactory(filePool, symlinkFactory, rootHandleAllocator, sort.Sort, clock.SystemClock)
-	if persistencyConfiguration := configuration.OutputPathPersistency; persistencyConfiguration != nil {
-		// Upload local files at the end of every build. This
-		// decorator needs to be added before
-		// PersistentOutputPathFactory, as it also ensures that
-		// local files have a digest.
-		if concurrency := persistencyConfiguration.LocalFileUploadConcurrency; concurrency > 0 {
-			outputPathFactory = cd_vfs.NewLocalFileUploadingOutputPathFactory(
-				outputPathFactory,
-				bareContentAddressableStorage,
-				util.DefaultErrorLogger,
-				semaphore.NewWeighted(concurrency))
-		}
-
-		// Enable persistent storage of bazel-out/ directories.
-		stateDirectory, err := filesystem.NewLocalDirectory(persistencyConfiguration.StateDirectoryPath)
+		lifecycleState, grpcClientFactory, err := global.ApplyConfiguration(configuration.Global)
 		if err != nil {
-			log.Fatalf("Failed to open persistent output path state directory %#v: %s", persistencyConfiguration.StateDirectoryPath, err)
+			return util.StatusWrap(err, "Failed to apply global configuration options")
 		}
-		maximumStateFileAge := persistencyConfiguration.MaximumStateFileAge
-		if err := maximumStateFileAge.CheckValid(); err != nil {
-			log.Fatal("Invalid maximum state file age: ", err)
+
+		// Storage access.
+		bareContentAddressableStorage, actionCache, err := blobstore_configuration.NewCASAndACBlobAccessFromConfiguration(
+			dependenciesGroup,
+			configuration.Blobstore,
+			grpcClientFactory,
+			int(configuration.MaximumMessageSizeBytes))
+		if err != nil {
+			return err
 		}
-		outputPathFactory = cd_vfs.NewPersistentOutputPathFactory(
-			outputPathFactory,
-			outputpathpersistency.NewMaximumAgeStore(
-				outputpathpersistency.NewDirectoryBackedStore(
-					stateDirectory,
-					persistencyConfiguration.MaximumStateFileSizeBytes),
+
+		// Create a demultiplexing build queue that forwards traffic to
+		// one or more schedulers specified in the configuration file.
+		buildQueue, err := builder.NewDemultiplexingBuildQueueFromConfiguration(configuration.Schedulers, grpcClientFactory)
+		if err != nil {
+			return err
+		}
+
+		// Storage of files created through the virtual file system.
+		filePool, err := re_filesystem.NewFilePoolFromConfiguration(configuration.FilePool)
+		if err != nil {
+			return util.StatusWrap(err, "Failed to create file pool")
+		}
+
+		// Separate BlobAccess that does retries in case of read errors.
+		// This is necessary, because it isn't always possible to
+		// directly propagate I/O errors returned by the virtual file
+		// system to clients.
+		retryingContentAddressableStorage := bareContentAddressableStorage
+		if maximumDelay := configuration.MaximumFileSystemRetryDelay; maximumDelay != nil {
+			if err := maximumDelay.CheckValid(); err != nil {
+				return util.StatusWrap(err, "Invalid maximum file system retry delay")
+			}
+			retryingContentAddressableStorage = cd_blobstore.NewErrorRetryingBlobAccess(
+				bareContentAddressableStorage,
 				clock.SystemClock,
-				maximumStateFileAge.AsDuration()),
-			clock.SystemClock,
-			util.DefaultErrorLogger,
-			symlinkFactory)
-	}
+				random.FastThreadSafeGenerator,
+				util.DefaultErrorLogger,
+				time.Second,
+				30*time.Second,
+				maximumDelay.AsDuration())
+		}
 
-	outputsDirectory := cd_vfs.NewRemoteOutputServiceDirectory(
-		rootHandleAllocator,
-		outputPathFactory,
-		bareContentAddressableStorage,
-		retryingContentAddressableStorage,
-		directoryFetcher,
-		symlinkFactory,
-		configuration.MaximumTreeSizeBytes)
+		// Create the virtual file system.
+		mount, rootHandleAllocator, err := virtual_configuration.NewMountFromConfiguration(
+			configuration.Mount,
+			"bb_clientd",
+			/* containsSelfMutatingSymlinks = */ false)
+		if err != nil {
+			return util.StatusWrap(err, "Failed to create virtual file system mount")
+		}
 
-	// Construct the top-level directory of the virtual file system
-	// mount. It contains three subdirectories:
-	//
-	// - "cas": raw access to the Content Addressable Storage.
-	// - "outputs": outputs of builds performed using Bazel.
-	// - "scratch": a writable directory for testing.
-	rootDirectory := rootHandleAllocator.New().AsStatelessDirectory(re_vfs.NewStaticDirectory(
-		map[path.Component]re_vfs.DirectoryChild{
-			path.MustNewComponent("cas"): re_vfs.DirectoryChild{}.FromDirectory(
-				cd_vfs.NewInstanceNameParsingDirectory(
-					rootHandleAllocator.New(),
-					map[path.Component]cd_vfs.InstanceNameLookupFunc{
-						path.MustNewComponent("blobs"): blobsDirectoryLookupFunc,
-					})),
-			path.MustNewComponent("outputs"): re_vfs.DirectoryChild{}.FromDirectory(outputsDirectory),
-			path.MustNewComponent("scratch"): re_vfs.DirectoryChild{}.FromDirectory(
-				re_vfs.NewInMemoryPrepopulatedDirectory(
-					re_vfs.NewHandleAllocatingFileAllocator(
-						re_vfs.NewPoolBackedFileAllocator(
-							filePool,
-							util.DefaultErrorLogger),
-						rootHandleAllocator),
-					symlinkFactory,
+		// Factories for virtual file system nodes corresponding to
+		// plain files, executable files, directories and trees.
+		//
+		// We create a CachingDirectoryFetcher for REv2 Directory nodes,
+		// as these tend to be loaded repeatedly when traversing a
+		// directory hierarchy, especially through "outputs/*".
+		directoryFetcher, err := re_cas.NewCachingDirectoryFetcherFromConfiguration(
+			configuration.DirectoryCache,
+			re_cas.NewBlobAccessDirectoryFetcher(
+				retryingContentAddressableStorage,
+				int(configuration.MaximumMessageSizeBytes),
+				configuration.MaximumTreeSizeBytes))
+		if err != nil {
+			return util.StatusWrap(err, "Failed to create caching directory fetcher")
+		}
+		casFileFactory := re_vfs.NewResolvableHandleAllocatingCASFileFactory(
+			re_vfs.NewBlobAccessCASFileFactory(
+				context.Background(),
+				retryingContentAddressableStorage,
+				util.DefaultErrorLogger),
+			rootHandleAllocator.New())
+		globalDirectoryContext := NewGlobalDirectoryContext(
+			context.Background(),
+			casFileFactory,
+			directoryFetcher,
+			rootHandleAllocator.New(),
+			util.DefaultErrorLogger)
+		globalTreeContext := NewGlobalTreeContext(
+			context.Background(),
+			casFileFactory,
+			directoryFetcher,
+			rootHandleAllocator.New(),
+			util.DefaultErrorLogger)
+
+		// Factory function for per instance name "blobs" directories
+		// that give access to arbitrary files, directories and trees.
+		blobsDirectoryHandleAllocator := rootHandleAllocator.New().AsStatelessAllocator()
+		commandFileFactory := cd_vfs.NewHandleAllocatingCommandFileFactory(
+			cd_vfs.NewBlobAccessCommandFileFactory(
+				context.Background(),
+				retryingContentAddressableStorage,
+				int(configuration.MaximumMessageSizeBytes),
+				util.DefaultErrorLogger),
+			rootHandleAllocator.New())
+		blobsDirectoryLookupFunc := func(instanceName digest.InstanceName) re_vfs.Directory {
+			handleAllocator := blobsDirectoryHandleAllocator.
+				New(re_vfs.ByteSliceID([]byte(instanceName.String()))).
+				AsStatelessAllocator()
+			var allocationCounter byte
+			allocateHandle := func() re_vfs.StatelessHandleAllocation {
+				allocationCounter++
+				return handleAllocator.New(bytes.NewBuffer([]byte{allocationCounter}))
+			}
+			blobsDirectoryContents := map[path.Component]re_vfs.DirectoryChild{}
+			for _, digestFunctionValue := range digest.SupportedDigestFunctions {
+				digestFunction, err := instanceName.GetDigestFunction(digestFunctionValue, 0)
+				if err != nil {
+					panic("Using a supported digest function should always succeed")
+				}
+				blobsDirectoryContents[path.MustNewComponent(strings.ToLower(digestFunctionValue.String()))] = re_vfs.DirectoryChild{}.FromDirectory(
+					allocateHandle().AsStatelessDirectory(re_vfs.NewStaticDirectory(
+						map[path.Component]re_vfs.DirectoryChild{
+							path.MustNewComponent("command"): re_vfs.DirectoryChild{}.FromDirectory(
+								allocateHandle().AsStatelessDirectory(cd_vfs.NewDigestParsingDirectory(
+									digestFunction,
+									func(digest digest.Digest) (re_vfs.DirectoryChild, re_vfs.Status) {
+										f, s := commandFileFactory.LookupFile(digest)
+										return re_vfs.DirectoryChild{}.FromLeaf(f), s
+									}))),
+							path.MustNewComponent("directory"): re_vfs.DirectoryChild{}.FromDirectory(
+								allocateHandle().AsStatelessDirectory(cd_vfs.NewDigestParsingDirectory(
+									digestFunction,
+									func(digest digest.Digest) (re_vfs.DirectoryChild, re_vfs.Status) {
+										return re_vfs.DirectoryChild{}.FromDirectory(globalDirectoryContext.LookupDirectory(digest)), re_vfs.StatusOK
+									}))),
+							path.MustNewComponent("executable"): re_vfs.DirectoryChild{}.FromDirectory(
+								allocateHandle().AsStatelessDirectory(cd_vfs.NewDigestParsingDirectory(
+									digestFunction,
+									func(digest digest.Digest) (re_vfs.DirectoryChild, re_vfs.Status) {
+										return re_vfs.DirectoryChild{}.FromLeaf(casFileFactory.LookupFile(digest, true, nil)), re_vfs.StatusOK
+									}))),
+							path.MustNewComponent("file"): re_vfs.DirectoryChild{}.FromDirectory(
+								allocateHandle().AsStatelessDirectory(cd_vfs.NewDigestParsingDirectory(
+									digestFunction,
+									func(digest digest.Digest) (re_vfs.DirectoryChild, re_vfs.Status) {
+										return re_vfs.DirectoryChild{}.FromLeaf(casFileFactory.LookupFile(digest, false, nil)), re_vfs.StatusOK
+									}))),
+							path.MustNewComponent("tree"): re_vfs.DirectoryChild{}.FromDirectory(
+								allocateHandle().AsStatelessDirectory(cd_vfs.NewDigestParsingDirectory(
+									digestFunction,
+									func(digest digest.Digest) (re_vfs.DirectoryChild, re_vfs.Status) {
+										return re_vfs.DirectoryChild{}.FromDirectory(globalTreeContext.LookupTree(digest)), re_vfs.StatusOK
+									}))),
+						})))
+			}
+			return allocateHandle().AsStatelessDirectory(re_vfs.NewStaticDirectory(blobsDirectoryContents))
+		}
+
+		// Implementation of the Remote Output Service. The Remote
+		// Output Service allows Bazel to place its bazel-out/
+		// directories on a virtual file system, thereby allowing data
+		// to be loaded lazily.
+		symlinkFactory := re_vfs.NewHandleAllocatingSymlinkFactory(
+			re_vfs.BaseSymlinkFactory,
+			rootHandleAllocator.New())
+		outputPathFactory := cd_vfs.NewInMemoryOutputPathFactory(filePool, symlinkFactory, rootHandleAllocator, sort.Sort, clock.SystemClock)
+		if persistencyConfiguration := configuration.OutputPathPersistency; persistencyConfiguration != nil {
+			// Upload local files at the end of every build. This
+			// decorator needs to be added before
+			// PersistentOutputPathFactory, as it also ensures that
+			// local files have a digest.
+			if concurrency := persistencyConfiguration.LocalFileUploadConcurrency; concurrency > 0 {
+				outputPathFactory = cd_vfs.NewLocalFileUploadingOutputPathFactory(
+					outputPathFactory,
+					bareContentAddressableStorage,
 					util.DefaultErrorLogger,
-					rootHandleAllocator,
-					sort.Sort,
-					/* hiddenFilesMatcher = */ func(string) bool { return false },
-					clock.SystemClock)),
-		}))
+					semaphore.NewWeighted(concurrency))
+			}
 
-	if err := mount.Expose(terminationContext, terminationGroup, rootDirectory); err != nil {
-		log.Fatal("Failed to expose virtual file system mount: ", err)
-	}
+			// Enable persistent storage of bazel-out/ directories.
+			stateDirectory, err := filesystem.NewLocalDirectory(persistencyConfiguration.StateDirectoryPath)
+			if err != nil {
+				return util.StatusWrapf(err, "Failed to open persistent output path state directory %#v", persistencyConfiguration.StateDirectoryPath)
+			}
+			maximumStateFileAge := persistencyConfiguration.MaximumStateFileAge
+			if err := maximumStateFileAge.CheckValid(); err != nil {
+				return util.StatusWrap(err, "Invalid maximum state file age")
+			}
+			outputPathFactory = cd_vfs.NewPersistentOutputPathFactory(
+				outputPathFactory,
+				outputpathpersistency.NewMaximumAgeStore(
+					outputpathpersistency.NewDirectoryBackedStore(
+						stateDirectory,
+						persistencyConfiguration.MaximumStateFileSizeBytes),
+					clock.SystemClock,
+					maximumStateFileAge.AsDuration()),
+				clock.SystemClock,
+				util.DefaultErrorLogger,
+				symlinkFactory)
+		}
 
-	// Create a gRPC server that forwards requests to backend clusters.
-	if err := bb_grpc.NewServersFromConfigurationAndServe(
-		configuration.GrpcServers,
-		func(s grpc.ServiceRegistrar) {
-			remoteexecution.RegisterActionCacheServer(
-				s,
-				grpcservers.NewActionCacheServer(
-					actionCache,
-					int(configuration.MaximumMessageSizeBytes)))
-			remoteexecution.RegisterContentAddressableStorageServer(
-				s,
-				grpcservers.NewContentAddressableStorageServer(
-					bareContentAddressableStorage,
-					configuration.MaximumMessageSizeBytes))
-			bytestream.RegisterByteStreamServer(
-				s,
-				grpcservers.NewByteStreamServer(
-					bareContentAddressableStorage,
-					1<<16))
-			remoteexecution.RegisterCapabilitiesServer(
-				s,
-				capabilities.NewServer(
-					capabilities.NewMergingProvider([]capabilities.Provider{
-						bareContentAddressableStorage,
+		outputsDirectory := cd_vfs.NewRemoteOutputServiceDirectory(
+			rootHandleAllocator,
+			outputPathFactory,
+			bareContentAddressableStorage,
+			retryingContentAddressableStorage,
+			directoryFetcher,
+			symlinkFactory,
+			configuration.MaximumTreeSizeBytes)
+
+		// Construct the top-level directory of the virtual file system
+		// mount. It contains three subdirectories:
+		//
+		// - "cas": raw access to the Content Addressable Storage.
+		// - "outputs": outputs of builds performed using Bazel.
+		// - "scratch": a writable directory for testing.
+		rootDirectory := rootHandleAllocator.New().AsStatelessDirectory(re_vfs.NewStaticDirectory(
+			map[path.Component]re_vfs.DirectoryChild{
+				path.MustNewComponent("cas"): re_vfs.DirectoryChild{}.FromDirectory(
+					cd_vfs.NewInstanceNameParsingDirectory(
+						rootHandleAllocator.New(),
+						map[path.Component]cd_vfs.InstanceNameLookupFunc{
+							path.MustNewComponent("blobs"): blobsDirectoryLookupFunc,
+						})),
+				path.MustNewComponent("outputs"): re_vfs.DirectoryChild{}.FromDirectory(outputsDirectory),
+				path.MustNewComponent("scratch"): re_vfs.DirectoryChild{}.FromDirectory(
+					re_vfs.NewInMemoryPrepopulatedDirectory(
+						re_vfs.NewHandleAllocatingFileAllocator(
+							re_vfs.NewPoolBackedFileAllocator(
+								filePool,
+								util.DefaultErrorLogger),
+							rootHandleAllocator),
+						symlinkFactory,
+						util.DefaultErrorLogger,
+						rootHandleAllocator,
+						sort.Sort,
+						/* hiddenFilesMatcher = */ func(string) bool { return false },
+						clock.SystemClock)),
+			}))
+
+		if err := mount.Expose(siblingsGroup, rootDirectory); err != nil {
+			return util.StatusWrap(err, "Failed to expose virtual file system mount")
+		}
+
+		// Create a gRPC server that forwards requests to backend clusters.
+		if err := bb_grpc.NewServersFromConfigurationAndServe(
+			configuration.GrpcServers,
+			func(s grpc.ServiceRegistrar) {
+				remoteexecution.RegisterActionCacheServer(
+					s,
+					grpcservers.NewActionCacheServer(
 						actionCache,
-						buildQueue,
-					})))
-			remoteexecution.RegisterExecutionServer(s, buildQueue)
+						int(configuration.MaximumMessageSizeBytes)))
+				remoteexecution.RegisterContentAddressableStorageServer(
+					s,
+					grpcservers.NewContentAddressableStorageServer(
+						bareContentAddressableStorage,
+						configuration.MaximumMessageSizeBytes))
+				bytestream.RegisterByteStreamServer(
+					s,
+					grpcservers.NewByteStreamServer(
+						bareContentAddressableStorage,
+						1<<16))
+				remoteexecution.RegisterCapabilitiesServer(
+					s,
+					capabilities.NewServer(
+						capabilities.NewMergingProvider([]capabilities.Provider{
+							bareContentAddressableStorage,
+							actionCache,
+							buildQueue,
+						})))
+				remoteexecution.RegisterExecutionServer(s, buildQueue)
 
-			remoteoutputservice.RegisterRemoteOutputServiceServer(s, outputsDirectory)
-		}); err != nil {
-		log.Fatal("gRPC server failure: ", err)
-	}
+				remoteoutputservice.RegisterRemoteOutputServiceServer(s, outputsDirectory)
+			},
+			siblingsGroup,
+		); err != nil {
+			return util.StatusWrap(err, "gRPC server failure")
+		}
 
-	lifecycleState.MarkReadyAndWait()
+		lifecycleState.MarkReadyAndWait(siblingsGroup)
+		return nil
+	})
 }

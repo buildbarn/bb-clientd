@@ -484,7 +484,7 @@ func (d *RemoteOutputServiceDirectory) BatchCreate(ctx context.Context, request 
 		if err != nil {
 			return nil, util.StatusWrapf(err, "Invalid digest for file %#v", entry.Path)
 		}
-		leaf := outputPathState.casFileFactory.LookupFile(childDigest, entry.IsExecutable)
+		leaf := outputPathState.casFileFactory.LookupFile(childDigest, entry.IsExecutable, nil)
 		if err := prefixCreator.createChild(entry.Path, virtual.InitialNode{}.FromLeaf(leaf)); err != nil {
 			leaf.Unlink()
 			return nil, util.StatusWrapf(err, "Failed to create file %#v", entry.Path)

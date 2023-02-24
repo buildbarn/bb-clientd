@@ -167,7 +167,11 @@ func TestPersistentOutputPathFactoryStartInitialBuild(t *testing.T) {
 			},
 		}, nil)
 		file1 := mock.NewMockNativeLeaf(ctrl)
-		casFileFactory.EXPECT().LookupFile(digest.MustNewDigest("default", remoteexecution.DigestFunction_SHA256, "f132632084ca4e2124fbc88223901e3976e126ebb8f8cc5a09116a0191369d9b", 34), false).Return(file1)
+		casFileFactory.EXPECT().LookupFile(
+			digest.MustNewDigest("default", remoteexecution.DigestFunction_SHA256, "f132632084ca4e2124fbc88223901e3976e126ebb8f8cc5a09116a0191369d9b", 34),
+			/* isExecutable = */ false,
+			/* readMonitor = */ nil,
+		).Return(file1)
 		file1.EXPECT().Unlink()
 		reader.EXPECT().Close()
 		globalErrorLogger.EXPECT().Log(testutil.EqStatus(t, status.Error(codes.InvalidArgument, "Failed to restore state file for output path \"0226bea917a1c8c9c2ad4f7d4229de01\": Failed to obtain digest for file \"file2\": Hash has length 20, while 64 characters were expected")))
@@ -213,9 +217,17 @@ func TestPersistentOutputPathFactoryStartInitialBuild(t *testing.T) {
 			},
 		}, nil)
 		file1 := mock.NewMockNativeLeaf(ctrl)
-		casFileFactory.EXPECT().LookupFile(digest.MustNewDigest("default", remoteexecution.DigestFunction_SHA256, "f132632084ca4e2124fbc88223901e3976e126ebb8f8cc5a09116a0191369d9b", 34), false).Return(file1)
+		casFileFactory.EXPECT().LookupFile(
+			digest.MustNewDigest("default", remoteexecution.DigestFunction_SHA256, "f132632084ca4e2124fbc88223901e3976e126ebb8f8cc5a09116a0191369d9b", 34),
+			/* isExecutable = */ false,
+			/* readMonitor = */ nil,
+		).Return(file1)
 		file2 := mock.NewMockNativeLeaf(ctrl)
-		casFileFactory.EXPECT().LookupFile(digest.MustNewDigest("default", remoteexecution.DigestFunction_SHA256, "ce22e2423b7d501d45f6b8aeab15cb40f28c73fb2edfe03e0f3cd450583fcef8", 42), true).Return(file2)
+		casFileFactory.EXPECT().LookupFile(
+			digest.MustNewDigest("default", remoteexecution.DigestFunction_SHA256, "ce22e2423b7d501d45f6b8aeab15cb40f28c73fb2edfe03e0f3cd450583fcef8", 42),
+			/* isExecutable = */ true,
+			/* readMonitor = */ nil,
+		).Return(file2)
 		symlink1 := mock.NewMockNativeLeaf(ctrl)
 		symlinkFactory.EXPECT().LookupSymlink([]byte("target1")).Return(symlink1)
 		baseOutputPath.EXPECT().CreateChildren(map[path.Component]re_vfs.InitialNode{

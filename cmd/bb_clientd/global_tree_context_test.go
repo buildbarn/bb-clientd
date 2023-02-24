@@ -151,14 +151,18 @@ func TestGlobalTreeContextLookupTree(t *testing.T) {
 
 	t.Run("RootSuccess", func(t *testing.T) {
 		executable := mock.NewMockNativeLeaf(ctrl)
-		casFileFactory.EXPECT().
-			LookupFile(digest.MustNewDigest("hello", remoteexecution.DigestFunction_SHA256, "32d757ab2b5c09e11daf0b0c04a3ba9da78e96fd24f9f838be0333f093354c82", 42), true).
-			Return(executable)
+		casFileFactory.EXPECT().LookupFile(
+			digest.MustNewDigest("hello", remoteexecution.DigestFunction_SHA256, "32d757ab2b5c09e11daf0b0c04a3ba9da78e96fd24f9f838be0333f093354c82", 42),
+			/* isExecutable = */ true,
+			/* readMonitor = */ nil,
+		).Return(executable)
 		executable.EXPECT().VirtualGetAttributes(ctx, virtual.AttributesMask(0), gomock.Any())
 		file := mock.NewMockNativeLeaf(ctrl)
-		casFileFactory.EXPECT().
-			LookupFile(digest.MustNewDigest("hello", remoteexecution.DigestFunction_SHA256, "64ec88ca00b268e5ba1a35678a1b5316d212f4f366b2477232534a8aeca37f3c", 11), false).
-			Return(file)
+		casFileFactory.EXPECT().LookupFile(
+			digest.MustNewDigest("hello", remoteexecution.DigestFunction_SHA256, "64ec88ca00b268e5ba1a35678a1b5316d212f4f366b2477232534a8aeca37f3c", 11),
+			/* isExecutable = */ false,
+			/* readMonitor = */ nil,
+		).Return(file)
 		file.EXPECT().VirtualGetAttributes(ctx, virtual.AttributesMask(0), gomock.Any())
 
 		directoryFetcher.EXPECT().GetTreeRootDirectory(ctx, treeDigest).Return(&remoteexecution.Directory{
@@ -244,9 +248,11 @@ func TestGlobalTreeContextLookupTree(t *testing.T) {
 
 	t.Run("ChildSuccess", func(t *testing.T) {
 		file := mock.NewMockNativeLeaf(ctrl)
-		casFileFactory.EXPECT().
-			LookupFile(digest.MustNewDigest("hello", remoteexecution.DigestFunction_SHA256, "64ec88ca00b268e5ba1a35678a1b5316d212f4f366b2477232534a8aeca37f3c", 11), false).
-			Return(file)
+		casFileFactory.EXPECT().LookupFile(
+			digest.MustNewDigest("hello", remoteexecution.DigestFunction_SHA256, "64ec88ca00b268e5ba1a35678a1b5316d212f4f366b2477232534a8aeca37f3c", 11),
+			/* isExecutable = */ false,
+			/* readMonitor = */ nil,
+		).Return(file)
 		file.EXPECT().VirtualGetAttributes(ctx, virtual.AttributesMask(0), gomock.Any())
 
 		directoryFetcher.EXPECT().GetTreeChildDirectory(ctx, treeDigest, childDigest).Return(&remoteexecution.Directory{

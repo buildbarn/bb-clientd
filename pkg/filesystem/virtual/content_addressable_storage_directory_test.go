@@ -184,7 +184,8 @@ func TestContentAddressableStorageDirectoryVirtualLookup(t *testing.T) {
 		childLeaf := mock.NewMockNativeLeaf(ctrl)
 		directoryContext.EXPECT().LookupFile(
 			digest.MustNewDigest("example", remoteexecution.DigestFunction_SHA256, "d3dda0e30611a0b3e98ee84a6c64d3eb7f174cd197a3713d0c44a35228bb33a7", 12),
-			true,
+			/* isExecutable = */ true,
+			/* readMonitor =*/ nil,
 		).Return(childLeaf)
 		childLeaf.EXPECT().VirtualGetAttributes(
 			ctx,
@@ -206,7 +207,8 @@ func TestContentAddressableStorageDirectoryVirtualLookup(t *testing.T) {
 		childLeaf := mock.NewMockNativeLeaf(ctrl)
 		directoryContext.EXPECT().LookupFile(
 			digest.MustNewDigest("example", remoteexecution.DigestFunction_SHA256, "059458af6543753150ceb7bcd4cc215e8aaabd61934ff6c67acdd9e7fb4cc96d", 34),
-			false,
+			/* isExecutable = */ false,
+			/* readMonitor =*/ nil,
 		).Return(childLeaf)
 		childLeaf.EXPECT().VirtualGetAttributes(
 			ctx,
@@ -413,7 +415,8 @@ func TestContentAddressableStorageDirectoryVirtualReadDir(t *testing.T) {
 		childLeaf1 := mock.NewMockNativeLeaf(ctrl)
 		directoryContext.EXPECT().LookupFile(
 			digest.MustNewDigest("example", remoteexecution.DigestFunction_SHA256, "473b6cb5358c3f8a086db591259ac33eac875d1ae3e37737bce210c1e9ea3503", 100),
-			true,
+			/* isExecutable = */ true,
+			/* readMonitor =*/ nil,
 		).Return(childLeaf1)
 		childLeaf1.EXPECT().VirtualGetAttributes(
 			ctx,
@@ -431,7 +434,8 @@ func TestContentAddressableStorageDirectoryVirtualReadDir(t *testing.T) {
 		childLeaf2 := mock.NewMockNativeLeaf(ctrl)
 		directoryContext.EXPECT().LookupFile(
 			digest.MustNewDigest("example", remoteexecution.DigestFunction_SHA256, "0ac567103ab10e4b6bfca9b1d3387baad93dee899be5e5cbc3859e01363fbdaa", 200),
-			false,
+			/* isExecutable = */ false,
+			/* readMonitor =*/ nil,
 		).Return(childLeaf2)
 		childLeaf2.EXPECT().VirtualGetAttributes(
 			ctx,
@@ -465,7 +469,8 @@ func TestContentAddressableStorageDirectoryVirtualReadDir(t *testing.T) {
 		childLeaf := mock.NewMockNativeLeaf(ctrl)
 		directoryContext.EXPECT().LookupFile(
 			digest.MustNewDigest("example", remoteexecution.DigestFunction_SHA256, "0ac567103ab10e4b6bfca9b1d3387baad93dee899be5e5cbc3859e01363fbdaa", 200),
-			false,
+			/* isExecutable = */ false,
+			/* readMonitor =*/ nil,
 		).Return(childLeaf)
 		childLeaf.EXPECT().VirtualGetAttributes(
 			ctx,

@@ -89,7 +89,7 @@ func (sr *stateRestorer) restoreDirectoryRecursive(reader outputpathpersistency.
 		if err != nil {
 			return util.StatusWrapf(err, "Failed to obtain digest for file %#v", childPath.String())
 		}
-		initialNodes[component] = virtual.InitialNode{}.FromLeaf(sr.casFileFactory.LookupFile(childDigest, entry.IsExecutable))
+		initialNodes[component] = virtual.InitialNode{}.FromLeaf(sr.casFileFactory.LookupFile(childDigest, entry.IsExecutable, nil))
 	}
 	for _, entry := range contents.Symlinks {
 		component, ok := path.NewComponent(entry.Name)
