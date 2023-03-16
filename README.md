@@ -22,7 +22,7 @@ There are various ways in which a copy of bb\_clientd may be obtained:
 
 - By running `bazel run //cmd/bb_clientd` inside this repository.
 - By downloading [a precompiled binary or package built through GitHub Actions](https://github.com/buildbarn/bb-clientd/actions?query=workflow%3Amaster).
-- By downloading [a container image from Docker Hub](https://hub.docker.com/r/buildbarn/bb-clientd).
+- By downloading [a container image from the GitHub Packages page](https://github.com/buildbarn/bb-remote-execution/pkgs/container/bb-clientd).
   Keep in mind that running bb\_clientd inside a Docker container may
   require it to be privileged, as bb\_clientd creates a FUSE mount.
 
