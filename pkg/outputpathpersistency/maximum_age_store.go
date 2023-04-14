@@ -29,6 +29,10 @@ func NewMaximumAgeStore(base Store, clock clock.Clock, maximumStateFileAge time.
 	}
 }
 
+func (s *maximumAgeStore) timeToEpoch(t time.Time) time.Duration {
+	return t.Sub(time.Unix(0, 0)) / s.maximumStateFileAge
+}
+
 func (s *maximumAgeStore) Read(outputBaseID path.Component) (ReadCloser, *outputpathpersistency.RootDirectory, error) {
 	reader, rootDirectory, err := s.Store.Read(outputBaseID)
 	if err != nil {
@@ -38,9 +42,9 @@ func (s *maximumAgeStore) Read(outputBaseID path.Component) (ReadCloser, *output
 		reader.Close()
 		return nil, nil, util.StatusWrapWithCode(err, codes.InvalidArgument, "State file contains an invalid initial creation time")
 	}
-	if initialCreationTime := rootDirectory.InitialCreationTime.AsTime(); initialCreationTime.Before(s.clock.Now().Add(-s.maximumStateFileAge)) {
+	if initialCreationTime := rootDirectory.InitialCreationTime.AsTime(); s.timeToEpoch(initialCreationTime) != s.timeToEpoch(s.clock.Now()) {
 		reader.Close()
-		return nil, nil, status.Errorf(codes.InvalidArgument, "State file was initially created at %s, which is more than %s in the past", initialCreationTime.Format(time.RFC3339), s.maximumStateFileAge)
+		return nil, nil, status.Errorf(codes.InvalidArgument, "State file was initially created at %s, which lies outside the current epoch of %s", initialCreationTime.Format(time.RFC3339), s.maximumStateFileAge)
 	}
 	return reader, rootDirectory, err
 }

@@ -123,6 +123,13 @@ message OutputPathPersistencyConfiguration {
   // This option effectively controls how frequently bb_clientd should
   // do an implicit "bazel clean" on an output path.
   //
+  // Instead of performing a literal comparison against the current time
+  // and the state file's creation time, it partitions times into epochs
+  // of the provided duration. State files belonging to the previous
+  // epoch are ignored. This ensures that in a distributed setup, all
+  // instances of bb_clientd discard their state at around the same
+  // time.
+  //
   // TODO: This option is only respected when running the initial build
   // for an output path after restarting bb_clientd. Should we also
   // purge data in the output path, even if bb_clientd doesn't get

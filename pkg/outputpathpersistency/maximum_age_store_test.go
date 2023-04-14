@@ -59,7 +59,7 @@ func TestMaximumAgeStore(t *testing.T) {
 		baseReader.EXPECT().Close()
 
 		_, _, err := store.Read(outputBaseID)
-		testutil.RequireEqualStatus(t, status.Error(codes.InvalidArgument, "State file was initially created at 2021-03-26T03:29:08Z, which is more than 24h0m0s in the past"), err)
+		testutil.RequireEqualStatus(t, status.Error(codes.InvalidArgument, "State file was initially created at 2021-03-26T03:29:08Z, which lies outside the current epoch of 24h0m0s"), err)
 	})
 
 	t.Run("Success", func(t *testing.T) {
