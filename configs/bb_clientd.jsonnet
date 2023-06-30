@@ -188,11 +188,7 @@ local cacheDirectory = homeDirectory + '/.cache/bb_clientd';
     nfsv4: {
       enforcedLeaseTime: '120s',
       announcedLeaseTime: '60s',
-      darwin: {
-        minimumDirectoriesAttributeCacheTimeout: '0s',
-        maximumDirectoriesAttributeCacheTimeout: '0s',
-        socketPath: cacheDirectory + '/nfsv4',
-      },
+      darwin: { socketPath: cacheDirectory + '/nfsv4' },
     },
   } else {
     mountPath: homeDirectory + '/bb_clientd',

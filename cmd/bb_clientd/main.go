@@ -40,7 +40,7 @@ import (
 )
 
 func main() {
-	program.Run(func(ctx context.Context, siblingsGroup, dependenciesGroup program.Group) error {
+	program.RunMain(func(ctx context.Context, siblingsGroup, dependenciesGroup program.Group) error {
 		if len(os.Args) != 2 {
 			return status.Error(codes.InvalidArgument, "Usage: bb_clientd bb_clientd.jsonnet")
 		}
@@ -99,7 +99,9 @@ func main() {
 		mount, rootHandleAllocator, err := virtual_configuration.NewMountFromConfiguration(
 			configuration.Mount,
 			"bb_clientd",
-			/* containsSelfMutatingSymlinks = */ false)
+			/* rootDirectory = */ virtual_configuration.LongAttributeCaching,
+			/* childDirectories = */ virtual_configuration.NoAttributeCaching,
+			/* leaves = */ virtual_configuration.LongAttributeCaching)
 		if err != nil {
 			return util.StatusWrap(err, "Failed to create virtual file system mount")
 		}
