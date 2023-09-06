@@ -247,7 +247,10 @@ local cacheDirectory = homeDirectory + '/.cache/bb_clientd';
     // when you need it, or at least make sure that access is limited.
     /*
     diagnosticsHttpServer: {
-      listenAddress: '127.0.0.1:12345',
+      httpServers: [{
+        listenAddresses: ['127.0.0.1:12345'],
+        authenticationPolicy: { allow: {} },
+      }],
       enablePrometheus: true,
       enablePprof: true,
       enableActiveSpans: true,
