@@ -21,7 +21,7 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-func contentAddressableStorageDirectoryExpectLookupSelf(t *testing.T, ctrl *gomock.Controller, handleAllocator *mock.MockResolvableHandleAllocator) {
+func casDirectoryExpectLookupSelf(t *testing.T, ctrl *gomock.Controller, handleAllocator *mock.MockResolvableHandleAllocator) {
 	handleAllocation := mock.NewMockResolvableHandleAllocation(ctrl)
 	handleAllocator.EXPECT().New(gomock.Any()).DoAndReturn(func(id io.WriterTo) re_vfs.ResolvableHandleAllocation {
 		actualIdentifier := bytes.NewBuffer(nil)
@@ -35,7 +35,7 @@ func contentAddressableStorageDirectoryExpectLookupSelf(t *testing.T, ctrl *gomo
 		DoAndReturn(func(directory re_vfs.Directory) re_vfs.Directory { return directory })
 }
 
-func contentAddressableStorageDirectoryExpectLookupSymlink(t *testing.T, ctrl *gomock.Controller, handleAllocator *mock.MockResolvableHandleAllocator, expectedIdentifier []byte) {
+func casDirectoryExpectLookupSymlink(t *testing.T, ctrl *gomock.Controller, handleAllocator *mock.MockResolvableHandleAllocator, expectedIdentifier []byte) {
 	handleAllocation := mock.NewMockResolvableHandleAllocation(ctrl)
 	handleAllocator.EXPECT().New(gomock.Any()).DoAndReturn(func(id io.WriterTo) re_vfs.ResolvableHandleAllocation {
 		actualIdentifier := bytes.NewBuffer(nil)
@@ -49,15 +49,15 @@ func contentAddressableStorageDirectoryExpectLookupSymlink(t *testing.T, ctrl *g
 		DoAndReturn(func(leaf re_vfs.NativeLeaf) re_vfs.NativeLeaf { return leaf })
 }
 
-func TestContentAddressableStorageDirectoryVirtualLookup(t *testing.T) {
+func TestCASDirectoryVirtualLookup(t *testing.T) {
 	ctrl, ctx := gomock.WithContext(context.Background(), t)
 
-	directoryContext := mock.NewMockDirectoryContext(ctrl)
+	directoryContext := mock.NewMockCASDirectoryContext(ctrl)
 	rootHandleAllocation := mock.NewMockResolvableHandleAllocation(ctrl)
 	handleAllocator := mock.NewMockResolvableHandleAllocator(ctrl)
 	rootHandleAllocation.EXPECT().AsResolvableAllocator(gomock.Any()).Return(handleAllocator)
-	contentAddressableStorageDirectoryExpectLookupSelf(t, ctrl, handleAllocator)
-	d, _ := cd_vfs.NewContentAddressableStorageDirectory(
+	casDirectoryExpectLookupSelf(t, ctrl, handleAllocator)
+	d, _ := cd_vfs.NewCASDirectory(
 		directoryContext,
 		digest.MustNewFunction("example", remoteexecution.DigestFunction_SHA256),
 		rootHandleAllocation,
@@ -227,7 +227,7 @@ func TestContentAddressableStorageDirectoryVirtualLookup(t *testing.T) {
 
 	t.Run("SuccessSymlink", func(t *testing.T) {
 		// Successfully looking up a symbolic link.
-		contentAddressableStorageDirectoryExpectLookupSymlink(t, ctrl, handleAllocator, []byte{1})
+		casDirectoryExpectLookupSymlink(t, ctrl, handleAllocator, []byte{1})
 
 		var out re_vfs.Attributes
 		actualChild, s := d.VirtualLookup(ctx, path.MustNewComponent("symlink"), re_vfs.AttributesMaskFileType, &out)
@@ -241,15 +241,15 @@ func TestContentAddressableStorageDirectoryVirtualLookup(t *testing.T) {
 	})
 }
 
-func TestContentAddressableStorageDirectoryVirtualReadDir(t *testing.T) {
+func TestCASDirectoryVirtualReadDir(t *testing.T) {
 	ctrl, ctx := gomock.WithContext(context.Background(), t)
 
-	directoryContext := mock.NewMockDirectoryContext(ctrl)
+	directoryContext := mock.NewMockCASDirectoryContext(ctrl)
 	rootHandleAllocation := mock.NewMockResolvableHandleAllocation(ctrl)
 	handleAllocator := mock.NewMockResolvableHandleAllocator(ctrl)
 	rootHandleAllocation.EXPECT().AsResolvableAllocator(gomock.Any()).Return(handleAllocator)
-	contentAddressableStorageDirectoryExpectLookupSelf(t, ctrl, handleAllocator)
-	d, _ := cd_vfs.NewContentAddressableStorageDirectory(
+	casDirectoryExpectLookupSelf(t, ctrl, handleAllocator)
+	d, _ := cd_vfs.NewCASDirectory(
 		directoryContext,
 		digest.MustNewFunction("example", remoteexecution.DigestFunction_SHA256),
 		rootHandleAllocation,
@@ -450,7 +450,7 @@ func TestContentAddressableStorageDirectoryVirtualReadDir(t *testing.T) {
 			re_vfs.DirectoryChild{}.FromLeaf(childLeaf2),
 			(&re_vfs.Attributes{}).SetInodeNumber(200),
 		).Return(true)
-		contentAddressableStorageDirectoryExpectLookupSymlink(t, ctrl, handleAllocator, []byte{1})
+		casDirectoryExpectLookupSymlink(t, ctrl, handleAllocator, []byte{1})
 		reporter.EXPECT().ReportEntry(
 			uint64(4),
 			path.MustNewComponent("symlink"),
@@ -485,7 +485,7 @@ func TestContentAddressableStorageDirectoryVirtualReadDir(t *testing.T) {
 			re_vfs.DirectoryChild{}.FromLeaf(childLeaf),
 			(&re_vfs.Attributes{}).SetInodeNumber(200),
 		).Return(true)
-		contentAddressableStorageDirectoryExpectLookupSymlink(t, ctrl, handleAllocator, []byte{1})
+		casDirectoryExpectLookupSymlink(t, ctrl, handleAllocator, []byte{1})
 		reporter.EXPECT().ReportEntry(
 			uint64(4),
 			path.MustNewComponent("symlink"),
@@ -518,15 +518,15 @@ func TestContentAddressableStorageDirectoryVirtualReadDir(t *testing.T) {
 	})
 }
 
-func TestContentAddressableStorageDirectoryHandleResolver(t *testing.T) {
+func TestCASDirectoryHandleResolver(t *testing.T) {
 	ctrl, ctx := gomock.WithContext(context.Background(), t)
 
-	directoryContext := mock.NewMockDirectoryContext(ctrl)
+	directoryContext := mock.NewMockCASDirectoryContext(ctrl)
 	rootHandleAllocation := mock.NewMockResolvableHandleAllocation(ctrl)
 	handleAllocator := mock.NewMockResolvableHandleAllocator(ctrl)
 	rootHandleAllocation.EXPECT().AsResolvableAllocator(gomock.Any()).Return(handleAllocator)
-	contentAddressableStorageDirectoryExpectLookupSelf(t, ctrl, handleAllocator)
-	d, handleResolver := cd_vfs.NewContentAddressableStorageDirectory(
+	casDirectoryExpectLookupSelf(t, ctrl, handleAllocator)
+	d, handleResolver := cd_vfs.NewCASDirectory(
 		directoryContext,
 		digest.MustNewFunction("example", remoteexecution.DigestFunction_SHA256),
 		rootHandleAllocation,
@@ -542,7 +542,7 @@ func TestContentAddressableStorageDirectoryHandleResolver(t *testing.T) {
 	t.Run("Self", func(t *testing.T) {
 		// Providing a zero identifier will end up resolving the
 		// directory itself.
-		contentAddressableStorageDirectoryExpectLookupSelf(t, ctrl, handleAllocator)
+		casDirectoryExpectLookupSelf(t, ctrl, handleAllocator)
 
 		child, s := handleResolver(bytes.NewBuffer([]byte{0}))
 		require.Equal(t, re_vfs.StatusOK, s)
@@ -580,7 +580,7 @@ func TestContentAddressableStorageDirectoryHandleResolver(t *testing.T) {
 
 	t.Run("SymlinkSuccess", func(t *testing.T) {
 		// Successfully resolve a symbolic link.
-		contentAddressableStorageDirectoryExpectLookupSymlink(t, ctrl, handleAllocator, []byte{2})
+		casDirectoryExpectLookupSymlink(t, ctrl, handleAllocator, []byte{2})
 
 		child, s := handleResolver(bytes.NewBuffer([]byte{2}))
 		require.Equal(t, re_vfs.StatusOK, s)

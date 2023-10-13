@@ -127,13 +127,13 @@ func main() {
 				retryingContentAddressableStorage,
 				util.DefaultErrorLogger),
 			rootHandleAllocator.New())
-		globalDirectoryContext := NewGlobalDirectoryContext(
+		decomposedCASDirectoryFactory := cd_vfs.NewDecomposedCASDirectoryFactory(
 			context.Background(),
 			casFileFactory,
 			directoryFetcher,
 			rootHandleAllocator.New(),
 			util.DefaultErrorLogger)
-		globalTreeContext := NewGlobalTreeContext(
+		treeCASDirectoryFactory := cd_vfs.NewTreeCASDirectoryFactory(
 			context.Background(),
 			casFileFactory,
 			directoryFetcher,
@@ -179,7 +179,7 @@ func main() {
 								allocateHandle().AsStatelessDirectory(cd_vfs.NewDigestParsingDirectory(
 									digestFunction,
 									func(digest digest.Digest) (re_vfs.DirectoryChild, re_vfs.Status) {
-										return re_vfs.DirectoryChild{}.FromDirectory(globalDirectoryContext.LookupDirectory(digest)), re_vfs.StatusOK
+										return re_vfs.DirectoryChild{}.FromDirectory(decomposedCASDirectoryFactory.LookupDirectory(digest)), re_vfs.StatusOK
 									}))),
 							path.MustNewComponent("executable"): re_vfs.DirectoryChild{}.FromDirectory(
 								allocateHandle().AsStatelessDirectory(cd_vfs.NewDigestParsingDirectory(
@@ -197,7 +197,7 @@ func main() {
 								allocateHandle().AsStatelessDirectory(cd_vfs.NewDigestParsingDirectory(
 									digestFunction,
 									func(digest digest.Digest) (re_vfs.DirectoryChild, re_vfs.Status) {
-										return re_vfs.DirectoryChild{}.FromDirectory(globalTreeContext.LookupTree(digest)), re_vfs.StatusOK
+										return re_vfs.DirectoryChild{}.FromDirectory(treeCASDirectoryFactory.LookupDirectory(digest)), re_vfs.StatusOK
 									}))),
 						})))
 			}

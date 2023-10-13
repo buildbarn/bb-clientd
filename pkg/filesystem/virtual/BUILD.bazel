@@ -4,8 +4,10 @@ go_library(
     name = "virtual",
     srcs = [
         "blob_access_command_file_factory.go",
+        "cas_directory.go",
+        "cas_directory_factory.go",
         "command_file_factory.go",
-        "content_addressable_storage_directory.go",
+        "decomposed_cas_directory_factory.go",
         "digest_parsing_directory.go",
         "handle_allocating_command_file_factory.go",
         "in_memory_output_path_factory.go",
@@ -15,6 +17,7 @@ go_library(
         "output_path_factory.go",
         "persistent_output_path_factory.go",
         "remote_output_service_directory.go",
+        "tree_cas_directory_factory.go",
     ],
     importpath = "github.com/buildbarn/bb-clientd/pkg/filesystem/virtual",
     visibility = ["//visibility:public"],
@@ -46,13 +49,15 @@ go_library(
 go_test(
     name = "virtual_test",
     srcs = [
-        "content_addressable_storage_directory_test.go",
+        "cas_directory_test.go",
+        "decomposed_cas_directory_factory_test.go",
         "digest_parsing_directory_test.go",
         "in_memory_output_path_factory_test.go",
         "instance_name_parsing_directory_test.go",
         "local_file_uploading_output_path_factory_test.go",
         "persistent_output_path_factory_test.go",
         "remote_output_service_directory_test.go",
+        "tree_cas_directory_factory_test.go",
     ],
     deps = [
         ":virtual",

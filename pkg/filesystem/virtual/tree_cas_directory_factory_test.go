@@ -1,4 +1,4 @@
-package main_test
+package virtual_test
 
 import (
 	"bytes"
@@ -7,9 +7,9 @@ import (
 	"testing"
 
 	remoteexecution "github.com/bazelbuild/remote-apis/build/bazel/remote/execution/v2"
-	bb_clientd "github.com/buildbarn/bb-clientd/cmd/bb_clientd"
 	"github.com/buildbarn/bb-clientd/internal/mock"
-	"github.com/buildbarn/bb-remote-execution/pkg/filesystem/virtual"
+	cd_vfs "github.com/buildbarn/bb-clientd/pkg/filesystem/virtual"
+	re_vfs "github.com/buildbarn/bb-remote-execution/pkg/filesystem/virtual"
 	"github.com/buildbarn/bb-storage/pkg/digest"
 	"github.com/buildbarn/bb-storage/pkg/filesystem"
 	"github.com/buildbarn/bb-storage/pkg/filesystem/path"
@@ -21,10 +21,10 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-func globalTreeContextExpectLookupTree(t *testing.T, ctrl *gomock.Controller, rootHandleAllocator *mock.MockStatelessHandleAllocator, instanceNameID, digestID []byte) *mock.MockResolvableHandleAllocator {
+func treeCASDirectoryFactoryExpectLookupRootDirectory(t *testing.T, ctrl *gomock.Controller, rootHandleAllocator *mock.MockStatelessHandleAllocator, instanceNameID, digestID []byte) *mock.MockResolvableHandleAllocator {
 	instanceNameHandleAllocation := mock.NewMockStatelessHandleAllocation(ctrl)
 	rootHandleAllocator.EXPECT().New(gomock.Any()).
-		DoAndReturn(func(id io.WriterTo) virtual.StatelessHandleAllocation {
+		DoAndReturn(func(id io.WriterTo) re_vfs.StatelessHandleAllocation {
 			actualIdentifier := bytes.NewBuffer(nil)
 			n, err := id.WriteTo(actualIdentifier)
 			require.NoError(t, err)
@@ -37,7 +37,7 @@ func globalTreeContextExpectLookupTree(t *testing.T, ctrl *gomock.Controller, ro
 
 	treeHandleAllocation := mock.NewMockResolvableHandleAllocation(ctrl)
 	instanceNameHandleAllocator.EXPECT().New(gomock.Any()).
-		DoAndReturn(func(id io.WriterTo) virtual.ResolvableHandleAllocation {
+		DoAndReturn(func(id io.WriterTo) re_vfs.ResolvableHandleAllocation {
 			actualIdentifier := bytes.NewBuffer(nil)
 			n, err := id.WriteTo(actualIdentifier)
 			require.NoError(t, err)
@@ -50,10 +50,10 @@ func globalTreeContextExpectLookupTree(t *testing.T, ctrl *gomock.Controller, ro
 	return treeHandleAllocator
 }
 
-func globalTreeContextExpectLookupDirectory(t *testing.T, ctrl *gomock.Controller, treeHandleAllocator *mock.MockResolvableHandleAllocator, directoryID, childID []byte) {
+func treeCASDirectoryFactoryExpectLookupChildDirectory(t *testing.T, ctrl *gomock.Controller, treeHandleAllocator *mock.MockResolvableHandleAllocator, directoryID, childID []byte) {
 	dHandleAllocation := mock.NewMockResolvableHandleAllocation(ctrl)
 	treeHandleAllocator.EXPECT().New(gomock.Any()).
-		DoAndReturn(func(id io.WriterTo) virtual.ResolvableHandleAllocation {
+		DoAndReturn(func(id io.WriterTo) re_vfs.ResolvableHandleAllocation {
 			actualIdentifier := bytes.NewBuffer(nil)
 			n, err := id.WriteTo(actualIdentifier)
 			require.NoError(t, err)
@@ -66,7 +66,7 @@ func globalTreeContextExpectLookupDirectory(t *testing.T, ctrl *gomock.Controlle
 
 	dDirectoryHandleAllocation := mock.NewMockResolvableHandleAllocation(ctrl)
 	dHandleAllocator.EXPECT().New(gomock.Any()).
-		DoAndReturn(func(id io.WriterTo) virtual.ResolvableHandleAllocation {
+		DoAndReturn(func(id io.WriterTo) re_vfs.ResolvableHandleAllocation {
 			actualIdentifier := bytes.NewBuffer(nil)
 			n, err := id.WriteTo(actualIdentifier)
 			require.NoError(t, err)
@@ -75,10 +75,10 @@ func globalTreeContextExpectLookupDirectory(t *testing.T, ctrl *gomock.Controlle
 			return dDirectoryHandleAllocation
 		})
 	dDirectoryHandleAllocation.EXPECT().AsStatelessDirectory(gomock.Any()).
-		DoAndReturn(func(directory virtual.Directory) virtual.Directory { return directory })
+		DoAndReturn(func(directory re_vfs.Directory) re_vfs.Directory { return directory })
 }
 
-func TestGlobalTreeContextLookupTree(t *testing.T) {
+func TestTreeCASDirectoryFactoryLookupDirectory(t *testing.T) {
 	ctrl, ctx := gomock.WithContext(context.Background(), t)
 
 	casFileFactory := mock.NewMockCASFileFactory(ctrl)
@@ -87,14 +87,14 @@ func TestGlobalTreeContextLookupTree(t *testing.T) {
 	rootHandleAllocator := mock.NewMockStatelessHandleAllocator(ctrl)
 	rootHandleAllocation.EXPECT().AsStatelessAllocator().Return(rootHandleAllocator)
 	errorLogger := mock.NewMockErrorLogger(ctrl)
-	globalTreeContext := bb_clientd.NewGlobalTreeContext(
+	treeCASDirectoryFactory := cd_vfs.NewTreeCASDirectoryFactory(
 		ctx,
 		casFileFactory,
 		directoryFetcher,
 		rootHandleAllocation,
 		errorLogger)
 
-	treeHandleAllocator := globalTreeContextExpectLookupTree(
+	treeHandleAllocator := treeCASDirectoryFactoryExpectLookupRootDirectory(
 		t,
 		ctrl,
 		rootHandleAllocator,
@@ -111,7 +111,7 @@ func TestGlobalTreeContextLookupTree(t *testing.T) {
 			// Size.
 			0xf6, 0x01,
 		})
-	globalTreeContextExpectLookupDirectory(
+	treeCASDirectoryFactoryExpectLookupChildDirectory(
 		t,
 		ctrl,
 		treeHandleAllocator,
@@ -121,21 +121,21 @@ func TestGlobalTreeContextLookupTree(t *testing.T) {
 		[]byte{0})
 
 	treeDigest := digest.MustNewDigest("hello", remoteexecution.DigestFunction_SHA256, "e0f28d311a9b2deff103e32f6105b2b29d636c287797ca72077a648cd736cd36", 123)
-	attributesMask := virtual.AttributesMaskFileType |
-		virtual.AttributesMaskInodeNumber |
-		virtual.AttributesMaskLinkCount |
-		virtual.AttributesMaskPermissions |
-		virtual.AttributesMaskSizeBytes
+	attributesMask := re_vfs.AttributesMaskFileType |
+		re_vfs.AttributesMaskInodeNumber |
+		re_vfs.AttributesMaskLinkCount |
+		re_vfs.AttributesMaskPermissions |
+		re_vfs.AttributesMaskSizeBytes
 
 	// Start off testing on a root directory of a tree.
-	dRoot := globalTreeContext.LookupTree(treeDigest)
-	var out virtual.Attributes
+	dRoot := treeCASDirectoryFactory.LookupDirectory(treeDigest)
+	var out re_vfs.Attributes
 	dRoot.VirtualGetAttributes(ctx, attributesMask, &out)
 	require.Equal(t, filesystem.FileTypeDirectory, out.GetFileType())
-	require.Equal(t, virtual.ImplicitDirectoryLinkCount, out.GetLinkCount())
+	require.Equal(t, re_vfs.ImplicitDirectoryLinkCount, out.GetLinkCount())
 	permissions, ok := out.GetPermissions()
 	require.True(t, ok)
-	require.Equal(t, virtual.PermissionsRead|virtual.PermissionsExecute, permissions)
+	require.Equal(t, re_vfs.PermissionsRead|re_vfs.PermissionsExecute, permissions)
 
 	t.Run("RootIOError", func(t *testing.T) {
 		// I/O errors when requesting the directory contents
@@ -146,7 +146,7 @@ func TestGlobalTreeContextLookupTree(t *testing.T) {
 		errorLogger.EXPECT().Log(testutil.EqStatus(t, status.Error(codes.Internal, "Tree \"1-e0f28d311a9b2deff103e32f6105b2b29d636c287797ca72077a648cd736cd36-123-hello\" root directory: Server on fire")))
 		reporter := mock.NewMockDirectoryEntryReporter(ctrl)
 
-		require.Equal(t, virtual.StatusErrIO, dRoot.VirtualReadDir(ctx, 0, 0, reporter))
+		require.Equal(t, re_vfs.StatusErrIO, dRoot.VirtualReadDir(ctx, 0, 0, reporter))
 	})
 
 	t.Run("RootSuccess", func(t *testing.T) {
@@ -156,14 +156,14 @@ func TestGlobalTreeContextLookupTree(t *testing.T) {
 			/* isExecutable = */ true,
 			/* readMonitor = */ nil,
 		).Return(executable)
-		executable.EXPECT().VirtualGetAttributes(ctx, virtual.AttributesMask(0), gomock.Any())
+		executable.EXPECT().VirtualGetAttributes(ctx, re_vfs.AttributesMask(0), gomock.Any())
 		file := mock.NewMockNativeLeaf(ctrl)
 		casFileFactory.EXPECT().LookupFile(
 			digest.MustNewDigest("hello", remoteexecution.DigestFunction_SHA256, "64ec88ca00b268e5ba1a35678a1b5316d212f4f366b2477232534a8aeca37f3c", 11),
 			/* isExecutable = */ false,
 			/* readMonitor = */ nil,
 		).Return(file)
-		file.EXPECT().VirtualGetAttributes(ctx, virtual.AttributesMask(0), gomock.Any())
+		file.EXPECT().VirtualGetAttributes(ctx, re_vfs.AttributesMask(0), gomock.Any())
 
 		directoryFetcher.EXPECT().GetTreeRootDirectory(ctx, treeDigest).Return(&remoteexecution.Directory{
 			Files: []*remoteexecution.FileNode{
@@ -185,10 +185,10 @@ func TestGlobalTreeContextLookupTree(t *testing.T) {
 			},
 		}, nil)
 		reporter := mock.NewMockDirectoryEntryReporter(ctrl)
-		reporter.EXPECT().ReportEntry(uint64(1), path.MustNewComponent("executable"), virtual.DirectoryChild{}.FromLeaf(executable), gomock.Any()).Return(true)
-		reporter.EXPECT().ReportEntry(uint64(2), path.MustNewComponent("file"), virtual.DirectoryChild{}.FromLeaf(file), gomock.Any()).Return(true)
+		reporter.EXPECT().ReportEntry(uint64(1), path.MustNewComponent("executable"), re_vfs.DirectoryChild{}.FromLeaf(executable), gomock.Any()).Return(true)
+		reporter.EXPECT().ReportEntry(uint64(2), path.MustNewComponent("file"), re_vfs.DirectoryChild{}.FromLeaf(file), gomock.Any()).Return(true)
 
-		require.Equal(t, virtual.StatusOK, dRoot.VirtualReadDir(ctx, 0, 0, reporter))
+		require.Equal(t, re_vfs.StatusOK, dRoot.VirtualReadDir(ctx, 0, 0, reporter))
 	})
 
 	// Continue testing on a child directory of a tree.
@@ -203,7 +203,7 @@ func TestGlobalTreeContextLookupTree(t *testing.T) {
 			},
 		},
 	}, nil)
-	globalTreeContextExpectLookupDirectory(
+	treeCASDirectoryFactoryExpectLookupChildDirectory(
 		t,
 		ctrl,
 		treeHandleAllocator,
@@ -223,14 +223,14 @@ func TestGlobalTreeContextLookupTree(t *testing.T) {
 		// Directory itself.
 		[]byte{0})
 
-	var outChild virtual.Attributes
+	var outChild re_vfs.Attributes
 	dChild, s := dRoot.VirtualLookup(ctx, path.MustNewComponent("directory"), attributesMask, &outChild)
-	require.Equal(t, virtual.StatusOK, s)
+	require.Equal(t, re_vfs.StatusOK, s)
 	require.Equal(t, filesystem.FileTypeDirectory, out.GetFileType())
-	require.Equal(t, virtual.ImplicitDirectoryLinkCount, out.GetLinkCount())
+	require.Equal(t, re_vfs.ImplicitDirectoryLinkCount, out.GetLinkCount())
 	permissions, ok = out.GetPermissions()
 	require.True(t, ok)
-	require.Equal(t, virtual.PermissionsRead|virtual.PermissionsExecute, permissions)
+	require.Equal(t, re_vfs.PermissionsRead|re_vfs.PermissionsExecute, permissions)
 
 	childDigest := digest.MustNewDigest("hello", remoteexecution.DigestFunction_SHA256, "cde6e00a0f207b218b57fe1a343c9bad353ad93a1cdacce29846acbf3c227842", 112)
 	dChildDirectory, _ := dChild.GetPair()
@@ -243,7 +243,7 @@ func TestGlobalTreeContextLookupTree(t *testing.T) {
 		errorLogger.EXPECT().Log(testutil.EqStatus(t, status.Error(codes.Internal, "Tree \"1-e0f28d311a9b2deff103e32f6105b2b29d636c287797ca72077a648cd736cd36-123-hello\" child directory \"1-cde6e00a0f207b218b57fe1a343c9bad353ad93a1cdacce29846acbf3c227842-112-hello\": Server on fire")))
 		reporter := mock.NewMockDirectoryEntryReporter(ctrl)
 
-		require.Equal(t, virtual.StatusErrIO, dChildDirectory.VirtualReadDir(ctx, 0, 0, reporter))
+		require.Equal(t, re_vfs.StatusErrIO, dChildDirectory.VirtualReadDir(ctx, 0, 0, reporter))
 	})
 
 	t.Run("ChildSuccess", func(t *testing.T) {
@@ -253,7 +253,7 @@ func TestGlobalTreeContextLookupTree(t *testing.T) {
 			/* isExecutable = */ false,
 			/* readMonitor = */ nil,
 		).Return(file)
-		file.EXPECT().VirtualGetAttributes(ctx, virtual.AttributesMask(0), gomock.Any())
+		file.EXPECT().VirtualGetAttributes(ctx, re_vfs.AttributesMask(0), gomock.Any())
 
 		directoryFetcher.EXPECT().GetTreeChildDirectory(ctx, treeDigest, childDigest).Return(&remoteexecution.Directory{
 			Files: []*remoteexecution.FileNode{
@@ -269,6 +269,6 @@ func TestGlobalTreeContextLookupTree(t *testing.T) {
 		reporter := mock.NewMockDirectoryEntryReporter(ctrl)
 		reporter.EXPECT().ReportEntry(uint64(1), path.MustNewComponent("file"), gomock.Any(), gomock.Any()).Return(true)
 
-		require.Equal(t, virtual.StatusOK, dChildDirectory.VirtualReadDir(ctx, 0, 0, reporter))
+		require.Equal(t, re_vfs.StatusOK, dChildDirectory.VirtualReadDir(ctx, 0, 0, reporter))
 	})
 }

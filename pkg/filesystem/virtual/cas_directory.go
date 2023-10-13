@@ -18,36 +18,34 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-// DirectoryContext contains all of the methods that the directory
-// created by NewContentAddressableStorageDirectory uses to obtain its
-// contents and instantiate inodes for its children.
-type DirectoryContext interface {
-	GetDirectoryContents() (*remoteexecution.Directory, virtual.Status)
-	LookupDirectory(digest digest.Digest) virtual.Directory
-	LogError(err error)
-
-	// Same as the above, but for regular files.
+// CASDirectoryContext contains all of the methods that the directory
+// created by NewCASDirectory uses to obtain its contents and
+// instantiate inodes for its children.
+type CASDirectoryContext interface {
+	CASDirectoryFactory
 	virtual.CASFileFactory
+
+	GetDirectoryContents() (*remoteexecution.Directory, virtual.Status)
+	LogError(err error)
 }
 
-type contentAddressableStorageDirectory struct {
+type casDirectory struct {
 	virtual.ReadOnlyDirectory
 
-	directoryContext DirectoryContext
+	directoryContext CASDirectoryContext
 	digestFunction   digest.Function
 	handleAllocator  virtual.ResolvableHandleAllocator
 	sizeBytes        uint64
 }
 
-// NewContentAddressableStorageDirectory creates an immutable directory
-// that is backed by a Directory message stored in the Content
-// Addressable Storage (CAS). In order to load the Directory message and
-// to instantiate inodes for any of its children, calls are made into a
-// DirectoryContext object.
+// NewCASDirectory creates an immutable directory that is backed by a
+// Directory message stored in the Content Addressable Storage (CAS). In
+// order to load the Directory message and to instantiate inodes for any
+// of its children, calls are made into a CASDirectoryContext object.
 //
 // TODO: Reimplement this on top of cas.DirectoryWalker.
-func NewContentAddressableStorageDirectory(directoryContext DirectoryContext, digestFunction digest.Function, handleAllocation virtual.ResolvableHandleAllocation, sizeBytes uint64) (virtual.Directory, virtual.HandleResolver) {
-	d := &contentAddressableStorageDirectory{
+func NewCASDirectory(directoryContext CASDirectoryContext, digestFunction digest.Function, handleAllocation virtual.ResolvableHandleAllocation, sizeBytes uint64) (virtual.Directory, virtual.HandleResolver) {
+	d := &casDirectory{
 		directoryContext: directoryContext,
 		digestFunction:   digestFunction,
 		sizeBytes:        sizeBytes,
@@ -56,18 +54,18 @@ func NewContentAddressableStorageDirectory(directoryContext DirectoryContext, di
 	return d.createSelf(), d.resolveHandle
 }
 
-func (d *contentAddressableStorageDirectory) createSelf() virtual.Directory {
+func (d *casDirectory) createSelf() virtual.Directory {
 	return d.handleAllocator.New(bytes.NewBuffer([]byte{0})).AsStatelessDirectory(d)
 }
 
-func (d *contentAddressableStorageDirectory) createSymlink(index uint64, target string) virtual.NativeLeaf {
+func (d *casDirectory) createSymlink(index uint64, target string) virtual.NativeLeaf {
 	var encodedIndex [binary.MaxVarintLen64]byte
 	return d.handleAllocator.
 		New(bytes.NewBuffer(encodedIndex[:binary.PutUvarint(encodedIndex[:], index+1)])).
 		AsNativeLeaf(virtual.BaseSymlinkFactory.LookupSymlink([]byte(target)))
 }
 
-func (d *contentAddressableStorageDirectory) resolveHandle(r io.ByteReader) (virtual.DirectoryChild, virtual.Status) {
+func (d *casDirectory) resolveHandle(r io.ByteReader) (virtual.DirectoryChild, virtual.Status) {
 	index, err := binary.ReadUvarint(r)
 	if err != nil {
 		return virtual.DirectoryChild{}, virtual.StatusErrBadHandle
@@ -89,7 +87,7 @@ func (d *contentAddressableStorageDirectory) resolveHandle(r io.ByteReader) (vir
 	return virtual.DirectoryChild{}.FromLeaf(d.createSymlink(index, directory.Symlinks[index].Target)), virtual.StatusOK
 }
 
-func (d *contentAddressableStorageDirectory) VirtualGetAttributes(ctx context.Context, requested virtual.AttributesMask, attributes *virtual.Attributes) {
+func (d *casDirectory) VirtualGetAttributes(ctx context.Context, requested virtual.AttributesMask, attributes *virtual.Attributes) {
 	attributes.SetChangeID(0)
 	// This should be 2 + nDirectories, but that requires us to load
 	// the directory. This is highly inefficient and error prone.
@@ -99,7 +97,7 @@ func (d *contentAddressableStorageDirectory) VirtualGetAttributes(ctx context.Co
 	attributes.SetSizeBytes(d.sizeBytes)
 }
 
-func (d *contentAddressableStorageDirectory) VirtualLookup(ctx context.Context, name path.Component, requested virtual.AttributesMask, out *virtual.Attributes) (virtual.DirectoryChild, virtual.Status) {
+func (d *casDirectory) VirtualLookup(ctx context.Context, name path.Component, requested virtual.AttributesMask, out *virtual.Attributes) (virtual.DirectoryChild, virtual.Status) {
 	directory, s := d.directoryContext.GetDirectoryContents()
 	if s != virtual.StatusOK {
 		return virtual.DirectoryChild{}, s
@@ -145,7 +143,7 @@ func (d *contentAddressableStorageDirectory) VirtualLookup(ctx context.Context, 
 	return virtual.DirectoryChild{}, virtual.StatusErrNoEnt
 }
 
-func (d *contentAddressableStorageDirectory) VirtualOpenChild(ctx context.Context, name path.Component, shareAccess virtual.ShareMask, createAttributes *virtual.Attributes, existingOptions *virtual.OpenExistingOptions, requested virtual.AttributesMask, openedFileAttributes *virtual.Attributes) (virtual.Leaf, virtual.AttributesMask, virtual.ChangeInfo, virtual.Status) {
+func (d *casDirectory) VirtualOpenChild(ctx context.Context, name path.Component, shareAccess virtual.ShareMask, createAttributes *virtual.Attributes, existingOptions *virtual.OpenExistingOptions, requested virtual.AttributesMask, openedFileAttributes *virtual.Attributes) (virtual.Leaf, virtual.AttributesMask, virtual.ChangeInfo, virtual.Status) {
 	directory, s := d.directoryContext.GetDirectoryContents()
 	if s != virtual.StatusOK {
 		return nil, 0, virtual.ChangeInfo{}, s
@@ -182,7 +180,7 @@ func (d *contentAddressableStorageDirectory) VirtualOpenChild(ctx context.Contex
 	return virtual.ReadOnlyDirectoryOpenChildDoesntExist(createAttributes)
 }
 
-func (d *contentAddressableStorageDirectory) VirtualReadDir(ctx context.Context, firstCookie uint64, requested virtual.AttributesMask, reporter virtual.DirectoryEntryReporter) virtual.Status {
+func (d *casDirectory) VirtualReadDir(ctx context.Context, firstCookie uint64, requested virtual.AttributesMask, reporter virtual.DirectoryEntryReporter) virtual.Status {
 	directory, s := d.directoryContext.GetDirectoryContents()
 	if s != virtual.StatusOK {
 		return s

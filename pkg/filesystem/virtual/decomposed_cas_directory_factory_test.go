@@ -1,4 +1,4 @@
-package main_test
+package virtual_test
 
 import (
 	"bytes"
@@ -7,9 +7,9 @@ import (
 	"testing"
 
 	remoteexecution "github.com/bazelbuild/remote-apis/build/bazel/remote/execution/v2"
-	bb_clientd "github.com/buildbarn/bb-clientd/cmd/bb_clientd"
 	"github.com/buildbarn/bb-clientd/internal/mock"
-	"github.com/buildbarn/bb-remote-execution/pkg/filesystem/virtual"
+	cd_vfs "github.com/buildbarn/bb-clientd/pkg/filesystem/virtual"
+	re_vfs "github.com/buildbarn/bb-remote-execution/pkg/filesystem/virtual"
 	"github.com/buildbarn/bb-storage/pkg/digest"
 	"github.com/buildbarn/bb-storage/pkg/filesystem"
 	"github.com/buildbarn/bb-storage/pkg/filesystem/path"
@@ -21,10 +21,10 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-func globalDirectoryContextExpectLookup(t *testing.T, ctrl *gomock.Controller, rootHandleAllocator *mock.MockStatelessHandleAllocator, instanceNameID, digestID, childID []byte) {
+func decomposedCASDirectoryFactoryExpectLookup(t *testing.T, ctrl *gomock.Controller, rootHandleAllocator *mock.MockStatelessHandleAllocator, instanceNameID, digestID, childID []byte) {
 	instanceNameHandleAllocation := mock.NewMockStatelessHandleAllocation(ctrl)
 	rootHandleAllocator.EXPECT().New(gomock.Any()).
-		DoAndReturn(func(id io.WriterTo) virtual.StatelessHandleAllocation {
+		DoAndReturn(func(id io.WriterTo) re_vfs.StatelessHandleAllocation {
 			actualIdentifier := bytes.NewBuffer(nil)
 			n, err := id.WriteTo(actualIdentifier)
 			require.NoError(t, err)
@@ -37,7 +37,7 @@ func globalDirectoryContextExpectLookup(t *testing.T, ctrl *gomock.Controller, r
 
 	dHandleAllocation := mock.NewMockResolvableHandleAllocation(ctrl)
 	instanceNameHandleAllocator.EXPECT().New(gomock.Any()).
-		DoAndReturn(func(id io.WriterTo) virtual.ResolvableHandleAllocation {
+		DoAndReturn(func(id io.WriterTo) re_vfs.ResolvableHandleAllocation {
 			actualIdentifier := bytes.NewBuffer(nil)
 			n, err := id.WriteTo(actualIdentifier)
 			require.NoError(t, err)
@@ -50,7 +50,7 @@ func globalDirectoryContextExpectLookup(t *testing.T, ctrl *gomock.Controller, r
 
 	dDirectoryHandleAllocation := mock.NewMockResolvableHandleAllocation(ctrl)
 	dHandleAllocator.EXPECT().New(gomock.Any()).
-		DoAndReturn(func(id io.WriterTo) virtual.ResolvableHandleAllocation {
+		DoAndReturn(func(id io.WriterTo) re_vfs.ResolvableHandleAllocation {
 			actualIdentifier := bytes.NewBuffer(nil)
 			n, err := id.WriteTo(actualIdentifier)
 			require.NoError(t, err)
@@ -59,10 +59,10 @@ func globalDirectoryContextExpectLookup(t *testing.T, ctrl *gomock.Controller, r
 			return dDirectoryHandleAllocation
 		})
 	dDirectoryHandleAllocation.EXPECT().AsStatelessDirectory(gomock.Any()).
-		DoAndReturn(func(directory virtual.Directory) virtual.Directory { return directory })
+		DoAndReturn(func(directory re_vfs.Directory) re_vfs.Directory { return directory })
 }
 
-func TestGlobalDirectoryContextLookupDirectory(t *testing.T) {
+func TestDecomposedCASDirectoryFactoryLookupDirectory(t *testing.T) {
 	ctrl, ctx := gomock.WithContext(context.Background(), t)
 
 	casFileFactory := mock.NewMockCASFileFactory(ctrl)
@@ -71,7 +71,7 @@ func TestGlobalDirectoryContextLookupDirectory(t *testing.T) {
 	rootHandleAllocator := mock.NewMockStatelessHandleAllocator(ctrl)
 	rootHandleAllocation.EXPECT().AsStatelessAllocator().Return(rootHandleAllocator)
 	errorLogger := mock.NewMockErrorLogger(ctrl)
-	globalDirectoryContext := bb_clientd.NewGlobalDirectoryContext(
+	casDirectoryFactory := cd_vfs.NewDecomposedCASDirectoryFactory(
 		ctx,
 		casFileFactory,
 		directoryFetcher,
@@ -79,14 +79,14 @@ func TestGlobalDirectoryContextLookupDirectory(t *testing.T) {
 		errorLogger)
 
 	directoryDigest := digest.MustNewDigest("hello", remoteexecution.DigestFunction_SHA256, "e0f28d311a9b2deff103e32f6105b2b29d636c287797ca72077a648cd736cd36", 123)
-	attributesMask := virtual.AttributesMaskChangeID |
-		virtual.AttributesMaskFileType |
-		virtual.AttributesMaskInodeNumber |
-		virtual.AttributesMaskLinkCount |
-		virtual.AttributesMaskPermissions |
-		virtual.AttributesMaskSizeBytes
+	attributesMask := re_vfs.AttributesMaskChangeID |
+		re_vfs.AttributesMaskFileType |
+		re_vfs.AttributesMaskInodeNumber |
+		re_vfs.AttributesMaskLinkCount |
+		re_vfs.AttributesMaskPermissions |
+		re_vfs.AttributesMaskSizeBytes
 
-	globalDirectoryContextExpectLookup(
+	decomposedCASDirectoryFactoryExpectLookup(
 		t,
 		ctrl,
 		rootHandleAllocator,
@@ -106,17 +106,17 @@ func TestGlobalDirectoryContextLookupDirectory(t *testing.T) {
 		// Directory itself.
 		[]byte{0})
 
-	d := globalDirectoryContext.LookupDirectory(directoryDigest)
-	var out virtual.Attributes
+	d := casDirectoryFactory.LookupDirectory(directoryDigest)
+	var out re_vfs.Attributes
 	d.VirtualGetAttributes(ctx, attributesMask, &out)
 	require.Equal(
 		t,
-		(&virtual.Attributes{}).
+		(&re_vfs.Attributes{}).
 			SetChangeID(0).
 			SetFileType(filesystem.FileTypeDirectory).
 			SetInodeNumber(0).
-			SetLinkCount(virtual.ImplicitDirectoryLinkCount).
-			SetPermissions(virtual.PermissionsRead|virtual.PermissionsExecute).
+			SetLinkCount(re_vfs.ImplicitDirectoryLinkCount).
+			SetPermissions(re_vfs.PermissionsRead|re_vfs.PermissionsExecute).
 			SetSizeBytes(123),
 		out.SetInodeNumber(0))
 
@@ -129,7 +129,7 @@ func TestGlobalDirectoryContextLookupDirectory(t *testing.T) {
 		errorLogger.EXPECT().Log(testutil.EqStatus(t, status.Error(codes.Internal, "Directory \"1-e0f28d311a9b2deff103e32f6105b2b29d636c287797ca72077a648cd736cd36-123-hello\": Server on fire")))
 		reporter := mock.NewMockDirectoryEntryReporter(ctrl)
 
-		require.Equal(t, virtual.StatusErrIO, d.VirtualReadDir(ctx, 0, 0, reporter))
+		require.Equal(t, re_vfs.StatusErrIO, d.VirtualReadDir(ctx, 0, 0, reporter))
 	})
 
 	t.Run("MalformedDirectory", func(t *testing.T) {
@@ -147,13 +147,13 @@ func TestGlobalDirectoryContextLookupDirectory(t *testing.T) {
 		errorLogger.EXPECT().Log(testutil.EqStatus(t, status.Error(codes.InvalidArgument, "Directory \"1-e0f28d311a9b2deff103e32f6105b2b29d636c287797ca72077a648cd736cd36-123-hello\": Failed to parse digest for file \"broken\": Hash has length 24, while 64 characters were expected")))
 		reporter := mock.NewMockDirectoryEntryReporter(ctrl)
 
-		require.Equal(t, virtual.StatusErrIO, d.VirtualReadDir(ctx, 0, 0, reporter))
+		require.Equal(t, re_vfs.StatusErrIO, d.VirtualReadDir(ctx, 0, 0, reporter))
 	})
 
 	t.Run("Success", func(t *testing.T) {
 		// Successfully obtain a directory listing. All entries
 		// should be converted to a FUSE directory entry.
-		globalDirectoryContextExpectLookup(
+		decomposedCASDirectoryFactoryExpectLookup(
 			t,
 			ctrl,
 			rootHandleAllocator,
@@ -176,14 +176,14 @@ func TestGlobalDirectoryContextLookupDirectory(t *testing.T) {
 			/* isExecutable = */ true,
 			/* readMonitor = */ nil,
 		).Return(executable)
-		executable.EXPECT().VirtualGetAttributes(ctx, virtual.AttributesMask(0), gomock.Any())
+		executable.EXPECT().VirtualGetAttributes(ctx, re_vfs.AttributesMask(0), gomock.Any())
 		file := mock.NewMockNativeLeaf(ctrl)
 		casFileFactory.EXPECT().LookupFile(
 			digest.MustNewDigest("hello", remoteexecution.DigestFunction_SHA256, "64ec88ca00b268e5ba1a35678a1b5316d212f4f366b2477232534a8aeca37f3c", 11),
 			/* isExecutable = */ false,
 			/* readMonitor = */ nil,
 		).Return(file)
-		file.EXPECT().VirtualGetAttributes(ctx, virtual.AttributesMask(0), gomock.Any())
+		file.EXPECT().VirtualGetAttributes(ctx, re_vfs.AttributesMask(0), gomock.Any())
 
 		directoryFetcher.EXPECT().GetDirectory(ctx, directoryDigest).Return(&remoteexecution.Directory{
 			Directories: []*remoteexecution.DirectoryNode{
@@ -215,9 +215,9 @@ func TestGlobalDirectoryContextLookupDirectory(t *testing.T) {
 		}, nil)
 		reporter := mock.NewMockDirectoryEntryReporter(ctrl)
 		reporter.EXPECT().ReportEntry(uint64(1), path.MustNewComponent("directory"), gomock.Any(), gomock.Any()).Return(true)
-		reporter.EXPECT().ReportEntry(uint64(2), path.MustNewComponent("executable"), virtual.DirectoryChild{}.FromLeaf(executable), gomock.Any()).Return(true)
-		reporter.EXPECT().ReportEntry(uint64(3), path.MustNewComponent("file"), virtual.DirectoryChild{}.FromLeaf(file), gomock.Any()).Return(true)
+		reporter.EXPECT().ReportEntry(uint64(2), path.MustNewComponent("executable"), re_vfs.DirectoryChild{}.FromLeaf(executable), gomock.Any()).Return(true)
+		reporter.EXPECT().ReportEntry(uint64(3), path.MustNewComponent("file"), re_vfs.DirectoryChild{}.FromLeaf(file), gomock.Any()).Return(true)
 
-		require.Equal(t, virtual.StatusOK, d.VirtualReadDir(ctx, 0, 0, reporter))
+		require.Equal(t, re_vfs.StatusOK, d.VirtualReadDir(ctx, 0, 0, reporter))
 	})
 }

@@ -55,8 +55,8 @@ gomock(
     name = "filesystem_virtual",
     out = "filesystem_virtual.go",
     interfaces = [
+        "CASDirectoryContext",
         "DigestLookupFunc",
-        "DirectoryContext",
         "InstanceNameLookupFunc",
         "OutputPath",
         "OutputPathFactory",
