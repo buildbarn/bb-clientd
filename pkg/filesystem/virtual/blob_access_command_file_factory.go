@@ -136,7 +136,7 @@ func (f *commandFile) VirtualReadlink(ctx context.Context) ([]byte, virtual.Stat
 	return nil, virtual.StatusErrInval
 }
 
-func (f *commandFile) VirtualClose() {}
+func (f *commandFile) VirtualClose(shareAccess virtual.ShareMask) {}
 
 func (f *commandFile) VirtualWrite(buf []byte, offset uint64) (int, virtual.Status) {
 	panic("Request to write to read-only file should have been intercepted")
