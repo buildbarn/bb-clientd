@@ -1,4 +1,4 @@
-module github.com/buildbarn/bb-browser
+module github.com/buildbarn/bb-clientd
 
 go 1.20
 
