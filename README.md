@@ -127,6 +127,13 @@ configuration provides support for routing requests to multiple
 clusters. It uses the instance name to determine to which cluster
 traffic needs to be routed.
 
+You may wish to add `--remote_bytestream_uri_prefix` to the `bazel build`
+command with the URI of the _real_ remote executor. This will cause Bazel's
+build event stream to emit URIs with this prefix rather than
+`${HOME}/.cache/bb_clientd/grpc`. Some build event consumers offer features
+that require access to the remote cache; this is necssary for those features
+to access the canonical remote.
+
 ### ... as a system local cache
 
 bb\_clientd's example configuration also reserves instance names
