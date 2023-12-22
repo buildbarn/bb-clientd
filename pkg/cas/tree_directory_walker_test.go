@@ -21,7 +21,7 @@ func TestTreeDirectoryWalker(t *testing.T) {
 
 	directoryFetcher := mock.NewMockDirectoryFetcher(ctrl)
 	treeDigest := digest.MustNewDigest("example", remoteexecution.DigestFunction_MD5, "6884a9e20905b512d1122a2b1ad8ba16", 123)
-	rootDirectoryWalker := cas.NewTreeDirectoryWalker(directoryFetcher, treeDigest)
+	rootDirectoryWalker := cas.NewTreeDirectoryWalker(directoryFetcher, treeDigest, nil)
 
 	exampleRootDirectory := &remoteexecution.Directory{
 		Directories: []*remoteexecution.DirectoryNode{

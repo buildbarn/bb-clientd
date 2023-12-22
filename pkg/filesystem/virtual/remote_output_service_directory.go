@@ -495,17 +495,25 @@ func (d *RemoteOutputServiceDirectory) BatchCreate(ctx context.Context, request 
 	for _, entry := range request.Directories {
 		childDigest, err := buildState.digestFunction.NewDigestFromProto(entry.TreeDigest)
 		if err != nil {
-			return nil, util.StatusWrapf(err, "Invalid digest for directory %#v", entry.Path)
+			return nil, util.StatusWrapf(err, "Invalid tree digest for directory %#v", entry.Path)
 		}
 		if sizeBytes := childDigest.GetSizeBytes(); sizeBytes > d.maximumTreeSizeBytes {
 			return nil, status.Errorf(codes.InvalidArgument, "Directory %#v is %d bytes in size, which exceeds the permitted maximum of %d bytes", entry.Path, sizeBytes, d.maximumTreeSizeBytes)
+		}
+		var rootDirectoryDigest *digest.Digest
+		if entry.RootDirectoryDigest != nil {
+			d, err := buildState.digestFunction.NewDigestFromProto(entry.RootDirectoryDigest)
+			if err != nil {
+				return nil, util.StatusWrapf(err, "Invalid root directory digest for directory %#v", entry.Path)
+			}
+			rootDirectoryDigest = &d
 		}
 		if err := prefixCreator.createChild(
 			entry.Path,
 			virtual.InitialNode{}.FromDirectory(
 				virtual.NewCASInitialContentsFetcher(
 					context.Background(),
-					cd_cas.NewTreeDirectoryWalker(d.directoryFetcher, childDigest),
+					cd_cas.NewTreeDirectoryWalker(d.directoryFetcher, childDigest, rootDirectoryDigest),
 					outputPathState.casFileFactory,
 					d.symlinkFactory,
 					buildState.digestFunction))); err != nil {

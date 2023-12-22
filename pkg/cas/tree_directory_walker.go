@@ -18,12 +18,23 @@ type treeDirectoryWalker struct {
 // all Directory messages are stored in a single Tree object in the
 // Content Addressable Storage (CAS). This is the case for output
 // directories of build actions.
-func NewTreeDirectoryWalker(fetcher cas.DirectoryFetcher, treeDigest digest.Digest) cas.DirectoryWalker {
-	return &treeRootDirectoryWalker{
-		treeDirectoryWalker: treeDirectoryWalker{
-			fetcher:    fetcher,
-			treeDigest: treeDigest,
-		},
+func NewTreeDirectoryWalker(fetcher cas.DirectoryFetcher, treeDigest digest.Digest, rootDirectoryDigest *digest.Digest) cas.DirectoryWalker {
+	dw := treeDirectoryWalker{
+		fetcher:    fetcher,
+		treeDigest: treeDigest,
+	}
+	if rootDirectoryDigest == nil {
+		// Digest of the root directory contained in the Tree
+		// message is unknown. Fall back to calling
+		// DirectoryFetcher.GetTreeRootDirectory(), which is far
+		// less efficient.
+		return &treeRootDirectoryWalker{
+			treeDirectoryWalker: dw,
+		}
+	}
+	return &treeChildDirectoryWalker{
+		treeDirectoryWalker: &dw,
+		childDigest:         *rootDirectoryDigest,
 	}
 }
 
