@@ -7,12 +7,12 @@ replace github.com/grpc-ecosystem/grpc-gateway/v2 => github.com/grpc-ecosystem/g
 
 require (
 	github.com/bazelbuild/remote-apis v0.0.0-20231221155620-d20ae8b97fd3
-	github.com/buildbarn/bb-remote-execution v0.0.0-20231221171027-a73ada8ac1fd
-	github.com/buildbarn/bb-storage v0.0.0-20231221165007-694d823e9dab
+	github.com/buildbarn/bb-remote-execution v0.0.0-20231222105429-4b3a11b508cf
+	github.com/buildbarn/bb-storage v0.0.0-20231222105222-e7766ceb0474
 	golang.org/x/sync v0.5.0
 	google.golang.org/genproto/googleapis/bytestream v0.0.0-20231212172506-995d672761c0
 	google.golang.org/grpc v1.60.1
-	google.golang.org/protobuf v1.31.0
+	google.golang.org/protobuf v1.32.0
 )
 
 require (

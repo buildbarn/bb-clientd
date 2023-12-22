@@ -173,14 +173,14 @@ def go_dependencies():
     go_repository(
         name = "com_github_buildbarn_bb_remote_execution",
         importpath = "github.com/buildbarn/bb-remote-execution",
-        sum = "h1:/oDjorfy0ywIXAGUZ+qhsRd/WGpZgKDnjI71mn77ong=",
-        version = "v0.0.0-20231221171027-a73ada8ac1fd",
+        sum = "h1:CS9eke4LpYdViM/88RTpCAT6YW5jaPBqDqWHxKGYwUE=",
+        version = "v0.0.0-20231222105429-4b3a11b508cf",
     )
     go_repository(
         name = "com_github_buildbarn_bb_storage",
         importpath = "github.com/buildbarn/bb-storage",
-        sum = "h1:EFgun+YD7Bd2Ue8t7EQwfOwDXFfgvjfRDjeG6Qk68XU=",
-        version = "v0.0.0-20231221165007-694d823e9dab",
+        sum = "h1:j0cPxqp0UUc9v5wU9DyCkj4a6JiyazUb7XZsVymDG2w=",
+        version = "v0.0.0-20231222105222-e7766ceb0474",
     )
     go_repository(
         name = "com_github_buildbarn_go_xdr",
@@ -1507,8 +1507,8 @@ def go_dependencies():
     go_repository(
         name = "org_golang_google_protobuf",
         importpath = "google.golang.org/protobuf",
-        sum = "h1:g0LDEJHgrBl9N9r17Ru3sqWhkIx2NB67okBHPwC7hs8=",
-        version = "v1.31.0",
+        sum = "h1:pPC6BG5ex8PDFnkbrGU3EixyhKcQ2aDuBS36lqK/C7I=",
+        version = "v1.32.0",
     )
     go_repository(
         name = "org_golang_x_crypto",
@@ -1525,8 +1525,8 @@ def go_dependencies():
     go_repository(
         name = "org_golang_x_lint",
         importpath = "golang.org/x/lint",
-        sum = "h1:2M3HP5CCK1Si9FQhwnzYhXdG6DXeebvUHFpre8QvbyI=",
-        version = "v0.0.0-20201208152925-83fdc39ff7b5",
+        sum = "h1:VLliZ0d+/avPrXXH+OakdXhpJuEoBZuwh1m2j7U6Iug=",
+        version = "v0.0.0-20210508222113-6edffad5e616",
     )
     go_repository(
         name = "org_golang_x_mod",

@@ -55,10 +55,10 @@ github.com/bazelbuild/remote-apis v0.0.0-20231221155620-d20ae8b97fd3/go.mod h1:r
 github.com/benbjohnson/clock v1.1.0/go.mod h1:J11/hYXuz8f4ySSvYwY0FKfm+ezbsZBKZxNJlLklBHA=
 github.com/beorn7/perks v1.0.1 h1:VlbKKnNfV8bJzeqoa4cOKqO6bYr3WgKZxO8Z16+hsOM=
 github.com/beorn7/perks v1.0.1/go.mod h1:G2ZrVWU2WbWT9wwq4/hrbKbnv/1ERSJQ0ibhJ6rlkpw=
-github.com/buildbarn/bb-remote-execution v0.0.0-20231221171027-a73ada8ac1fd h1:/oDjorfy0ywIXAGUZ+qhsRd/WGpZgKDnjI71mn77ong=
-github.com/buildbarn/bb-remote-execution v0.0.0-20231221171027-a73ada8ac1fd/go.mod h1:jBzZiJQ/GhVeXY/m62HCV3uly90D38ENMSVF48Je2IY=
-github.com/buildbarn/bb-storage v0.0.0-20231221165007-694d823e9dab h1:EFgun+YD7Bd2Ue8t7EQwfOwDXFfgvjfRDjeG6Qk68XU=
-github.com/buildbarn/bb-storage v0.0.0-20231221165007-694d823e9dab/go.mod h1:y/5b5S+2+l4IVBJuTdrKa80V/NPDl3PWxu8q6vGVs8o=
+github.com/buildbarn/bb-remote-execution v0.0.0-20231222105429-4b3a11b508cf h1:CS9eke4LpYdViM/88RTpCAT6YW5jaPBqDqWHxKGYwUE=
+github.com/buildbarn/bb-remote-execution v0.0.0-20231222105429-4b3a11b508cf/go.mod h1:P4KZIvHzuYCvcrxsz0y3pyy5LueddXQP41pZxsgoZEY=
+github.com/buildbarn/bb-storage v0.0.0-20231222105222-e7766ceb0474 h1:j0cPxqp0UUc9v5wU9DyCkj4a6JiyazUb7XZsVymDG2w=
+github.com/buildbarn/bb-storage v0.0.0-20231222105222-e7766ceb0474/go.mod h1:2JFdqOUodMQHyZ3kX21n0hYlY1zmca0BEPHEpPf6wEw=
 github.com/buildbarn/go-xdr v0.0.0-20231115101217-a9e2aa4cf64b h1:/sKWC0Fs5fXNo/t72BRZRLERg4v2gFoEeg2Mk+a8xak=
 github.com/buildbarn/go-xdr v0.0.0-20231115101217-a9e2aa4cf64b/go.mod h1:VwInghBSUyPtNBhl7o2oCUnxOCTGgySJnRTO1Kh7XuI=
 github.com/census-instrumentation/opencensus-proto v0.2.1/go.mod h1:f6KPmirojxKA12rnyqOA5BBL4O983OfeGPqjHWSTneU=
@@ -343,8 +343,8 @@ google.golang.org/protobuf v1.23.1-0.20200526195155-81db48ad09cc/go.mod h1:EGpAD
 google.golang.org/protobuf v1.25.0/go.mod h1:9JNX74DMeImyA3h4bdi1ymwjUzf21/xIlbajtzgsN7c=
 google.golang.org/protobuf v1.26.0-rc.1/go.mod h1:jlhhOSvTdKEhbULTjvd4ARK9grFBp09yW+WbY/TyQbw=
 google.golang.org/protobuf v1.26.0/go.mod h1:9q0QmTI4eRPtz6boOQmLYwt+qCgq0jsYwAQnmE0givc=
-google.golang.org/protobuf v1.31.0 h1:g0LDEJHgrBl9N9r17Ru3sqWhkIx2NB67okBHPwC7hs8=
-google.golang.org/protobuf v1.31.0/go.mod h1:HV8QOd/L58Z+nl8r43ehVNZIU/HEI6OcFqwMG9pJV4I=
+google.golang.org/protobuf v1.32.0 h1:pPC6BG5ex8PDFnkbrGU3EixyhKcQ2aDuBS36lqK/C7I=
+google.golang.org/protobuf v1.32.0/go.mod h1:c6P6GXX6sHbq/GpV6MGZEdwhWPcYBgnhAHhKbcUYpos=
 gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405/go.mod h1:Co6ibVJAznAaIkqp8huTwlJQCZ016jof/cbN4VW5Yz0=
 gopkg.in/check.v1 v1.0.0-20180628173108-788fd7840127/go.mod h1:Co6ibVJAznAaIkqp8huTwlJQCZ016jof/cbN4VW5Yz0=
 gopkg.in/yaml.v2 v2.2.2/go.mod h1:hI93XBmqTisBFMUTm0b8Fm+jr3Dg1NNxqwp+5A1VGuI=
