@@ -61,11 +61,21 @@ func (op *localFileUploadingOutputPath) FinalizeBuild(ctx context.Context, diges
 		digest.KeyWithoutInstance,
 		blobstore.RecommendedFindMissingDigestsCount,
 		op.factory.concurrency)
+
+	// For the Remote Output Service use case it's not important
+	// enough to have a configurable delay here, because the time it
+	// takes until Bazel calls FinalizeBuild() is sufficiently high.
+	// Furthermore, if we upload files with missing contents, a
+	// subsequent build would repair these files.
+	writableFileUploadDelay := make(chan struct{})
+	close(writableFileUploadDelay)
+
 	uploader := localFileUploader{
 		context:                   ctx,
 		contentAddressableStorage: contentAddressableStorage,
 		digestFunction:            digestFunction,
 		outputBaseID:              op.outputBaseID,
+		writableFileUploadDelay:   writableFileUploadDelay,
 	}
 	err1 := uploader.uploadLocalFilesRecursive(op.OutputPath, nil)
 	err2 := flusher(ctx)
@@ -81,6 +91,7 @@ type localFileUploader struct {
 	contentAddressableStorage blobstore.BlobAccess
 	digestFunction            digest.Function
 	outputBaseID              path.Component
+	writableFileUploadDelay   <-chan struct{}
 }
 
 func (u *localFileUploader) uploadLocalFilesRecursive(d virtual.PrepopulatedDirectory, dPath *path.Trace) error {
@@ -95,7 +106,7 @@ func (u *localFileUploader) uploadLocalFilesRecursive(d virtual.PrepopulatedDire
 		}
 	}
 	for _, entry := range leaves {
-		_, err := entry.Child.UploadFile(u.context, u.contentAddressableStorage, u.digestFunction)
+		_, err := entry.Child.UploadFile(u.context, u.contentAddressableStorage, u.digestFunction, u.writableFileUploadDelay)
 		if err != nil && status.Code(err) != codes.InvalidArgument {
 			return util.StatusWrapf(err, "Failed to upload local file %#v in output path %#v", dPath.Append(entry.Name).String(), u.outputBaseID.String())
 		}
