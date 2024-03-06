@@ -242,7 +242,7 @@ disadvantages:
   of the build, meaning that Bazel can't continue where it left off.
 
 To solve these issues, bb\_clientd implements a gRPC API named the
-Remote Output Service. Bazel can use this API to store the entire
+Bazel Output Service. Bazel can use this API to store the entire
 `bazel-out/` directory inside the FUSE/NFSv4 file system. Every time
 Bazel needs to download a file from the Remote Execution service, it
 calls into a `BatchCreate()` gRPC method. bb\_clientd implements this
@@ -251,13 +251,7 @@ directory. This means that you can enjoy the performance improvements of
 "Remote Builds without the Bytes", but not with the restrictions that it
 currently imposes.
 
-The Remote Output Service can be used by building a copy of Bazel that
-includes [upstream PR#12823](https://github.com/bazelbuild/bazel/pull/12823).
-You may then run Bazel with the following additional command line flags:
-
-```
---remote_output_service unix:${HOME}/.cache/bb_clientd/grpc --remote_output_service_output_path_prefix ${HOME}/bb_clientd/outputs
-```
-
-We hope that upstream versions of Bazel ship with integrated support for
-the Remote Output Service going forward.
+The Bazel Output Service protocol was added to the Bazel repository in
+[PR#21140](https://github.com/bazelbuild/bazel/pull/21140). It is
+expected that a client for the Bazel Output Service protocol is added to
+Bazel 7.2.

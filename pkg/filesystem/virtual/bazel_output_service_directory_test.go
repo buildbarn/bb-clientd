@@ -4,13 +4,13 @@ import (
 	"context"
 	"syscall"
 	"testing"
-	"time"
 
 	remoteexecution "github.com/bazelbuild/remote-apis/build/bazel/remote/execution/v2"
 	"github.com/buildbarn/bb-clientd/internal/mock"
 	cd_vfs "github.com/buildbarn/bb-clientd/pkg/filesystem/virtual"
 	re_vfs "github.com/buildbarn/bb-remote-execution/pkg/filesystem/virtual"
-	"github.com/buildbarn/bb-remote-execution/pkg/proto/remoteoutputservice"
+	"github.com/buildbarn/bb-remote-execution/pkg/proto/bazeloutputservice"
+	bazeloutputservicerev2 "github.com/buildbarn/bb-remote-execution/pkg/proto/bazeloutputservice/rev2"
 	"github.com/buildbarn/bb-storage/pkg/digest"
 	"github.com/buildbarn/bb-storage/pkg/filesystem/path"
 	"github.com/buildbarn/bb-storage/pkg/testutil"
@@ -19,10 +19,10 @@ import (
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"google.golang.org/protobuf/types/known/timestamppb"
+	"google.golang.org/protobuf/types/known/anypb"
 )
 
-func TestRemoteOutputServiceDirectoryClean(t *testing.T) {
+func TestBazelOutputServiceDirectoryClean(t *testing.T) {
 	ctrl, ctx := gomock.WithContext(context.Background(), t)
 
 	handleAllocator := mock.NewMockStatefulHandleAllocator(ctrl)
@@ -35,7 +35,7 @@ func TestRemoteOutputServiceDirectoryClean(t *testing.T) {
 	handleAllocator.EXPECT().New().Return(dHandleAllocation)
 	dHandle := mock.NewMockStatefulDirectoryHandle(ctrl)
 	dHandleAllocation.EXPECT().AsStatefulDirectory(gomock.Any()).Return(dHandle)
-	d := cd_vfs.NewRemoteOutputServiceDirectory(
+	d := cd_vfs.NewBazelOutputServiceDirectory(
 		handleAllocator,
 		outputPathFactory,
 		bareContentAddressableStorage,
@@ -46,7 +46,7 @@ func TestRemoteOutputServiceDirectoryClean(t *testing.T) {
 
 	t.Run("InvalidOutputBaseID", func(t *testing.T) {
 		// The output base ID must be a valid directory name.
-		_, err := d.Clean(ctx, &remoteoutputservice.CleanRequest{
+		_, err := d.Clean(ctx, &bazeloutputservice.CleanRequest{
 			OutputBaseId: "..",
 		})
 		testutil.RequireEqualStatus(t, status.Error(codes.InvalidArgument, "Output base ID is not a valid filename"), err)
@@ -60,7 +60,7 @@ func TestRemoteOutputServiceDirectoryClean(t *testing.T) {
 		// output path.
 		outputPathFactory.EXPECT().Clean(path.MustNewComponent("9e6defb5a0a8a7af63077e0623279b78"))
 
-		_, err := d.Clean(ctx, &remoteoutputservice.CleanRequest{
+		_, err := d.Clean(ctx, &bazeloutputservice.CleanRequest{
 			OutputBaseId: "9e6defb5a0a8a7af63077e0623279b78",
 		})
 		require.NoError(t, err)
@@ -81,17 +81,21 @@ func TestRemoteOutputServiceDirectoryClean(t *testing.T) {
 		).Return(outputPath)
 		outputPath.EXPECT().FilterChildren(gomock.Any())
 
-		response, err := d.StartBuild(ctx, &remoteoutputservice.StartBuildRequest{
+		args, err := anypb.New(&bazeloutputservicerev2.StartBuildArgs{
+			DigestFunction: remoteexecution.DigestFunction_SHA256,
+		})
+		require.NoError(t, err)
+		response, err := d.StartBuild(ctx, &bazeloutputservice.StartBuildRequest{
 			OutputBaseId:     "a448da900e7bd4b025ab91da2aba6244",
 			BuildId:          "37f5dbef-b117-4fb6-bce8-5c147cb603b4",
-			DigestFunction:   remoteexecution.DigestFunction_SHA256,
+			Args:             args,
 			OutputPathPrefix: "/home/bob/bb_clientd/outputs",
 			OutputPathAliases: map[string]string{
 				"/home/bob/.cache/bazel/_bazel_bob/a448da900e7bd4b025ab91da2aba6244/execroot/myproject/bazel-out": ".",
 			},
 		})
 		require.NoError(t, err)
-		testutil.RequireEqualProto(t, &remoteoutputservice.StartBuildResponse{
+		testutil.RequireEqualProto(t, &bazeloutputservice.StartBuildResponse{
 			OutputPathSuffix: "a448da900e7bd4b025ab91da2aba6244",
 		}, response)
 
@@ -99,7 +103,7 @@ func TestRemoteOutputServiceDirectoryClean(t *testing.T) {
 		// removing the files and directories contained within
 		// the output path.
 		outputPath.EXPECT().RemoveAllChildren(true).Return(status.Error(codes.Internal, "Disk on fire"))
-		_, err = d.Clean(ctx, &remoteoutputservice.CleanRequest{
+		_, err = d.Clean(ctx, &bazeloutputservice.CleanRequest{
 			OutputBaseId: "a448da900e7bd4b025ab91da2aba6244",
 		})
 		testutil.RequireEqualStatus(t, status.Error(codes.Internal, "Disk on fire"), err)
@@ -107,7 +111,7 @@ func TestRemoteOutputServiceDirectoryClean(t *testing.T) {
 		// A second removal attempt succeeds.
 		outputPath.EXPECT().RemoveAllChildren(true)
 		dHandle.EXPECT().NotifyRemoval(path.MustNewComponent("a448da900e7bd4b025ab91da2aba6244"))
-		_, err = d.Clean(ctx, &remoteoutputservice.CleanRequest{
+		_, err = d.Clean(ctx, &bazeloutputservice.CleanRequest{
 			OutputBaseId: "a448da900e7bd4b025ab91da2aba6244",
 		})
 		require.NoError(t, err)
@@ -115,14 +119,14 @@ func TestRemoteOutputServiceDirectoryClean(t *testing.T) {
 		// Successive attempts should request the removal of
 		// persistent state.
 		outputPathFactory.EXPECT().Clean(path.MustNewComponent("a448da900e7bd4b025ab91da2aba6244"))
-		_, err = d.Clean(ctx, &remoteoutputservice.CleanRequest{
+		_, err = d.Clean(ctx, &bazeloutputservice.CleanRequest{
 			OutputBaseId: "a448da900e7bd4b025ab91da2aba6244",
 		})
 		require.NoError(t, err)
 	})
 }
 
-func TestRemoteOutputServiceDirectoryStartBuild(t *testing.T) {
+func TestBazelOutputServiceDirectoryStartBuild(t *testing.T) {
 	ctrl, ctx := gomock.WithContext(context.Background(), t)
 
 	handleAllocator := mock.NewMockStatefulHandleAllocator(ctrl)
@@ -135,7 +139,7 @@ func TestRemoteOutputServiceDirectoryStartBuild(t *testing.T) {
 	handleAllocator.EXPECT().New().Return(dHandleAllocation)
 	dHandle := mock.NewMockStatefulDirectoryHandle(ctrl)
 	dHandleAllocation.EXPECT().AsStatefulDirectory(gomock.Any()).Return(dHandle)
-	d := cd_vfs.NewRemoteOutputServiceDirectory(
+	d := cd_vfs.NewBazelOutputServiceDirectory(
 		handleAllocator,
 		outputPathFactory,
 		bareContentAddressableStorage,
@@ -146,10 +150,14 @@ func TestRemoteOutputServiceDirectoryStartBuild(t *testing.T) {
 
 	t.Run("InvalidOutputBaseID", func(t *testing.T) {
 		// The output base ID must be a valid directory name.
-		_, err := d.StartBuild(ctx, &remoteoutputservice.StartBuildRequest{
+		args, err := anypb.New(&bazeloutputservicerev2.StartBuildArgs{
+			DigestFunction: remoteexecution.DigestFunction_SHA256,
+		})
+		require.NoError(t, err)
+		_, err = d.StartBuild(ctx, &bazeloutputservice.StartBuildRequest{
 			OutputBaseId:     "//////",
 			BuildId:          "37f5dbef-b117-4fb6-bce8-5c147cb603b4",
-			DigestFunction:   remoteexecution.DigestFunction_SHA256,
+			Args:             args,
 			OutputPathPrefix: "/home/bob/bb_clientd/outputs",
 			OutputPathAliases: map[string]string{
 				"/home/bob/.cache/bazel/_bazel_bob/a448da900e7bd4b025ab91da2aba6244/execroot/myproject/bazel-out": ".",
@@ -160,10 +168,14 @@ func TestRemoteOutputServiceDirectoryStartBuild(t *testing.T) {
 
 	t.Run("InvalidOutputPathPrefix", func(t *testing.T) {
 		// The output path prefix must be absolute.
-		_, err := d.StartBuild(ctx, &remoteoutputservice.StartBuildRequest{
+		args, err := anypb.New(&bazeloutputservicerev2.StartBuildArgs{
+			DigestFunction: remoteexecution.DigestFunction_SHA256,
+		})
+		require.NoError(t, err)
+		_, err = d.StartBuild(ctx, &bazeloutputservice.StartBuildRequest{
 			OutputBaseId:     "9da951b8cb759233037166e28f7ea186",
 			BuildId:          "37f5dbef-b117-4fb6-bce8-5c147cb603b4",
-			DigestFunction:   remoteexecution.DigestFunction_SHA256,
+			Args:             args,
 			OutputPathPrefix: "relative/path",
 			OutputPathAliases: map[string]string{
 				"/home/bob/.cache/bazel/_bazel_bob/a448da900e7bd4b025ab91da2aba6244/execroot/myproject/bazel-out": ".",
@@ -174,10 +186,14 @@ func TestRemoteOutputServiceDirectoryStartBuild(t *testing.T) {
 
 	t.Run("InvalidOutputPathAliases", func(t *testing.T) {
 		// Output path aliases must also be absolute.
-		_, err := d.StartBuild(ctx, &remoteoutputservice.StartBuildRequest{
+		args, err := anypb.New(&bazeloutputservicerev2.StartBuildArgs{
+			DigestFunction: remoteexecution.DigestFunction_SHA256,
+		})
+		require.NoError(t, err)
+		_, err = d.StartBuild(ctx, &bazeloutputservice.StartBuildRequest{
 			OutputBaseId:     "9da951b8cb759233037166e28f7ea186",
 			BuildId:          "37f5dbef-b117-4fb6-bce8-5c147cb603b4",
-			DigestFunction:   remoteexecution.DigestFunction_SHA256,
+			Args:             args,
 			OutputPathPrefix: "/home/bob/bb_clientd/outputs",
 			OutputPathAliases: map[string]string{
 				"relative/path": ".",
@@ -188,10 +204,14 @@ func TestRemoteOutputServiceDirectoryStartBuild(t *testing.T) {
 
 	t.Run("InvalidDigestFunction", func(t *testing.T) {
 		// Digest function is not supported by this implementation.
-		_, err := d.StartBuild(ctx, &remoteoutputservice.StartBuildRequest{
+		args, err := anypb.New(&bazeloutputservicerev2.StartBuildArgs{
+			DigestFunction: remoteexecution.DigestFunction_UNKNOWN,
+		})
+		require.NoError(t, err)
+		_, err = d.StartBuild(ctx, &bazeloutputservice.StartBuildRequest{
 			OutputBaseId:     "9da951b8cb759233037166e28f7ea186",
 			BuildId:          "37f5dbef-b117-4fb6-bce8-5c147cb603b4",
-			DigestFunction:   remoteexecution.DigestFunction_UNKNOWN,
+			Args:             args,
 			OutputPathPrefix: "/home/bob/bb_clientd/outputs",
 			OutputPathAliases: map[string]string{
 				"/home/bob/.cache/bazel/_bazel_bob/a448da900e7bd4b025ab91da2aba6244/execroot/myproject/bazel-out": ".",
@@ -216,18 +236,22 @@ func TestRemoteOutputServiceDirectoryStartBuild(t *testing.T) {
 		).Return(outputPath)
 		outputPath.EXPECT().FilterChildren(gomock.Any())
 
-		response, err := d.StartBuild(ctx, &remoteoutputservice.StartBuildRequest{
+		initialArgs, err := anypb.New(&bazeloutputservicerev2.StartBuildArgs{
+			InstanceName:   "my-cluster",
+			DigestFunction: remoteexecution.DigestFunction_SHA256,
+		})
+		require.NoError(t, err)
+		response, err := d.StartBuild(ctx, &bazeloutputservice.StartBuildRequest{
 			OutputBaseId:     "9da951b8cb759233037166e28f7ea186",
 			BuildId:          "37f5dbef-b117-4fb6-bce8-5c147cb603b4",
-			InstanceName:     "my-cluster",
-			DigestFunction:   remoteexecution.DigestFunction_SHA256,
+			Args:             initialArgs,
 			OutputPathPrefix: "/home/bob/bb_clientd/outputs",
 			OutputPathAliases: map[string]string{
 				"/home/bob/.cache/bazel/_bazel_bob/a448da900e7bd4b025ab91da2aba6244/execroot/myproject/bazel-out": ".",
 			},
 		})
 		require.NoError(t, err)
-		testutil.RequireEqualProto(t, &remoteoutputservice.StartBuildResponse{
+		testutil.RequireEqualProto(t, &bazeloutputservice.StartBuildResponse{
 			OutputPathSuffix: "9da951b8cb759233037166e28f7ea186",
 		}, response)
 
@@ -239,11 +263,10 @@ func TestRemoteOutputServiceDirectoryStartBuild(t *testing.T) {
 			// present remotely. Let this fail.
 			outputPath.EXPECT().FilterChildren(gomock.Any()).Return(status.Error(codes.Internal, "Failed to read directory contents"))
 
-			_, err = d.StartBuild(ctx, &remoteoutputservice.StartBuildRequest{
+			_, err = d.StartBuild(ctx, &bazeloutputservice.StartBuildRequest{
 				OutputBaseId:     "9da951b8cb759233037166e28f7ea186",
 				BuildId:          "2e3fd15a-f2ae-4855-ac69-bdd4a0ef7339",
-				InstanceName:     "my-cluster",
-				DigestFunction:   remoteexecution.DigestFunction_SHA256,
+				Args:             initialArgs,
 				OutputPathPrefix: "/home/bob/bb_clientd/outputs",
 				OutputPathAliases: map[string]string{
 					"/home/bob/.cache/bazel/_bazel_bob/a448da900e7bd4b025ab91da2aba6244/execroot/myproject/bazel-out": ".",
@@ -265,11 +288,10 @@ func TestRemoteOutputServiceDirectoryStartBuild(t *testing.T) {
 				return nil
 			})
 
-			_, err = d.StartBuild(ctx, &remoteoutputservice.StartBuildRequest{
+			_, err = d.StartBuild(ctx, &bazeloutputservice.StartBuildRequest{
 				OutputBaseId:     "9da951b8cb759233037166e28f7ea186",
 				BuildId:          "2e3fd15a-f2ae-4855-ac69-bdd4a0ef7339",
-				InstanceName:     "my-cluster",
-				DigestFunction:   remoteexecution.DigestFunction_SHA256,
+				Args:             initialArgs,
 				OutputPathPrefix: "/home/bob/bb_clientd/outputs",
 				OutputPathAliases: map[string]string{
 					"/home/bob/.cache/bazel/_bazel_bob/a448da900e7bd4b025ab91da2aba6244/execroot/myproject/bazel-out": ".",
@@ -292,11 +314,10 @@ func TestRemoteOutputServiceDirectoryStartBuild(t *testing.T) {
 				return nil
 			})
 
-			_, err = d.StartBuild(ctx, &remoteoutputservice.StartBuildRequest{
+			_, err = d.StartBuild(ctx, &bazeloutputservice.StartBuildRequest{
 				OutputBaseId:     "9da951b8cb759233037166e28f7ea186",
 				BuildId:          "2e3fd15a-f2ae-4855-ac69-bdd4a0ef7339",
-				InstanceName:     "my-cluster",
-				DigestFunction:   remoteexecution.DigestFunction_SHA256,
+				Args:             initialArgs,
 				OutputPathPrefix: "/home/bob/bb_clientd/outputs",
 				OutputPathAliases: map[string]string{
 					"/home/bob/.cache/bazel/_bazel_bob/a448da900e7bd4b025ab91da2aba6244/execroot/myproject/bazel-out": ".",
@@ -320,11 +341,10 @@ func TestRemoteOutputServiceDirectoryStartBuild(t *testing.T) {
 				return nil
 			})
 
-			_, err = d.StartBuild(ctx, &remoteoutputservice.StartBuildRequest{
+			_, err = d.StartBuild(ctx, &bazeloutputservice.StartBuildRequest{
 				OutputBaseId:     "9da951b8cb759233037166e28f7ea186",
 				BuildId:          "2e3fd15a-f2ae-4855-ac69-bdd4a0ef7339",
-				InstanceName:     "my-cluster",
-				DigestFunction:   remoteexecution.DigestFunction_SHA256,
+				Args:             initialArgs,
 				OutputPathPrefix: "/home/bob/bb_clientd/outputs",
 				OutputPathAliases: map[string]string{
 					"/home/bob/.cache/bazel/_bazel_bob/a448da900e7bd4b025ab91da2aba6244/execroot/myproject/bazel-out": ".",
@@ -348,11 +368,15 @@ func TestRemoteOutputServiceDirectoryStartBuild(t *testing.T) {
 			bareContentAddressableStorage.EXPECT().FindMissing(ctx, digests).
 				Return(digest.EmptySet, status.Error(codes.Unavailable, "CAS unavailable"))
 
-			_, err = d.StartBuild(ctx, &remoteoutputservice.StartBuildRequest{
+			args, err := anypb.New(&bazeloutputservicerev2.StartBuildArgs{
+				InstanceName:   "my-cluster",
+				DigestFunction: remoteexecution.DigestFunction_MD5,
+			})
+			require.NoError(t, err)
+			_, err = d.StartBuild(ctx, &bazeloutputservice.StartBuildRequest{
 				OutputBaseId:     "9da951b8cb759233037166e28f7ea186",
 				BuildId:          "2e3fd15a-f2ae-4855-ac69-bdd4a0ef7339",
-				InstanceName:     "my-cluster",
-				DigestFunction:   remoteexecution.DigestFunction_MD5,
+				Args:             args,
 				OutputPathPrefix: "/home/bob/bb_clientd/outputs",
 				OutputPathAliases: map[string]string{
 					"/home/bob/.cache/bazel/_bazel_bob/a448da900e7bd4b025ab91da2aba6244/execroot/myproject/bazel-out": ".",
@@ -376,11 +400,15 @@ func TestRemoteOutputServiceDirectoryStartBuild(t *testing.T) {
 			bareContentAddressableStorage.EXPECT().FindMissing(ctx, digests).Return(digests, nil)
 			remover.EXPECT().Call().Return(status.Error(codes.Internal, "Disk on fire"))
 
-			_, err = d.StartBuild(ctx, &remoteoutputservice.StartBuildRequest{
+			args, err := anypb.New(&bazeloutputservicerev2.StartBuildArgs{
+				InstanceName:   "my-cluster",
+				DigestFunction: remoteexecution.DigestFunction_MD5,
+			})
+			require.NoError(t, err)
+			_, err = d.StartBuild(ctx, &bazeloutputservice.StartBuildRequest{
 				OutputBaseId:     "9da951b8cb759233037166e28f7ea186",
 				BuildId:          "2e3fd15a-f2ae-4855-ac69-bdd4a0ef7339",
-				InstanceName:     "my-cluster",
-				DigestFunction:   remoteexecution.DigestFunction_MD5,
+				Args:             args,
 				OutputPathPrefix: "/home/bob/bb_clientd/outputs",
 				OutputPathAliases: map[string]string{
 					"/home/bob/.cache/bazel/_bazel_bob/a448da900e7bd4b025ab91da2aba6244/execroot/myproject/bazel-out": ".",
@@ -481,11 +509,15 @@ func TestRemoteOutputServiceDirectoryStartBuild(t *testing.T) {
 			remover4.EXPECT().Call()
 			remover7.EXPECT().Call()
 
-			_, err = d.StartBuild(ctx, &remoteoutputservice.StartBuildRequest{
+			args, err := anypb.New(&bazeloutputservicerev2.StartBuildArgs{
+				InstanceName:   "my-cluster",
+				DigestFunction: remoteexecution.DigestFunction_MD5,
+			})
+			require.NoError(t, err)
+			_, err = d.StartBuild(ctx, &bazeloutputservice.StartBuildRequest{
 				OutputBaseId:     "9da951b8cb759233037166e28f7ea186",
 				BuildId:          "2e3fd15a-f2ae-4855-ac69-bdd4a0ef7339",
-				InstanceName:     "my-cluster",
-				DigestFunction:   remoteexecution.DigestFunction_MD5,
+				Args:             args,
 				OutputPathPrefix: "/home/bob/bb_clientd/outputs",
 				OutputPathAliases: map[string]string{
 					"/home/bob/.cache/bazel/_bazel_bob/a448da900e7bd4b025ab91da2aba6244/execroot/myproject/bazel-out": ".",
@@ -496,7 +528,7 @@ func TestRemoteOutputServiceDirectoryStartBuild(t *testing.T) {
 	})
 }
 
-func TestRemoteOutputServiceDirectoryBatchCreate(t *testing.T) {
+func TestBazelOutputServiceDirectoryStageArtifacts(t *testing.T) {
 	ctrl, ctx := gomock.WithContext(context.Background(), t)
 
 	handleAllocator := mock.NewMockStatefulHandleAllocator(ctrl)
@@ -509,7 +541,7 @@ func TestRemoteOutputServiceDirectoryBatchCreate(t *testing.T) {
 	handleAllocator.EXPECT().New().Return(dHandleAllocation)
 	dHandle := mock.NewMockStatefulDirectoryHandle(ctrl)
 	dHandleAllocation.EXPECT().AsStatefulDirectory(gomock.Any()).Return(dHandle)
-	d := cd_vfs.NewRemoteOutputServiceDirectory(
+	d := cd_vfs.NewBazelOutputServiceDirectory(
 		handleAllocator,
 		outputPathFactory,
 		bareContentAddressableStorage,
@@ -520,17 +552,19 @@ func TestRemoteOutputServiceDirectoryBatchCreate(t *testing.T) {
 
 	t.Run("InvalidBuildID", func(t *testing.T) {
 		// StartBuild() should be called first.
-		_, err := d.BatchCreate(ctx, &remoteoutputservice.BatchCreateRequest{
-			BuildId: "ad778a53-48e6-4ae1-b1f5-01b84a508f5f",
-			Files: []*remoteexecution.OutputFile{
-				{
-					Path: "foo.o",
-					Digest: &remoteexecution.Digest{
-						Hash:      "d0ab620af7f3e77f3adfa190d41a25ce",
-						SizeBytes: 123,
-					},
-				},
+		locator, err := anypb.New(&bazeloutputservicerev2.FileArtifactLocator{
+			Digest: &remoteexecution.Digest{
+				Hash:      "d0ab620af7f3e77f3adfa190d41a25ce",
+				SizeBytes: 123,
 			},
+		})
+		require.NoError(t, err)
+		_, err = d.StageArtifacts(ctx, &bazeloutputservice.StageArtifactsRequest{
+			BuildId: "ad778a53-48e6-4ae1-b1f5-01b84a508f5f",
+			Artifacts: []*bazeloutputservice.StageArtifactsRequest_Artifact{{
+				Path:    "foo.o",
+				Locator: locator,
+			}},
 		})
 		testutil.RequireEqualStatus(t, status.Error(codes.FailedPrecondition, "Build ID is not associated with any running build"), err)
 	})
@@ -549,123 +583,48 @@ func TestRemoteOutputServiceDirectoryBatchCreate(t *testing.T) {
 	).Return(outputPath)
 	outputPath.EXPECT().FilterChildren(gomock.Any())
 
-	response, err := d.StartBuild(ctx, &remoteoutputservice.StartBuildRequest{
+	args, err := anypb.New(&bazeloutputservicerev2.StartBuildArgs{
+		InstanceName:   "my-cluster",
+		DigestFunction: remoteexecution.DigestFunction_MD5,
+	})
+	require.NoError(t, err)
+	response, err := d.StartBuild(ctx, &bazeloutputservice.StartBuildRequest{
 		OutputBaseId:     "c6adef0d5ca1888a4aa847fb51229a8c",
 		BuildId:          "ad778a53-48e6-4ae1-b1f5-01b84a508f5f",
-		InstanceName:     "my-cluster",
-		DigestFunction:   remoteexecution.DigestFunction_MD5,
+		Args:             args,
 		OutputPathPrefix: "/home/bob/bb_clientd/outputs",
 		OutputPathAliases: map[string]string{
 			"/home/bob/.cache/bazel/_bazel_bob/c6adef0d5ca1888a4aa847fb51229a8c/execroot/myproject/bazel-out": ".",
 		},
 	})
 	require.NoError(t, err)
-	testutil.RequireEqualProto(t, &remoteoutputservice.StartBuildResponse{
+	testutil.RequireEqualProto(t, &bazeloutputservice.StartBuildResponse{
 		OutputPathSuffix: "c6adef0d5ca1888a4aa847fb51229a8c",
 	}, response)
-
-	// Tests for the path_prefix and clean_path_prefix options.
-
-	t.Run("InvalidPathPrefix", func(t *testing.T) {
-		_, err := d.BatchCreate(ctx, &remoteoutputservice.BatchCreateRequest{
-			BuildId:    "ad778a53-48e6-4ae1-b1f5-01b84a508f5f",
-			PathPrefix: "/etc",
-			Files: []*remoteexecution.OutputFile{
-				{
-					Path: "foo.o",
-					Digest: &remoteexecution.Digest{
-						Hash:      "d0ab620af7f3e77f3adfa190d41a25ce",
-						SizeBytes: 123,
-					},
-				},
-			},
-		})
-		testutil.RequireEqualStatus(t, status.Error(codes.InvalidArgument, "Failed to create path prefix directory: Path is absolute, while a relative path was expected"), err)
-	})
-
-	t.Run("PathPrefixCreationFailure", func(t *testing.T) {
-		child1 := mock.NewMockPrepopulatedDirectory(ctrl)
-		outputPath.EXPECT().CreateAndEnterPrepopulatedDirectory(path.MustNewComponent("some")).
-			Return(child1, nil)
-		child1.EXPECT().CreateAndEnterPrepopulatedDirectory(path.MustNewComponent("sub")).
-			Return(nil, status.Error(codes.Internal, "Disk failure"))
-
-		_, err := d.BatchCreate(ctx, &remoteoutputservice.BatchCreateRequest{
-			BuildId:    "ad778a53-48e6-4ae1-b1f5-01b84a508f5f",
-			PathPrefix: "some/sub/directory",
-			Files: []*remoteexecution.OutputFile{
-				{
-					Path: "foo.o",
-					Digest: &remoteexecution.Digest{
-						Hash:      "d0ab620af7f3e77f3adfa190d41a25ce",
-						SizeBytes: 123,
-					},
-				},
-			},
-		})
-		testutil.RequireEqualStatus(t, status.Error(codes.Internal, "Failed to create path prefix directory: Disk failure"), err)
-	})
-
-	t.Run("PathPrefixCleanFailure", func(t *testing.T) {
-		child1 := mock.NewMockPrepopulatedDirectory(ctrl)
-		outputPath.EXPECT().CreateAndEnterPrepopulatedDirectory(path.MustNewComponent("directory")).
-			Return(child1, nil)
-		child1.EXPECT().RemoveAllChildren(false).Return(status.Error(codes.Internal, "Disk failure"))
-
-		_, err := d.BatchCreate(ctx, &remoteoutputservice.BatchCreateRequest{
-			BuildId:         "ad778a53-48e6-4ae1-b1f5-01b84a508f5f",
-			PathPrefix:      "directory",
-			CleanPathPrefix: true,
-			Files: []*remoteexecution.OutputFile{
-				{
-					Path: "foo.o",
-					Digest: &remoteexecution.Digest{
-						Hash:      "d0ab620af7f3e77f3adfa190d41a25ce",
-						SizeBytes: 123,
-					},
-				},
-			},
-		})
-		testutil.RequireEqualStatus(t, status.Error(codes.Internal, "Failed to clean path prefix directory: Disk failure"), err)
-	})
-
-	t.Run("SymlinkCreationFailure", func(t *testing.T) {
-		symlink := mock.NewMockNativeLeaf(ctrl)
-		symlinkFactory.EXPECT().LookupSymlink([]byte("target")).Return(symlink)
-		outputPath.EXPECT().CreateChildren(map[path.Component]re_vfs.InitialNode{
-			path.MustNewComponent("foo"): re_vfs.InitialNode{}.FromLeaf(symlink),
-		}, true).Return(status.Error(codes.Internal, "I/O error"))
-		symlink.EXPECT().Unlink()
-
-		_, err := d.BatchCreate(ctx, &remoteoutputservice.BatchCreateRequest{
-			BuildId: "ad778a53-48e6-4ae1-b1f5-01b84a508f5f",
-			Symlinks: []*remoteexecution.OutputSymlink{
-				{
-					Path:   "foo",
-					Target: "target",
-				},
-			},
-		})
-		testutil.RequireEqualStatus(t, status.Error(codes.Internal, "Failed to create symbolic link \"foo\": I/O error"), err)
-	})
 
 	t.Run("DirectoryTooBig", func(t *testing.T) {
 		// We should forbid the creation of directories in the
 		// output directory that are too big, as attempting to
 		// access those would fail anyway.
-		_, err := d.BatchCreate(ctx, &remoteoutputservice.BatchCreateRequest{
-			BuildId: "ad778a53-48e6-4ae1-b1f5-01b84a508f5f",
-			Directories: []*remoteexecution.OutputDirectory{
-				{
-					Path: "large_directory",
-					TreeDigest: &remoteexecution.Digest{
-						Hash:      "b2bc8901bd2dfc25e0e43f0a1eaf8758",
-						SizeBytes: 9999999,
-					},
-				},
+		locator, err := anypb.New(&bazeloutputservicerev2.TreeArtifactLocator{
+			TreeDigest: &remoteexecution.Digest{
+				Hash:      "b2bc8901bd2dfc25e0e43f0a1eaf8758",
+				SizeBytes: 9999999,
 			},
 		})
-		testutil.RequireEqualStatus(t, status.Error(codes.InvalidArgument, "Directory \"large_directory\" is 9999999 bytes in size, which exceeds the permitted maximum of 10000 bytes"), err)
+		response, err := d.StageArtifacts(ctx, &bazeloutputservice.StageArtifactsRequest{
+			BuildId: "ad778a53-48e6-4ae1-b1f5-01b84a508f5f",
+			Artifacts: []*bazeloutputservice.StageArtifactsRequest_Artifact{{
+				Path:    "large_directory",
+				Locator: locator,
+			}},
+		})
+		require.NoError(t, err)
+		testutil.RequireEqualProto(t, &bazeloutputservice.StageArtifactsResponse{
+			Responses: []*bazeloutputservice.StageArtifactsResponse_Response{{
+				Status: status.New(codes.InvalidArgument, "Directory is 9999999 bytes in size, which exceeds the permitted maximum of 10000 bytes").Proto(),
+			}},
+		}, response)
 	})
 
 	// The creation of actual files and directories is hard to test,
@@ -674,67 +633,60 @@ func TestRemoteOutputServiceDirectoryBatchCreate(t *testing.T) {
 	// test for the success case.
 
 	t.Run("Success", func(t *testing.T) {
-		child1 := mock.NewMockPrepopulatedDirectory(ctrl)
-		outputPath.EXPECT().CreateAndEnterPrepopulatedDirectory(path.MustNewComponent("a")).
-			Return(child1, nil)
-
-		child2 := mock.NewMockPrepopulatedDirectory(ctrl)
-		child1.EXPECT().CreateAndEnterPrepopulatedDirectory(path.MustNewComponent("b")).
-			Return(child2, nil).Times(3)
+		child := mock.NewMockPrepopulatedDirectory(ctrl)
+		outputPath.EXPECT().CreateAndEnterPrepopulatedDirectory(path.MustNewComponent("b")).
+			Return(child, nil).Times(2)
 
 		// Creation of "file".
 		casFileHandleAllocation := mock.NewMockStatelessHandleAllocation(ctrl)
 		casFileHandleAllocator.EXPECT().New(gomock.Any()).Return(casFileHandleAllocation)
 		file := mock.NewMockNativeLeaf(ctrl)
 		casFileHandleAllocation.EXPECT().AsNativeLeaf(gomock.Any()).Return(file)
-		child2.EXPECT().CreateChildren(map[path.Component]re_vfs.InitialNode{
+		child.EXPECT().CreateChildren(map[path.Component]re_vfs.InitialNode{
 			path.MustNewComponent("file"): re_vfs.InitialNode{}.FromLeaf(file),
 		}, true)
 
 		// Creation of "directory".
-		child2.EXPECT().CreateChildren(gomock.Any(), true)
+		child.EXPECT().CreateChildren(gomock.Any(), true)
 
-		// Creation of "symlink".
-		symlink := mock.NewMockNativeLeaf(ctrl)
-		symlinkFactory.EXPECT().LookupSymlink([]byte("file")).Return(symlink)
-		child2.EXPECT().CreateChildren(map[path.Component]re_vfs.InitialNode{
-			path.MustNewComponent("symlink"): re_vfs.InitialNode{}.FromLeaf(symlink),
-		}, true)
-
-		_, err := d.BatchCreate(ctx, &remoteoutputservice.BatchCreateRequest{
-			BuildId:    "ad778a53-48e6-4ae1-b1f5-01b84a508f5f",
-			PathPrefix: "a",
-			Files: []*remoteexecution.OutputFile{
-				{
-					Path:         "b/file",
-					IsExecutable: true,
-					Digest: &remoteexecution.Digest{
-						Hash:      "d0ab620af7f3e77f3adfa190d41a25ce",
-						SizeBytes: 123,
-					},
-				},
+		fileLocator, err := anypb.New(&bazeloutputservicerev2.FileArtifactLocator{
+			Digest: &remoteexecution.Digest{
+				Hash:      "d0ab620af7f3e77f3adfa190d41a25ce",
+				SizeBytes: 123,
 			},
-			Directories: []*remoteexecution.OutputDirectory{
-				{
-					Path: "b/directory",
-					TreeDigest: &remoteexecution.Digest{
-						Hash:      "8e1554fc1ad824a6e9180c7b145790d2",
-						SizeBytes: 123,
-					},
-				},
+		})
+		require.NoError(t, err)
+		directoryLocator, err := anypb.New(&bazeloutputservicerev2.TreeArtifactLocator{
+			TreeDigest: &remoteexecution.Digest{
+				Hash:      "8e1554fc1ad824a6e9180c7b145790d2",
+				SizeBytes: 123,
 			},
-			Symlinks: []*remoteexecution.OutputSymlink{
+		})
+		require.NoError(t, err)
+		response, err := d.StageArtifacts(ctx, &bazeloutputservice.StageArtifactsRequest{
+			BuildId: "ad778a53-48e6-4ae1-b1f5-01b84a508f5f",
+			Artifacts: []*bazeloutputservice.StageArtifactsRequest_Artifact{
 				{
-					Path:   "b/symlink",
-					Target: "file",
+					Path:    "b/file",
+					Locator: fileLocator,
+				},
+				{
+					Path:    "b/directory",
+					Locator: directoryLocator,
 				},
 			},
 		})
 		require.NoError(t, err)
+		testutil.RequireEqualProto(t, &bazeloutputservice.StageArtifactsResponse{
+			Responses: []*bazeloutputservice.StageArtifactsResponse_Response{
+				{},
+				{},
+			},
+		}, response)
 	})
 }
 
-func TestRemoteOutputServiceDirectoryBatchStat(t *testing.T) {
+func TestBazelOutputServiceDirectoryBatchStat(t *testing.T) {
 	ctrl, ctx := gomock.WithContext(context.Background(), t)
 
 	handleAllocator := mock.NewMockStatefulHandleAllocator(ctrl)
@@ -747,7 +699,7 @@ func TestRemoteOutputServiceDirectoryBatchStat(t *testing.T) {
 	handleAllocator.EXPECT().New().Return(dHandleAllocation)
 	dHandle := mock.NewMockStatefulDirectoryHandle(ctrl)
 	dHandleAllocation.EXPECT().AsStatefulDirectory(gomock.Any()).Return(dHandle)
-	d := cd_vfs.NewRemoteOutputServiceDirectory(
+	d := cd_vfs.NewBazelOutputServiceDirectory(
 		handleAllocator,
 		outputPathFactory,
 		bareContentAddressableStorage,
@@ -758,7 +710,7 @@ func TestRemoteOutputServiceDirectoryBatchStat(t *testing.T) {
 
 	t.Run("InvalidBuildID", func(t *testing.T) {
 		// StartBuild() should be called first.
-		_, err := d.BatchStat(ctx, &remoteoutputservice.BatchStatRequest{
+		_, err := d.BatchStat(ctx, &bazeloutputservice.BatchStatRequest{
 			BuildId: "140dbef8-1b24-4966-bb9e-8edc7fa61df8",
 			Paths:   []string{"foo.o"},
 		})
@@ -779,25 +731,29 @@ func TestRemoteOutputServiceDirectoryBatchStat(t *testing.T) {
 	).Return(outputPath)
 	outputPath.EXPECT().FilterChildren(gomock.Any())
 
-	response, err := d.StartBuild(ctx, &remoteoutputservice.StartBuildRequest{
+	args, err := anypb.New(&bazeloutputservicerev2.StartBuildArgs{
+		InstanceName:   "my-cluster",
+		DigestFunction: remoteexecution.DigestFunction_MD5,
+	})
+	require.NoError(t, err)
+	response, err := d.StartBuild(ctx, &bazeloutputservice.StartBuildRequest{
 		OutputBaseId:     "9da951b8cb759233037166e28f7ea186",
 		BuildId:          "37f5dbef-b117-4fb6-bce8-5c147cb603b4",
-		InstanceName:     "my-cluster",
-		DigestFunction:   remoteexecution.DigestFunction_MD5,
+		Args:             args,
 		OutputPathPrefix: "/home/bob/bb_clientd/outputs",
 		OutputPathAliases: map[string]string{
 			"/home/bob/.cache/bazel/_bazel_bob/9da951b8cb759233037166e28f7ea186/execroot/myproject/bazel-out": ".",
 		},
 	})
 	require.NoError(t, err)
-	testutil.RequireEqualProto(t, &remoteoutputservice.StartBuildResponse{
+	testutil.RequireEqualProto(t, &bazeloutputservice.StartBuildResponse{
 		OutputPathSuffix: "9da951b8cb759233037166e28f7ea186",
 	}, response)
 
 	t.Run("Noop", func(t *testing.T) {
 		// Requests that don't contain any paths shouldn't cause
 		// any I/O against the output path.
-		_, err := d.BatchStat(ctx, &remoteoutputservice.BatchStatRequest{
+		_, err := d.BatchStat(ctx, &bazeloutputservice.BatchStatRequest{
 			BuildId: "37f5dbef-b117-4fb6-bce8-5c147cb603b4",
 		})
 		require.NoError(t, err)
@@ -806,7 +762,7 @@ func TestRemoteOutputServiceDirectoryBatchStat(t *testing.T) {
 	t.Run("OnDirectoryLookupFailure", func(t *testing.T) {
 		outputPath.EXPECT().LookupChild(path.MustNewComponent("stdio")).Return(re_vfs.PrepopulatedDirectoryChild{}, status.Error(codes.Internal, "Disk failure"))
 
-		_, err := d.BatchStat(ctx, &remoteoutputservice.BatchStatRequest{
+		_, err := d.BatchStat(ctx, &bazeloutputservice.BatchStatRequest{
 			BuildId: "37f5dbef-b117-4fb6-bce8-5c147cb603b4",
 			Paths:   []string{"stdio/printf.o"},
 		})
@@ -818,7 +774,7 @@ func TestRemoteOutputServiceDirectoryBatchStat(t *testing.T) {
 		outputPath.EXPECT().LookupChild(path.MustNewComponent("stdio")).Return(re_vfs.PrepopulatedDirectoryChild{}.FromLeaf(leaf), nil)
 		leaf.EXPECT().Readlink().Return("", status.Error(codes.Internal, "Disk failure"))
 
-		_, err := d.BatchStat(ctx, &remoteoutputservice.BatchStatRequest{
+		_, err := d.BatchStat(ctx, &bazeloutputservice.BatchStatRequest{
 			BuildId: "37f5dbef-b117-4fb6-bce8-5c147cb603b4",
 			Paths:   []string{"stdio/printf.o"},
 		})
@@ -828,32 +784,19 @@ func TestRemoteOutputServiceDirectoryBatchStat(t *testing.T) {
 	t.Run("OnTerminalLookupFailure", func(t *testing.T) {
 		outputPath.EXPECT().LookupChild(path.MustNewComponent("printf.o")).Return(re_vfs.PrepopulatedDirectoryChild{}, status.Error(codes.Internal, "Disk failure"))
 
-		_, err := d.BatchStat(ctx, &remoteoutputservice.BatchStatRequest{
+		_, err := d.BatchStat(ctx, &bazeloutputservice.BatchStatRequest{
 			BuildId: "37f5dbef-b117-4fb6-bce8-5c147cb603b4",
 			Paths:   []string{"printf.o"},
 		})
 		testutil.RequireEqualStatus(t, status.Error(codes.Internal, "Failed to resolve path \"printf.o\" beyond \".\": Disk failure"), err)
 	})
 
-	t.Run("OnTerminalReadlinkFailure", func(t *testing.T) {
+	t.Run("OnTerminalGetBazelOutputServiceStatFailure", func(t *testing.T) {
 		leaf := mock.NewMockNativeLeaf(ctrl)
 		outputPath.EXPECT().LookupChild(path.MustNewComponent("printf.o")).Return(re_vfs.PrepopulatedDirectoryChild{}.FromLeaf(leaf), nil)
-		leaf.EXPECT().Readlink().Return("", status.Error(codes.Internal, "Disk failure"))
+		leaf.EXPECT().GetBazelOutputServiceStat(gomock.Any()).Return(nil, status.Error(codes.Internal, "Disk failure"))
 
-		_, err := d.BatchStat(ctx, &remoteoutputservice.BatchStatRequest{
-			BuildId:        "37f5dbef-b117-4fb6-bce8-5c147cb603b4",
-			FollowSymlinks: true,
-			Paths:          []string{"printf.o"},
-		})
-		testutil.RequireEqualStatus(t, status.Error(codes.Internal, "Failed to resolve path \"printf.o\" beyond \".\": Disk failure"), err)
-	})
-
-	t.Run("OnTerminalGetOutputServiceFileStatusFailure", func(t *testing.T) {
-		leaf := mock.NewMockNativeLeaf(ctrl)
-		outputPath.EXPECT().LookupChild(path.MustNewComponent("printf.o")).Return(re_vfs.PrepopulatedDirectoryChild{}.FromLeaf(leaf), nil)
-		leaf.EXPECT().GetOutputServiceFileStatus(gomock.Any()).Return(nil, status.Error(codes.Internal, "Disk failure"))
-
-		_, err := d.BatchStat(ctx, &remoteoutputservice.BatchStatRequest{
+		_, err := d.BatchStat(ctx, &bazeloutputservice.BatchStatRequest{
 			BuildId: "37f5dbef-b117-4fb6-bce8-5c147cb603b4",
 			Paths:   []string{"printf.o"},
 		})
@@ -864,14 +807,17 @@ func TestRemoteOutputServiceDirectoryBatchStat(t *testing.T) {
 		// Lookup of "file", pointing to directly to a file.
 		leaf1 := mock.NewMockNativeLeaf(ctrl)
 		outputPath.EXPECT().LookupChild(path.MustNewComponent("file")).Return(re_vfs.PrepopulatedDirectoryChild{}.FromLeaf(leaf1), nil)
-		leaf1.EXPECT().Readlink().Return("", syscall.EINVAL)
-		leaf1.EXPECT().GetOutputServiceFileStatus(gomock.Any()).Return(&remoteoutputservice.FileStatus{
-			FileType: &remoteoutputservice.FileStatus_File_{
-				File: &remoteoutputservice.FileStatus_File{
-					Digest: &remoteexecution.Digest{
-						Hash:      "ad17450bb18953f249532a478d2150ba",
-						SizeBytes: 72,
-					},
+		locator, err := anypb.New(&bazeloutputservicerev2.FileArtifactLocator{
+			Digest: &remoteexecution.Digest{
+				Hash:      "ad17450bb18953f249532a478d2150ba",
+				SizeBytes: 72,
+			},
+		})
+		require.NoError(t, err)
+		leaf1.EXPECT().GetBazelOutputServiceStat(gomock.Any()).Return(&bazeloutputservice.BatchStatResponse_Stat{
+			Type: &bazeloutputservice.BatchStatResponse_Stat_File_{
+				File: &bazeloutputservice.BatchStatResponse_Stat_File{
+					Locator: locator,
 				},
 			},
 		}, nil)
@@ -879,104 +825,58 @@ func TestRemoteOutputServiceDirectoryBatchStat(t *testing.T) {
 		// Lookup of "directory". pointing directly to a directory.
 		directory1 := mock.NewMockPrepopulatedDirectory(ctrl)
 		outputPath.EXPECT().LookupChild(path.MustNewComponent("directory")).Return(re_vfs.PrepopulatedDirectoryChild{}.FromDirectory(directory1), nil)
-		directory1.EXPECT().VirtualGetAttributes(ctx, re_vfs.AttributesMaskLastDataModificationTime, gomock.Any()).
-			Do(func(ctx context.Context, requested re_vfs.AttributesMask, attributes *re_vfs.Attributes) {
-				attributes.SetLastDataModificationTime(time.Unix(1000, 0))
-			})
-
-		// Lookup of "nested/symlink_internal_relative_file",
-		// being a symlink that points to a file.
-		directory2 := mock.NewMockPrepopulatedDirectory(ctrl)
-		outputPath.EXPECT().LookupChild(path.MustNewComponent("nested")).Return(re_vfs.PrepopulatedDirectoryChild{}.FromDirectory(directory2), nil)
-		leaf2 := mock.NewMockNativeLeaf(ctrl)
-		directory2.EXPECT().LookupChild(path.MustNewComponent("symlink_internal_relative_file")).Return(re_vfs.PrepopulatedDirectoryChild{}.FromLeaf(leaf2), nil)
-		leaf2.EXPECT().Readlink().Return("../target", nil)
-		leaf3 := mock.NewMockNativeLeaf(ctrl)
-		outputPath.EXPECT().LookupChild(path.MustNewComponent("target")).Return(re_vfs.PrepopulatedDirectoryChild{}.FromLeaf(leaf3), nil)
-		leaf3.EXPECT().Readlink().Return("", syscall.EINVAL)
-		leaf3.EXPECT().GetOutputServiceFileStatus(gomock.Any()).Return(&remoteoutputservice.FileStatus{
-			FileType: &remoteoutputservice.FileStatus_File_{
-				File: &remoteoutputservice.FileStatus_File{
-					Digest: &remoteexecution.Digest{
-						Hash:      "166d6efee3489f73be1c3c2304e50bca",
-						SizeBytes: 85,
-					},
-				},
-			},
-		}, nil)
 
 		// Lookup of "nested/symlink_internal_relative_directory",
 		// being a symlink that points to a directory.
-		directory3 := mock.NewMockPrepopulatedDirectory(ctrl)
-		outputPath.EXPECT().LookupChild(path.MustNewComponent("nested")).Return(re_vfs.PrepopulatedDirectoryChild{}.FromDirectory(directory3), nil)
-		leaf4 := mock.NewMockNativeLeaf(ctrl)
-		directory3.EXPECT().LookupChild(path.MustNewComponent("symlink_internal_relative_directory")).Return(re_vfs.PrepopulatedDirectoryChild{}.FromLeaf(leaf4), nil)
-		leaf4.EXPECT().Readlink().Return("..", nil)
-		outputPath.EXPECT().VirtualGetAttributes(ctx, re_vfs.AttributesMaskLastDataModificationTime, gomock.Any()).
-			Do(func(ctx context.Context, requested re_vfs.AttributesMask, attributes *re_vfs.Attributes) {
-				attributes.SetLastDataModificationTime(time.Unix(1001, 0))
-			})
+		directory2 := mock.NewMockPrepopulatedDirectory(ctrl)
+		outputPath.EXPECT().LookupChild(path.MustNewComponent("nested")).Return(re_vfs.PrepopulatedDirectoryChild{}.FromDirectory(directory2), nil)
+		leaf2 := mock.NewMockNativeLeaf(ctrl)
+		directory2.EXPECT().LookupChild(path.MustNewComponent("symlink_internal_relative_directory")).Return(re_vfs.PrepopulatedDirectoryChild{}.FromLeaf(leaf2), nil)
+		leaf2.EXPECT().Readlink().Return("..", nil)
 
 		// Lookup of "nested/symlink_internal_absolute_path",
 		// being a symlink containing an absolute path starting
 		// with the output path.
+		directory3 := mock.NewMockPrepopulatedDirectory(ctrl)
+		outputPath.EXPECT().LookupChild(path.MustNewComponent("nested")).Return(re_vfs.PrepopulatedDirectoryChild{}.FromDirectory(directory3), nil)
+		leaf3 := mock.NewMockNativeLeaf(ctrl)
+		directory3.EXPECT().LookupChild(path.MustNewComponent("symlink_internal_absolute_path")).Return(re_vfs.PrepopulatedDirectoryChild{}.FromLeaf(leaf3), nil)
+		leaf3.EXPECT().Readlink().Return("/home/bob/bb_clientd/outputs/9da951b8cb759233037166e28f7ea186/hello", nil)
 		directory4 := mock.NewMockPrepopulatedDirectory(ctrl)
-		outputPath.EXPECT().LookupChild(path.MustNewComponent("nested")).Return(re_vfs.PrepopulatedDirectoryChild{}.FromDirectory(directory4), nil)
-		leaf5 := mock.NewMockNativeLeaf(ctrl)
-		directory4.EXPECT().LookupChild(path.MustNewComponent("symlink_internal_absolute_path")).Return(re_vfs.PrepopulatedDirectoryChild{}.FromLeaf(leaf5), nil)
-		leaf5.EXPECT().Readlink().Return("/home/bob/bb_clientd/outputs/9da951b8cb759233037166e28f7ea186/hello", nil)
-		directory5 := mock.NewMockPrepopulatedDirectory(ctrl)
-		outputPath.EXPECT().LookupChild(path.MustNewComponent("hello")).Return(re_vfs.PrepopulatedDirectoryChild{}.FromDirectory(directory5), nil)
-		directory5.EXPECT().VirtualGetAttributes(ctx, re_vfs.AttributesMaskLastDataModificationTime, gomock.Any()).
-			Do(func(ctx context.Context, requested re_vfs.AttributesMask, attributes *re_vfs.Attributes) {
-				attributes.SetLastDataModificationTime(time.Unix(1002, 0))
-			})
+		outputPath.EXPECT().LookupChild(path.MustNewComponent("hello")).Return(re_vfs.PrepopulatedDirectoryChild{}.FromDirectory(directory4), nil)
 
 		// Lookup of "nested/symlink_internal_absolute_alias",
 		// being a symlink containing an absolute path starting
 		// with one of the output path aliases.
+		directory5 := mock.NewMockPrepopulatedDirectory(ctrl)
+		outputPath.EXPECT().LookupChild(path.MustNewComponent("nested")).Return(re_vfs.PrepopulatedDirectoryChild{}.FromDirectory(directory5), nil)
+		leaf4 := mock.NewMockNativeLeaf(ctrl)
+		directory5.EXPECT().LookupChild(path.MustNewComponent("symlink_internal_absolute_alias")).Return(re_vfs.PrepopulatedDirectoryChild{}.FromLeaf(leaf4), nil)
+		leaf4.EXPECT().Readlink().Return("/home/bob/.cache/bazel/_bazel_bob/9da951b8cb759233037166e28f7ea186/execroot/myproject/bazel-out/hello", nil)
 		directory6 := mock.NewMockPrepopulatedDirectory(ctrl)
-		outputPath.EXPECT().LookupChild(path.MustNewComponent("nested")).Return(re_vfs.PrepopulatedDirectoryChild{}.FromDirectory(directory6), nil)
-		leaf6 := mock.NewMockNativeLeaf(ctrl)
-		directory6.EXPECT().LookupChild(path.MustNewComponent("symlink_internal_absolute_alias")).Return(re_vfs.PrepopulatedDirectoryChild{}.FromLeaf(leaf6), nil)
-		leaf6.EXPECT().Readlink().Return("/home/bob/.cache/bazel/_bazel_bob/9da951b8cb759233037166e28f7ea186/execroot/myproject/bazel-out/hello", nil)
-		directory7 := mock.NewMockPrepopulatedDirectory(ctrl)
-		outputPath.EXPECT().LookupChild(path.MustNewComponent("hello")).Return(re_vfs.PrepopulatedDirectoryChild{}.FromDirectory(directory7), nil)
-		directory7.EXPECT().VirtualGetAttributes(ctx, re_vfs.AttributesMaskLastDataModificationTime, gomock.Any()).
-			Do(func(ctx context.Context, requested re_vfs.AttributesMask, attributes *re_vfs.Attributes) {
-				attributes.SetLastDataModificationTime(time.Unix(1003, 0))
-			})
+		outputPath.EXPECT().LookupChild(path.MustNewComponent("hello")).Return(re_vfs.PrepopulatedDirectoryChild{}.FromDirectory(directory6), nil)
 
 		// Lookup of "nested/symlink_external", being a symlink
 		// containing an absolute path that doesn't start with
 		// any known prefix.
-		directory8 := mock.NewMockPrepopulatedDirectory(ctrl)
-		outputPath.EXPECT().LookupChild(path.MustNewComponent("nested")).Return(re_vfs.PrepopulatedDirectoryChild{}.FromDirectory(directory8), nil)
-		leaf7 := mock.NewMockNativeLeaf(ctrl)
-		directory8.EXPECT().LookupChild(path.MustNewComponent("symlink_external")).Return(re_vfs.PrepopulatedDirectoryChild{}.FromLeaf(leaf7), nil)
-		leaf7.EXPECT().Readlink().Return("/etc/passwd", nil)
+		directory7 := mock.NewMockPrepopulatedDirectory(ctrl)
+		outputPath.EXPECT().LookupChild(path.MustNewComponent("nested")).Return(re_vfs.PrepopulatedDirectoryChild{}.FromDirectory(directory7), nil)
+		leaf5 := mock.NewMockNativeLeaf(ctrl)
+		directory7.EXPECT().LookupChild(path.MustNewComponent("symlink_external")).Return(re_vfs.PrepopulatedDirectoryChild{}.FromLeaf(leaf5), nil)
+		leaf5.EXPECT().Readlink().Return("/etc/passwd", nil)
 
 		// Lookup of "nonexistent".
 		outputPath.EXPECT().LookupChild(path.MustNewComponent("nonexistent")).Return(re_vfs.PrepopulatedDirectoryChild{}, syscall.ENOENT)
 
-		// Lookup of ".".
-		outputPath.EXPECT().VirtualGetAttributes(ctx, re_vfs.AttributesMaskLastDataModificationTime, gomock.Any()).
-			Do(func(ctx context.Context, requested re_vfs.AttributesMask, attributes *re_vfs.Attributes) {
-				attributes.SetLastDataModificationTime(time.Unix(1004, 0))
-			})
-
-		response, err := d.BatchStat(ctx, &remoteoutputservice.BatchStatRequest{
-			BuildId:           "37f5dbef-b117-4fb6-bce8-5c147cb603b4",
-			IncludeFileDigest: true,
-			FollowSymlinks:    true,
+		response, err := d.BatchStat(ctx, &bazeloutputservice.BatchStatRequest{
+			BuildId: "37f5dbef-b117-4fb6-bce8-5c147cb603b4",
 			Paths: []string{
 				"file",
 				"directory",
-				"nested/symlink_internal_relative_file",
-				"nested/symlink_internal_relative_directory",
-				"nested/symlink_internal_absolute_path",
-				"nested/symlink_internal_absolute_alias",
-				"nested/symlink_external",
+				"nested/symlink_internal_relative_directory/",
+				"nested/symlink_internal_absolute_path/",
+				"nested/symlink_internal_absolute_alias/",
+				"nested/symlink_external/",
 				"../foo",
 				"/etc/passwd",
 				"nonexistent",
@@ -984,113 +884,76 @@ func TestRemoteOutputServiceDirectoryBatchStat(t *testing.T) {
 			},
 		})
 		require.NoError(t, err)
-		testutil.RequireEqualProto(t, &remoteoutputservice.BatchStatResponse{
-			Responses: []*remoteoutputservice.StatResponse{
+		fileLocator, err := anypb.New(&bazeloutputservicerev2.FileArtifactLocator{
+			Digest: &remoteexecution.Digest{
+				Hash:      "ad17450bb18953f249532a478d2150ba",
+				SizeBytes: 72,
+			},
+		})
+		require.NoError(t, err)
+		testutil.RequireEqualProto(t, &bazeloutputservice.BatchStatResponse{
+			Responses: []*bazeloutputservice.BatchStatResponse_StatResponse{
 				// "file".
 				{
-					FileStatus: &remoteoutputservice.FileStatus{
-						FileType: &remoteoutputservice.FileStatus_File_{
-							File: &remoteoutputservice.FileStatus_File{
-								Digest: &remoteexecution.Digest{
-									Hash:      "ad17450bb18953f249532a478d2150ba",
-									SizeBytes: 72,
-								},
+					Stat: &bazeloutputservice.BatchStatResponse_Stat{
+						Type: &bazeloutputservice.BatchStatResponse_Stat_File_{
+							File: &bazeloutputservice.BatchStatResponse_Stat_File{
+								Locator: fileLocator,
 							},
 						},
 					},
 				},
 				// "directory".
 				{
-					FileStatus: &remoteoutputservice.FileStatus{
-						FileType: &remoteoutputservice.FileStatus_Directory_{
-							Directory: &remoteoutputservice.FileStatus_Directory{
-								LastModifiedTime: &timestamppb.Timestamp{Seconds: 1000},
-							},
-						},
-					},
-				},
-				// "nested/symlink_internal_relative_file".
-				{
-					FileStatus: &remoteoutputservice.FileStatus{
-						FileType: &remoteoutputservice.FileStatus_File_{
-							File: &remoteoutputservice.FileStatus_File{
-								Digest: &remoteexecution.Digest{
-									Hash:      "166d6efee3489f73be1c3c2304e50bca",
-									SizeBytes: 85,
-								},
-							},
+					Stat: &bazeloutputservice.BatchStatResponse_Stat{
+						Type: &bazeloutputservice.BatchStatResponse_Stat_Directory_{
+							Directory: &bazeloutputservice.BatchStatResponse_Stat_Directory{},
 						},
 					},
 				},
 				// "nested/symlink_internal_relative_directory".
 				{
-					FileStatus: &remoteoutputservice.FileStatus{
-						FileType: &remoteoutputservice.FileStatus_Directory_{
-							Directory: &remoteoutputservice.FileStatus_Directory{
-								LastModifiedTime: &timestamppb.Timestamp{Seconds: 1001},
-							},
+					Stat: &bazeloutputservice.BatchStatResponse_Stat{
+						Type: &bazeloutputservice.BatchStatResponse_Stat_Directory_{
+							Directory: &bazeloutputservice.BatchStatResponse_Stat_Directory{},
 						},
 					},
 				},
 				// "nested/symlink_internal_absolute_path".
 				{
-					FileStatus: &remoteoutputservice.FileStatus{
-						FileType: &remoteoutputservice.FileStatus_Directory_{
-							Directory: &remoteoutputservice.FileStatus_Directory{
-								LastModifiedTime: &timestamppb.Timestamp{Seconds: 1002},
-							},
+					Stat: &bazeloutputservice.BatchStatResponse_Stat{
+						Type: &bazeloutputservice.BatchStatResponse_Stat_Directory_{
+							Directory: &bazeloutputservice.BatchStatResponse_Stat_Directory{},
 						},
 					},
 				},
 				// "nested/symlink_internal_absolute_alias".
 				{
-					FileStatus: &remoteoutputservice.FileStatus{
-						FileType: &remoteoutputservice.FileStatus_Directory_{
-							Directory: &remoteoutputservice.FileStatus_Directory{
-								LastModifiedTime: &timestamppb.Timestamp{Seconds: 1003},
-							},
+					Stat: &bazeloutputservice.BatchStatResponse_Stat{
+						Type: &bazeloutputservice.BatchStatResponse_Stat_Directory_{
+							Directory: &bazeloutputservice.BatchStatResponse_Stat_Directory{},
 						},
 					},
 				},
 				// "nested/symlink_external".
 				{
-					FileStatus: &remoteoutputservice.FileStatus{
-						FileType: &remoteoutputservice.FileStatus_External_{
-							External: &remoteoutputservice.FileStatus_External{
-								NextPath: "/etc/passwd",
-							},
-						},
-					},
+					Stat: &bazeloutputservice.BatchStatResponse_Stat{},
 				},
 				// "../foo".
 				{
-					FileStatus: &remoteoutputservice.FileStatus{
-						FileType: &remoteoutputservice.FileStatus_External_{
-							External: &remoteoutputservice.FileStatus_External{
-								NextPath: "../foo",
-							},
-						},
-					},
+					Stat: &bazeloutputservice.BatchStatResponse_Stat{},
 				},
 				// "/etc/passwd".
 				{
-					FileStatus: &remoteoutputservice.FileStatus{
-						FileType: &remoteoutputservice.FileStatus_External_{
-							External: &remoteoutputservice.FileStatus_External{
-								NextPath: "/etc/passwd",
-							},
-						},
-					},
+					Stat: &bazeloutputservice.BatchStatResponse_Stat{},
 				},
 				// "nonexistent".
 				{},
 				// ".".
 				{
-					FileStatus: &remoteoutputservice.FileStatus{
-						FileType: &remoteoutputservice.FileStatus_Directory_{
-							Directory: &remoteoutputservice.FileStatus_Directory{
-								LastModifiedTime: &timestamppb.Timestamp{Seconds: 1004},
-							},
+					Stat: &bazeloutputservice.BatchStatResponse_Stat{
+						Type: &bazeloutputservice.BatchStatResponse_Stat_Directory_{
+							Directory: &bazeloutputservice.BatchStatResponse_Stat_Directory{},
 						},
 					},
 				},
@@ -1099,7 +962,7 @@ func TestRemoteOutputServiceDirectoryBatchStat(t *testing.T) {
 	})
 }
 
-func TestRemoteOutputServiceDirectoryVirtualLookup(t *testing.T) {
+func TestBazelOutputServiceDirectoryVirtualLookup(t *testing.T) {
 	ctrl, ctx := gomock.WithContext(context.Background(), t)
 
 	handleAllocator := mock.NewMockStatefulHandleAllocator(ctrl)
@@ -1112,7 +975,7 @@ func TestRemoteOutputServiceDirectoryVirtualLookup(t *testing.T) {
 	handleAllocator.EXPECT().New().Return(dHandleAllocation)
 	dHandle := mock.NewMockStatefulDirectoryHandle(ctrl)
 	dHandleAllocation.EXPECT().AsStatefulDirectory(gomock.Any()).Return(dHandle)
-	d := cd_vfs.NewRemoteOutputServiceDirectory(
+	d := cd_vfs.NewBazelOutputServiceDirectory(
 		handleAllocator,
 		outputPathFactory,
 		bareContentAddressableStorage,
@@ -1140,17 +1003,21 @@ func TestRemoteOutputServiceDirectoryVirtualLookup(t *testing.T) {
 	).Return(outputPath)
 	outputPath.EXPECT().FilterChildren(gomock.Any())
 
-	response, err := d.StartBuild(ctx, &remoteoutputservice.StartBuildRequest{
+	args, err := anypb.New(&bazeloutputservicerev2.StartBuildArgs{
+		DigestFunction: remoteexecution.DigestFunction_MD5,
+	})
+	require.NoError(t, err)
+	response, err := d.StartBuild(ctx, &bazeloutputservice.StartBuildRequest{
 		OutputBaseId:     "eaf1d65b7ab802934e6b57d0e14b3f30",
 		BuildId:          "2840d789-16ff-4fe4-9639-3245f9bb9106",
-		DigestFunction:   remoteexecution.DigestFunction_MD5,
+		Args:             args,
 		OutputPathPrefix: "/home/bob/bb_clientd/outputs",
 		OutputPathAliases: map[string]string{
 			"/home/bob/.cache/bazel/_bazel_bob/eaf1d65b7ab802934e6b57d0e14b3f30/execroot/myproject/bazel-out": ".",
 		},
 	})
 	require.NoError(t, err)
-	testutil.RequireEqualProto(t, &remoteoutputservice.StartBuildResponse{
+	testutil.RequireEqualProto(t, &bazeloutputservice.StartBuildResponse{
 		OutputPathSuffix: "eaf1d65b7ab802934e6b57d0e14b3f30",
 	}, response)
 
@@ -1173,7 +1040,7 @@ func TestRemoteOutputServiceDirectoryVirtualLookup(t *testing.T) {
 	outputPath.EXPECT().RemoveAllChildren(true)
 	dHandle.EXPECT().NotifyRemoval(path.MustNewComponent("eaf1d65b7ab802934e6b57d0e14b3f30"))
 
-	_, err = d.Clean(ctx, &remoteoutputservice.CleanRequest{
+	_, err = d.Clean(ctx, &bazeloutputservice.CleanRequest{
 		OutputBaseId: "eaf1d65b7ab802934e6b57d0e14b3f30",
 	})
 	require.NoError(t, err)
@@ -1184,7 +1051,7 @@ func TestRemoteOutputServiceDirectoryVirtualLookup(t *testing.T) {
 	require.Equal(t, re_vfs.StatusErrNoEnt, s)
 }
 
-func TestRemoteOutputServiceDirectoryVirtualReadDir(t *testing.T) {
+func TestBazelOutputServiceDirectoryVirtualReadDir(t *testing.T) {
 	ctrl, ctx := gomock.WithContext(context.Background(), t)
 
 	handleAllocator := mock.NewMockStatefulHandleAllocator(ctrl)
@@ -1197,7 +1064,7 @@ func TestRemoteOutputServiceDirectoryVirtualReadDir(t *testing.T) {
 	handleAllocator.EXPECT().New().Return(dHandleAllocation)
 	dHandle := mock.NewMockStatefulDirectoryHandle(ctrl)
 	dHandleAllocation.EXPECT().AsStatefulDirectory(gomock.Any()).Return(dHandle)
-	d := cd_vfs.NewRemoteOutputServiceDirectory(
+	d := cd_vfs.NewBazelOutputServiceDirectory(
 		handleAllocator,
 		outputPathFactory,
 		bareContentAddressableStorage,
@@ -1230,17 +1097,21 @@ func TestRemoteOutputServiceDirectoryVirtualReadDir(t *testing.T) {
 	).Return(outputPath1)
 	outputPath1.EXPECT().FilterChildren(gomock.Any())
 
-	response, err := d.StartBuild(ctx, &remoteoutputservice.StartBuildRequest{
+	args, err := anypb.New(&bazeloutputservicerev2.StartBuildArgs{
+		DigestFunction: remoteexecution.DigestFunction_MD5,
+	})
+	require.NoError(t, err)
+	response, err := d.StartBuild(ctx, &bazeloutputservice.StartBuildRequest{
 		OutputBaseId:     "83f3e6ff93a5403cbfb14682d8165968",
 		BuildId:          "2b2b974f-ed53-40f0-a75a-422c09ba8be8",
-		DigestFunction:   remoteexecution.DigestFunction_MD5,
+		Args:             args,
 		OutputPathPrefix: "/home/bob/bb_clientd/outputs",
 		OutputPathAliases: map[string]string{
 			"/home/bob/.cache/bazel/_bazel_bob/83f3e6ff93a5403cbfb14682d8165968/execroot/project1/bazel-out": ".",
 		},
 	})
 	require.NoError(t, err)
-	testutil.RequireEqualProto(t, &remoteoutputservice.StartBuildResponse{
+	testutil.RequireEqualProto(t, &bazeloutputservice.StartBuildResponse{
 		OutputPathSuffix: "83f3e6ff93a5403cbfb14682d8165968",
 	}, response)
 
@@ -1257,17 +1128,17 @@ func TestRemoteOutputServiceDirectoryVirtualReadDir(t *testing.T) {
 	).Return(outputPath2)
 	outputPath2.EXPECT().FilterChildren(gomock.Any())
 
-	response, err = d.StartBuild(ctx, &remoteoutputservice.StartBuildRequest{
+	response, err = d.StartBuild(ctx, &bazeloutputservice.StartBuildRequest{
 		OutputBaseId:     "d4b145a6191c6d8d037d13986274d08d",
 		BuildId:          "2f941206-fb17-460a-a779-10c621bc0d19",
-		DigestFunction:   remoteexecution.DigestFunction_MD5,
+		Args:             args,
 		OutputPathPrefix: "/home/bob/bb_clientd/outputs",
 		OutputPathAliases: map[string]string{
 			"/home/bob/.cache/bazel/_bazel_bob/d4b145a6191c6d8d037d13986274d08d/execroot/project2/bazel-out": ".",
 		},
 	})
 	require.NoError(t, err)
-	testutil.RequireEqualProto(t, &remoteoutputservice.StartBuildResponse{
+	testutil.RequireEqualProto(t, &bazeloutputservice.StartBuildResponse{
 		OutputPathSuffix: "d4b145a6191c6d8d037d13986274d08d",
 	}, response)
 
@@ -1348,14 +1219,14 @@ func TestRemoteOutputServiceDirectoryVirtualReadDir(t *testing.T) {
 	// Remove all output paths.
 	outputPath1.EXPECT().RemoveAllChildren(true)
 	dHandle.EXPECT().NotifyRemoval(path.MustNewComponent("83f3e6ff93a5403cbfb14682d8165968"))
-	_, err = d.Clean(ctx, &remoteoutputservice.CleanRequest{
+	_, err = d.Clean(ctx, &bazeloutputservice.CleanRequest{
 		OutputBaseId: "83f3e6ff93a5403cbfb14682d8165968",
 	})
 	require.NoError(t, err)
 
 	outputPath2.EXPECT().RemoveAllChildren(true)
 	dHandle.EXPECT().NotifyRemoval(path.MustNewComponent("d4b145a6191c6d8d037d13986274d08d"))
-	_, err = d.Clean(ctx, &remoteoutputservice.CleanRequest{
+	_, err = d.Clean(ctx, &bazeloutputservice.CleanRequest{
 		OutputBaseId: "d4b145a6191c6d8d037d13986274d08d",
 	})
 	require.NoError(t, err)

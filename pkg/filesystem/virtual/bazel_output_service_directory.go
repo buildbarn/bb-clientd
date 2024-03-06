@@ -8,7 +8,8 @@ import (
 	cd_cas "github.com/buildbarn/bb-clientd/pkg/cas"
 	re_cas "github.com/buildbarn/bb-remote-execution/pkg/cas"
 	"github.com/buildbarn/bb-remote-execution/pkg/filesystem/virtual"
-	"github.com/buildbarn/bb-remote-execution/pkg/proto/remoteoutputservice"
+	"github.com/buildbarn/bb-remote-execution/pkg/proto/bazeloutputservice"
+	bazeloutputservicerev2 "github.com/buildbarn/bb-remote-execution/pkg/proto/bazeloutputservice/rev2"
 	"github.com/buildbarn/bb-storage/pkg/blobstore"
 	"github.com/buildbarn/bb-storage/pkg/digest"
 	"github.com/buildbarn/bb-storage/pkg/filesystem"
@@ -17,8 +18,6 @@ import (
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"google.golang.org/protobuf/types/known/emptypb"
-	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type buildState struct {
@@ -42,18 +41,17 @@ type outputPathState struct {
 	outputBaseID path.Component
 }
 
-// RemoteOutputServiceDirectory is FUSE directory that acts as the
-// top-level directory for Remote Output Service. The Remote Output
+// BazelOutputServiceDirectory is FUSE directory that acts as the
+// top-level directory for Bazel Output Service. The Bazel Output
 // Service can be used by build clients to efficiently populate a
 // directory with build outputs.
 //
 // In addition to acting as a FUSE directory, this type also implements
-// a gRPC server for the Remote Output Service. This gRPC service can be
+// a gRPC server for the Bazel Output Service. This gRPC service can be
 // used to start and finalize builds, but also to perform bulk creation
 // and stat() operations.
 //
-// This implementation of the Remote Output Service is relatively
-// simple:
+// This implementation of the Bazel Output Service is relatively simple:
 //
 //   - There is no persistency of build information across restarts.
 //   - No snapshotting of completed builds takes place, meaning that only
@@ -64,7 +62,7 @@ type outputPathState struct {
 //
 // This implementation should eventually be extended to address the
 // issues listed above.
-type RemoteOutputServiceDirectory struct {
+type BazelOutputServiceDirectory struct {
 	virtual.ReadOnlyDirectory
 
 	handleAllocator                   virtual.StatefulHandleAllocator
@@ -84,14 +82,14 @@ type RemoteOutputServiceDirectory struct {
 }
 
 var (
-	_ virtual.Directory                             = &RemoteOutputServiceDirectory{}
-	_ remoteoutputservice.RemoteOutputServiceServer = &RemoteOutputServiceDirectory{}
+	_ virtual.Directory                           = &BazelOutputServiceDirectory{}
+	_ bazeloutputservice.BazelOutputServiceServer = &BazelOutputServiceDirectory{}
 )
 
-// NewRemoteOutputServiceDirectory creates a new instance of
-// RemoteOutputServiceDirectory.
-func NewRemoteOutputServiceDirectory(handleAllocator virtual.StatefulHandleAllocator, outputPathFactory OutputPathFactory, bareContentAddressableStorage, retryingContentAddressableStorage blobstore.BlobAccess, directoryFetcher re_cas.DirectoryFetcher, symlinkFactory virtual.SymlinkFactory, maximumTreeSizeBytes int64) *RemoteOutputServiceDirectory {
-	d := &RemoteOutputServiceDirectory{
+// NewBazelOutputServiceDirectory creates a new instance of
+// BazelOutputServiceDirectory.
+func NewBazelOutputServiceDirectory(handleAllocator virtual.StatefulHandleAllocator, outputPathFactory OutputPathFactory, bareContentAddressableStorage, retryingContentAddressableStorage blobstore.BlobAccess, directoryFetcher re_cas.DirectoryFetcher, symlinkFactory virtual.SymlinkFactory, maximumTreeSizeBytes int64) *BazelOutputServiceDirectory {
+	d := &BazelOutputServiceDirectory{
 		handleAllocator:                   handleAllocator,
 		outputPathFactory:                 outputPathFactory,
 		bareContentAddressableStorage:     bareContentAddressableStorage,
@@ -110,7 +108,7 @@ func NewRemoteOutputServiceDirectory(handleAllocator virtual.StatefulHandleAlloc
 }
 
 // Clean all build outputs associated with a single output base.
-func (d *RemoteOutputServiceDirectory) Clean(ctx context.Context, request *remoteoutputservice.CleanRequest) (*emptypb.Empty, error) {
+func (d *BazelOutputServiceDirectory) Clean(ctx context.Context, request *bazeloutputservice.CleanRequest) (*bazeloutputservice.CleanResponse, error) {
 	outputBaseID, ok := path.NewComponent(request.OutputBaseId)
 	if !ok {
 		return nil, status.Error(codes.InvalidArgument, "Output base ID is not a valid filename")
@@ -149,13 +147,13 @@ func (d *RemoteOutputServiceDirectory) Clean(ctx context.Context, request *remot
 		// is removed as well.
 		return nil, err
 	}
-	return &emptypb.Empty{}, nil
+	return &bazeloutputservice.CleanResponse{}, nil
 }
 
 // findMissingAndRemove is called during StartBuild() to remove a single
 // batch of files from the output path that are no longer present in the
 // Content Addressable Storage.
-func (d *RemoteOutputServiceDirectory) findMissingAndRemove(ctx context.Context, queue map[digest.Digest][]func() error) error {
+func (d *BazelOutputServiceDirectory) findMissingAndRemove(ctx context.Context, queue map[digest.Digest][]func() error) error {
 	set := digest.NewSetBuilder()
 	for digest := range queue {
 		set.Add(digest)
@@ -178,7 +176,7 @@ func (d *RemoteOutputServiceDirectory) findMissingAndRemove(ctx context.Context,
 // all files in the output path, calling FindMissingBlobs() on them to
 // ensure that they will not disappear during the build. Any files that
 // are missing are removed from the output path.
-func (d *RemoteOutputServiceDirectory) filterMissingChildren(ctx context.Context, rootDirectory virtual.PrepopulatedDirectory, digestFunction digest.Function) error {
+func (d *BazelOutputServiceDirectory) filterMissingChildren(ctx context.Context, rootDirectory virtual.PrepopulatedDirectory, digestFunction digest.Function) error {
 	queue := map[digest.Digest][]func() error{}
 	var savedErr error
 	if err := rootDirectory.FilterChildren(func(node virtual.InitialNode, removeFunc virtual.ChildRemover) bool {
@@ -246,7 +244,7 @@ func (d *RemoteOutputServiceDirectory) filterMissingChildren(ctx context.Context
 
 // StartBuild is called by a build client to indicate that a new build
 // in a given output base is starting.
-func (d *RemoteOutputServiceDirectory) StartBuild(ctx context.Context, request *remoteoutputservice.StartBuildRequest) (*remoteoutputservice.StartBuildResponse, error) {
+func (d *BazelOutputServiceDirectory) StartBuild(ctx context.Context, request *bazeloutputservice.StartBuildRequest) (*bazeloutputservice.StartBuildResponse, error) {
 	// Compute the full output path and the output path suffix. The
 	// former needs to be used by us, while the latter is
 	// communicated back to the client.
@@ -276,11 +274,16 @@ func (d *RemoteOutputServiceDirectory) StartBuild(ctx context.Context, request *
 		return nil, err
 	}
 
-	instanceName, err := digest.NewInstanceName(request.InstanceName)
-	if err != nil {
-		return nil, util.StatusWrapf(err, "Failed to parse instance name %#v", request.InstanceName)
+	var args bazeloutputservicerev2.StartBuildArgs
+	if err := request.Args.UnmarshalTo(&args); err != nil {
+		return nil, util.StatusWrap(err, "Failed to unmarshal start build arguments")
 	}
-	digestFunction, err := instanceName.GetDigestFunction(request.DigestFunction, 0)
+
+	instanceName, err := digest.NewInstanceName(args.InstanceName)
+	if err != nil {
+		return nil, util.StatusWrapf(err, "Failed to parse instance name %#v", args.InstanceName)
+	}
+	digestFunction, err := instanceName.GetDigestFunction(args.DigestFunction, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -328,8 +331,8 @@ func (d *RemoteOutputServiceDirectory) StartBuild(ctx context.Context, request *
 			d.changeID++
 		}
 
-		// Allow BatchCreate() and BatchStat() requests for the
-		// new build ID.
+		// Allow StageArtifacts() and BatchStat() requests for
+		// the new build ID.
 		state.buildState = &buildState{
 			id:                 request.BuildId,
 			digestFunction:     digestFunction,
@@ -349,7 +352,7 @@ func (d *RemoteOutputServiceDirectory) StartBuild(ctx context.Context, request *
 		return nil, util.StatusWrap(err, "Failed to filter contents of the output path")
 	}
 
-	return &remoteoutputservice.StartBuildResponse{
+	return &bazeloutputservice.StartBuildResponse{
 		// TODO: Fill in InitialOutputPathContents, so that the
 		// client can skip parts of its analysis. The easiest
 		// way to achieve this would be to freeze the contents
@@ -360,8 +363,9 @@ func (d *RemoteOutputServiceDirectory) StartBuild(ctx context.Context, request *
 
 // getOutputPathAndBuildState returns the state objects associated with
 // a given build ID. This function is used by all gRPC methods that can
-// only be invoked as part of a build (e.g., BatchCreate(), BatchStat()).
-func (d *RemoteOutputServiceDirectory) getOutputPathAndBuildState(buildID string) (*outputPathState, *buildState, error) {
+// only be invoked as part of a build (e.g., StageArtifacts(),
+// BatchStat()).
+func (d *BazelOutputServiceDirectory) getOutputPathAndBuildState(buildID string) (*outputPathState, *buildState, error) {
 	d.lock.Lock()
 	defer d.lock.Unlock()
 
@@ -372,62 +376,10 @@ func (d *RemoteOutputServiceDirectory) getOutputPathAndBuildState(buildID string
 	return outputPathState, outputPathState.buildState, nil
 }
 
-// directoryCreatingComponentWalker is an implementation of
-// ComponentWalker that is used by BatchCreate() to resolve the path
-// prefix under which all provided files, symbolic links and directories
-// should be created.
-//
-// This resolver forcefully creates all intermediate pathname
-// components, removing any non-directories that are in the way.
-type directoryCreatingComponentWalker struct {
-	stack util.NonEmptyStack[virtual.PrepopulatedDirectory]
-}
-
-func (cw *directoryCreatingComponentWalker) OnDirectory(name path.Component) (path.GotDirectoryOrSymlink, error) {
-	child, err := cw.stack.Peek().CreateAndEnterPrepopulatedDirectory(name)
-	if err != nil {
-		return nil, err
-	}
-	cw.stack.Push(child)
-	return path.GotDirectory{
-		Child:        cw,
-		IsReversible: true,
-	}, nil
-}
-
-func (cw *directoryCreatingComponentWalker) OnTerminal(name path.Component) (*path.GotSymlink, error) {
-	return path.OnTerminalViaOnDirectory(cw, name)
-}
-
-func (cw *directoryCreatingComponentWalker) OnUp() (path.ComponentWalker, error) {
-	if _, ok := cw.stack.PopSingle(); !ok {
-		return nil, status.Error(codes.InvalidArgument, "Path resolves to a location outside the output path")
-	}
-	return cw, nil
-}
-
-func (cw *directoryCreatingComponentWalker) createChild(outputPath string, initialNode virtual.InitialNode) error {
-	outputParentCreator := parentDirectoryCreatingComponentWalker{
-		stack: cw.stack.Copy(),
-	}
-	if err := path.Resolve(outputPath, path.NewRelativeScopeWalker(&outputParentCreator)); err != nil {
-		return util.StatusWrap(err, "Failed to resolve path")
-	}
-	name := outputParentCreator.TerminalName
-	if name == nil {
-		return status.Errorf(codes.InvalidArgument, "Path resolves to a directory")
-	}
-	return outputParentCreator.stack.Peek().CreateChildren(
-		map[path.Component]virtual.InitialNode{
-			*name: initialNode,
-		},
-		true)
-}
-
 // parentDirectoryCreatingComponentWalker is an implementation of
-// ComponentWalker that is used by BatchCreate() to resolve the parent
-// directory of the path where a file, directory or symlink needs to be
-// created.
+// ComponentWalker that is used by StageArtifacts() to resolve the
+// parent directory of the path where a file, directory or symlink needs
+// to be created.
 type parentDirectoryCreatingComponentWalker struct {
 	path.TerminalNameTrackingComponentWalker
 	stack util.NonEmptyStack[virtual.PrepopulatedDirectory]
@@ -452,85 +404,104 @@ func (cw *parentDirectoryCreatingComponentWalker) OnUp() (path.ComponentWalker, 
 	return cw, nil
 }
 
-// BatchCreate can be called by a build client to create files, symbolic
-// links and directories.
+func (d *BazelOutputServiceDirectory) stageSingleArtifact(ctx context.Context, artifact *bazeloutputservice.StageArtifactsRequest_Artifact, outputPathState *outputPathState, buildState *buildState) error {
+	// Resolve the parent directory and filename of the artifact to create.
+	outputParentCreator := parentDirectoryCreatingComponentWalker{
+		stack: util.NewNonEmptyStack[virtual.PrepopulatedDirectory](outputPathState.rootDirectory),
+	}
+	if err := path.Resolve(artifact.Path, path.NewRelativeScopeWalker(&outputParentCreator)); err != nil {
+		return util.StatusWrap(err, "Failed to resolve path")
+	}
+	name := outputParentCreator.TerminalName
+	if name == nil {
+		return status.Errorf(codes.InvalidArgument, "Path resolves to a directory")
+	}
+
+	anyLocator, err := artifact.Locator.UnmarshalNew()
+	if err != nil {
+		return util.StatusWrapWithCode(err, codes.InvalidArgument, "Failed to unmarshal locator")
+	}
+	switch locator := anyLocator.(type) {
+	case *bazeloutputservicerev2.FileArtifactLocator:
+		// Client wants to create a lazy loading file.
+		childDigest, err := buildState.digestFunction.NewDigestFromProto(locator.Digest)
+		if err != nil {
+			return util.StatusWrap(err, "Invalid digest")
+		}
+
+		return outputParentCreator.stack.Peek().CreateChildren(
+			map[path.Component]virtual.InitialNode{
+				*name: virtual.InitialNode{}.FromLeaf(
+					outputPathState.casFileFactory.LookupFile(
+						childDigest,
+						/* isExecutable = */ true,
+						/* fileReadMonitorFactory = */ nil,
+					),
+				),
+			},
+			/* overwrite = */ true,
+		)
+	case *bazeloutputservicerev2.TreeArtifactLocator:
+		// Client wants to create a lazy loading directory.
+		childDigest, err := buildState.digestFunction.NewDigestFromProto(locator.TreeDigest)
+		if err != nil {
+			return util.StatusWrap(err, "Invalid tree digest")
+		}
+		if sizeBytes := childDigest.GetSizeBytes(); sizeBytes > d.maximumTreeSizeBytes {
+			return status.Errorf(codes.InvalidArgument, "Directory is %d bytes in size, which exceeds the permitted maximum of %d bytes", sizeBytes, d.maximumTreeSizeBytes)
+		}
+		var rootDirectoryDigest *digest.Digest
+		if locator.RootDirectoryDigest != nil {
+			d, err := buildState.digestFunction.NewDigestFromProto(locator.RootDirectoryDigest)
+			if err != nil {
+				return util.StatusWrap(err, "Invalid root directory digest")
+			}
+			rootDirectoryDigest = &d
+		}
+
+		return outputParentCreator.stack.Peek().CreateChildren(
+			map[path.Component]virtual.InitialNode{
+				*name: virtual.InitialNode{}.FromDirectory(
+					virtual.NewCASInitialContentsFetcher(
+						context.Background(),
+						cd_cas.NewTreeDirectoryWalker(d.directoryFetcher, childDigest, rootDirectoryDigest),
+						outputPathState.casFileFactory,
+						d.symlinkFactory,
+						buildState.digestFunction,
+					),
+				),
+			},
+			/* overwrite = */ true,
+		)
+	default:
+		return status.Error(codes.InvalidArgument, "Locator is of an unknown type")
+	}
+}
+
+// StageArtifacts can be called by a build client to create files and
+// directories.
 //
-// Because files and directories are provided in the form of OutputFile
-// and OutputDirectory messages, this implementation is capable of
-// creating files and directories whose contents get loaded from the
-// Content Addressable Storage lazily.
-func (d *RemoteOutputServiceDirectory) BatchCreate(ctx context.Context, request *remoteoutputservice.BatchCreateRequest) (*emptypb.Empty, error) {
+// Because files and directories are provided in the form of REv2
+// digests, this implementation is capable of creating files and
+// directories whose contents get loaded from the Content Addressable
+// Storage lazily.
+func (d *BazelOutputServiceDirectory) StageArtifacts(ctx context.Context, request *bazeloutputservice.StageArtifactsRequest) (*bazeloutputservice.StageArtifactsResponse, error) {
 	outputPathState, buildState, err := d.getOutputPathAndBuildState(request.BuildId)
 	if err != nil {
 		return nil, err
 	}
 
-	// Resolve the path prefix. Optionally, remove all of its contents.
-	prefixCreator := directoryCreatingComponentWalker{
-		stack: util.NewNonEmptyStack[virtual.PrepopulatedDirectory](outputPathState.rootDirectory),
+	responses := make([]*bazeloutputservice.StageArtifactsResponse_Response, 0, len(request.Artifacts))
+	for _, artifact := range request.Artifacts {
+		responses = append(
+			responses,
+			&bazeloutputservice.StageArtifactsResponse_Response{
+				Status: status.Convert(d.stageSingleArtifact(ctx, artifact, outputPathState, buildState)).Proto(),
+			})
 	}
-	if err := path.Resolve(request.PathPrefix, path.NewRelativeScopeWalker(&prefixCreator)); err != nil {
-		return nil, util.StatusWrap(err, "Failed to create path prefix directory")
-	}
-	if request.CleanPathPrefix {
-		if err := prefixCreator.stack.Peek().RemoveAllChildren(false); err != nil {
-			return nil, util.StatusWrap(err, "Failed to clean path prefix directory")
-		}
-	}
-
-	// Create requested files.
-	for _, entry := range request.Files {
-		childDigest, err := buildState.digestFunction.NewDigestFromProto(entry.Digest)
-		if err != nil {
-			return nil, util.StatusWrapf(err, "Invalid digest for file %#v", entry.Path)
-		}
-		leaf := outputPathState.casFileFactory.LookupFile(childDigest, entry.IsExecutable, nil)
-		if err := prefixCreator.createChild(entry.Path, virtual.InitialNode{}.FromLeaf(leaf)); err != nil {
-			leaf.Unlink()
-			return nil, util.StatusWrapf(err, "Failed to create file %#v", entry.Path)
-		}
-	}
-
-	// Create requested directories.
-	for _, entry := range request.Directories {
-		childDigest, err := buildState.digestFunction.NewDigestFromProto(entry.TreeDigest)
-		if err != nil {
-			return nil, util.StatusWrapf(err, "Invalid tree digest for directory %#v", entry.Path)
-		}
-		if sizeBytes := childDigest.GetSizeBytes(); sizeBytes > d.maximumTreeSizeBytes {
-			return nil, status.Errorf(codes.InvalidArgument, "Directory %#v is %d bytes in size, which exceeds the permitted maximum of %d bytes", entry.Path, sizeBytes, d.maximumTreeSizeBytes)
-		}
-		var rootDirectoryDigest *digest.Digest
-		if entry.RootDirectoryDigest != nil {
-			d, err := buildState.digestFunction.NewDigestFromProto(entry.RootDirectoryDigest)
-			if err != nil {
-				return nil, util.StatusWrapf(err, "Invalid root directory digest for directory %#v", entry.Path)
-			}
-			rootDirectoryDigest = &d
-		}
-		if err := prefixCreator.createChild(
-			entry.Path,
-			virtual.InitialNode{}.FromDirectory(
-				virtual.NewCASInitialContentsFetcher(
-					context.Background(),
-					cd_cas.NewTreeDirectoryWalker(d.directoryFetcher, childDigest, rootDirectoryDigest),
-					outputPathState.casFileFactory,
-					d.symlinkFactory,
-					buildState.digestFunction))); err != nil {
-			return nil, util.StatusWrapf(err, "Failed to create directory %#v", entry.Path)
-		}
-	}
-
-	// Create requested symbolic links.
-	for _, entry := range request.Symlinks {
-		leaf := d.symlinkFactory.LookupSymlink([]byte(entry.Target))
-		if err := prefixCreator.createChild(entry.Path, virtual.InitialNode{}.FromLeaf(leaf)); err != nil {
-			leaf.Unlink()
-			return nil, util.StatusWrapf(err, "Failed to create symbolic link %#v", entry.Path)
-		}
-	}
-
-	return &emptypb.Empty{}, nil
+	return &bazeloutputservice.StageArtifactsResponse{
+		Responses: responses,
+	}, nil
 }
 
 // statWalker is an implementation of ScopeWalker and ComponentWalker
@@ -538,11 +509,10 @@ func (d *RemoteOutputServiceDirectory) BatchCreate(ctx context.Context, request 
 // corresponding to a requested path. It is capable of expanding
 // symbolic links, if encountered.
 type statWalker struct {
-	followSymlinks bool
 	digestFunction *digest.Function
 
-	stack      util.NonEmptyStack[virtual.PrepopulatedDirectory]
-	fileStatus *remoteoutputservice.FileStatus
+	stack util.NonEmptyStack[virtual.PrepopulatedDirectory]
+	stat  *bazeloutputservice.BatchStatResponse_Stat
 }
 
 func (cw *statWalker) OnScope(absolute bool) (path.ComponentWalker, error) {
@@ -550,8 +520,8 @@ func (cw *statWalker) OnScope(absolute bool) (path.ComponentWalker, error) {
 		cw.stack.PopAll()
 	}
 	// Currently in a known directory.
-	cw.fileStatus = &remoteoutputservice.FileStatus{
-		FileType: &remoteoutputservice.FileStatus_Directory_{},
+	cw.stat = &bazeloutputservice.BatchStatResponse_Stat{
+		Type: &bazeloutputservice.BatchStatResponse_Stat_Directory_{},
 	}
 	return cw, nil
 }
@@ -581,9 +551,7 @@ func (cw *statWalker) OnDirectory(name path.Component) (path.GotDirectoryOrSymli
 
 	// Got a symbolic link in the middle of a path. Those should
 	// always be followed.
-	cw.fileStatus = &remoteoutputservice.FileStatus{
-		FileType: &remoteoutputservice.FileStatus_External_{},
-	}
+	cw.stat = &bazeloutputservice.BatchStatResponse_Stat{}
 	return path.GotSymlink{
 		Parent: cw,
 		Target: target,
@@ -598,41 +566,22 @@ func (cw *statWalker) OnTerminal(name path.Component) (*path.GotSymlink, error) 
 
 	directory, leaf := child.GetPair()
 	if directory != nil {
-		// Got a directory. The existing FileStatus is sufficient.
+		// Got a directory. The existing Stat is sufficient.
 		cw.stack.Push(directory)
 		return nil, nil
 	}
 
-	if cw.followSymlinks {
-		target, err := leaf.Readlink()
-		if err == nil {
-			// Got a symbolic link, and we should follow it.
-			cw.fileStatus = &remoteoutputservice.FileStatus{
-				FileType: &remoteoutputservice.FileStatus_External_{},
-			}
-			return &path.GotSymlink{
-				Parent: cw,
-				Target: target,
-			}, nil
-		}
-		if err != syscall.EINVAL {
-			return nil, err
-		}
-	}
-
-	fileStatus, err := leaf.GetOutputServiceFileStatus(cw.digestFunction)
+	stat, err := leaf.GetBazelOutputServiceStat(cw.digestFunction)
 	if err != nil {
 		return nil, err
 	}
-	cw.fileStatus = fileStatus
+	cw.stat = stat
 	return nil, nil
 }
 
 func (cw *statWalker) OnUp() (path.ComponentWalker, error) {
 	if _, ok := cw.stack.PopSingle(); !ok {
-		cw.fileStatus = &remoteoutputservice.FileStatus{
-			FileType: &remoteoutputservice.FileStatus_External_{},
-		}
+		cw.stat = &bazeloutputservice.BatchStatResponse_Stat{}
 		return path.VoidComponentWalker, nil
 	}
 	return cw, nil
@@ -646,70 +595,53 @@ func (cw *statWalker) OnUp() (path.ComponentWalker, error) {
 // significantly reduces the amount of context switching. It also
 // prevents the computation of digests for files for which the digest is
 // already known.
-func (d *RemoteOutputServiceDirectory) BatchStat(ctx context.Context, request *remoteoutputservice.BatchStatRequest) (*remoteoutputservice.BatchStatResponse, error) {
+func (d *BazelOutputServiceDirectory) BatchStat(ctx context.Context, request *bazeloutputservice.BatchStatRequest) (*bazeloutputservice.BatchStatResponse, error) {
 	outputPathState, buildState, err := d.getOutputPathAndBuildState(request.BuildId)
 	if err != nil {
 		return nil, err
 	}
 
-	response := remoteoutputservice.BatchStatResponse{
-		Responses: make([]*remoteoutputservice.StatResponse, 0, len(request.Paths)),
+	response := bazeloutputservice.BatchStatResponse{
+		Responses: make([]*bazeloutputservice.BatchStatResponse_StatResponse, 0, len(request.Paths)),
 	}
 	for _, statPath := range request.Paths {
 		statWalker := statWalker{
-			followSymlinks: request.FollowSymlinks,
-			stack:          util.NewNonEmptyStack[virtual.PrepopulatedDirectory](outputPathState.rootDirectory),
-			fileStatus: &remoteoutputservice.FileStatus{
-				FileType: &remoteoutputservice.FileStatus_External_{},
-			},
+			stack: util.NewNonEmptyStack[virtual.PrepopulatedDirectory](outputPathState.rootDirectory),
+			stat:  &bazeloutputservice.BatchStatResponse_Stat{},
 		}
-		if request.IncludeFileDigest {
-			statWalker.digestFunction = &buildState.digestFunction
-		}
+		statWalker.digestFunction = &buildState.digestFunction
 
 		resolvedPath, scopeWalker := path.EmptyBuilder.Join(
 			buildState.scopeWalkerFactory.New(path.NewLoopDetectingScopeWalker(&statWalker)))
 		if err := path.Resolve(statPath, scopeWalker); err == syscall.ENOENT {
 			// Path does not exist.
-			response.Responses = append(response.Responses, &remoteoutputservice.StatResponse{})
+			response.Responses = append(response.Responses, &bazeloutputservice.BatchStatResponse_StatResponse{})
 		} else if err != nil {
 			// Some other error occurred.
 			return nil, util.StatusWrapf(err, "Failed to resolve path %#v beyond %#v", statPath, resolvedPath.String())
 		} else {
-			switch fileType := statWalker.fileStatus.FileType.(type) {
-			case *remoteoutputservice.FileStatus_Directory_:
-				// For directories we need to provide the last
-				// modification time, as the client uses that to
-				// invalidate cached results.
-				var attributes virtual.Attributes
-				statWalker.stack.Peek().VirtualGetAttributes(ctx, virtual.AttributesMaskLastDataModificationTime, &attributes)
-				lastModifiedTime, ok := attributes.GetLastDataModificationTime()
-				if !ok {
-					panic("Directory did not provide a last data modification time, even though the Remote Output Service protocol requires it")
-				}
-				fileType.Directory = &remoteoutputservice.FileStatus_Directory{
-					LastModifiedTime: timestamppb.New(lastModifiedTime),
-				}
-			case *remoteoutputservice.FileStatus_External_:
-				// Path resolves to a location outside the file
-				// system. Return the resolved path back to the
-				// client, so it can stat() it manually.
-				fileType.External = &remoteoutputservice.FileStatus_External{
-					NextPath: resolvedPath.String(),
-				}
-			}
-			response.Responses = append(response.Responses, &remoteoutputservice.StatResponse{
-				FileStatus: statWalker.fileStatus,
+			response.Responses = append(response.Responses, &bazeloutputservice.BatchStatResponse_StatResponse{
+				Stat: statWalker.stat,
 			})
 		}
 	}
 	return &response, nil
 }
 
+// FinalizeArtifacts can be called by a build client to indicate that
+// files are no longer expected to be modified by the build client. If
+// the file is modified after finalization, it may be reported through
+// InitialOutputPathContents.
+func (d *BazelOutputServiceDirectory) FinalizeArtifacts(ctx context.Context, request *bazeloutputservice.FinalizeArtifactsRequest) (*bazeloutputservice.FinalizeArtifactsResponse, error) {
+	// TODO: Properly track which artifacts are finalized, so that
+	// we can accurately report which files are modified.
+	return &bazeloutputservice.FinalizeArtifactsResponse{}, nil
+}
+
 // FinalizeBuild can be called by a build client to indicate the current
-// build has completed. This prevents successive BatchCreate() and
+// build has completed. This prevents successive StageArtifacts() and
 // BatchStat() calls from being processed.
-func (d *RemoteOutputServiceDirectory) FinalizeBuild(ctx context.Context, request *remoteoutputservice.FinalizeBuildRequest) (*emptypb.Empty, error) {
+func (d *BazelOutputServiceDirectory) FinalizeBuild(ctx context.Context, request *bazeloutputservice.FinalizeBuildRequest) (*bazeloutputservice.FinalizeBuildResponse, error) {
 	d.lock.Lock()
 	defer d.lock.Unlock()
 
@@ -721,12 +653,12 @@ func (d *RemoteOutputServiceDirectory) FinalizeBuild(ctx context.Context, reques
 		delete(d.buildIDs, buildState.id)
 		outputPathState.buildState = nil
 	}
-	return &emptypb.Empty{}, nil
+	return &bazeloutputservice.FinalizeBuildResponse{}, nil
 }
 
 // VirtualGetAttributes returns the attributes of the root directory of
-// the Remote Output Service.
-func (d *RemoteOutputServiceDirectory) VirtualGetAttributes(ctx context.Context, requested virtual.AttributesMask, attributes *virtual.Attributes) {
+// the Bazel Output Service.
+func (d *BazelOutputServiceDirectory) VirtualGetAttributes(ctx context.Context, requested virtual.AttributesMask, attributes *virtual.Attributes) {
 	attributes.SetFileType(filesystem.FileTypeDirectory)
 	attributes.SetPermissions(virtual.PermissionsRead | virtual.PermissionsExecute)
 	attributes.SetSizeBytes(0)
@@ -741,7 +673,7 @@ func (d *RemoteOutputServiceDirectory) VirtualGetAttributes(ctx context.Context,
 
 // VirtualLookup can be used to look up the root directory of an output
 // path for a given output base.
-func (d *RemoteOutputServiceDirectory) VirtualLookup(ctx context.Context, name path.Component, requested virtual.AttributesMask, out *virtual.Attributes) (virtual.DirectoryChild, virtual.Status) {
+func (d *BazelOutputServiceDirectory) VirtualLookup(ctx context.Context, name path.Component, requested virtual.AttributesMask, out *virtual.Attributes) (virtual.DirectoryChild, virtual.Status) {
 	d.lock.Lock()
 	outputPathState, ok := d.outputBaseIDs[name]
 	d.lock.Unlock()
@@ -753,9 +685,9 @@ func (d *RemoteOutputServiceDirectory) VirtualLookup(ctx context.Context, name p
 }
 
 // VirtualOpenChild can be used to open or create a file in the root
-// directory of the Remote Output Service. Because this directory never
+// directory of the Bazel Output Service. Because this directory never
 // contains any files, this function is guaranteed to fail.
-func (d *RemoteOutputServiceDirectory) VirtualOpenChild(ctx context.Context, name path.Component, shareAccess virtual.ShareMask, createAttributes *virtual.Attributes, existingOptions *virtual.OpenExistingOptions, requested virtual.AttributesMask, openedFileAttributes *virtual.Attributes) (virtual.Leaf, virtual.AttributesMask, virtual.ChangeInfo, virtual.Status) {
+func (d *BazelOutputServiceDirectory) VirtualOpenChild(ctx context.Context, name path.Component, shareAccess virtual.ShareMask, createAttributes *virtual.Attributes, existingOptions *virtual.OpenExistingOptions, requested virtual.AttributesMask, openedFileAttributes *virtual.Attributes) (virtual.Leaf, virtual.AttributesMask, virtual.ChangeInfo, virtual.Status) {
 	d.lock.Lock()
 	_, ok := d.outputBaseIDs[name]
 	d.lock.Unlock()
@@ -766,8 +698,8 @@ func (d *RemoteOutputServiceDirectory) VirtualOpenChild(ctx context.Context, nam
 }
 
 // VirtualReadDir returns a list of all the output paths managed by this
-// Remote Output Service.
-func (d *RemoteOutputServiceDirectory) VirtualReadDir(ctx context.Context, firstCookie uint64, requested virtual.AttributesMask, reporter virtual.DirectoryEntryReporter) virtual.Status {
+// Bazel Output Service.
+func (d *BazelOutputServiceDirectory) VirtualReadDir(ctx context.Context, firstCookie uint64, requested virtual.AttributesMask, reporter virtual.DirectoryEntryReporter) virtual.Status {
 	d.lock.Lock()
 	defer d.lock.Unlock()
 

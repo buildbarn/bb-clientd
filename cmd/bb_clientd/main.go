@@ -17,7 +17,7 @@ import (
 	re_filesystem "github.com/buildbarn/bb-remote-execution/pkg/filesystem"
 	re_vfs "github.com/buildbarn/bb-remote-execution/pkg/filesystem/virtual"
 	virtual_configuration "github.com/buildbarn/bb-remote-execution/pkg/filesystem/virtual/configuration"
-	"github.com/buildbarn/bb-remote-execution/pkg/proto/remoteoutputservice"
+	"github.com/buildbarn/bb-remote-execution/pkg/proto/bazeloutputservice"
 	blobstore_configuration "github.com/buildbarn/bb-storage/pkg/blobstore/configuration"
 	"github.com/buildbarn/bb-storage/pkg/blobstore/grpcservers"
 	"github.com/buildbarn/bb-storage/pkg/builder"
@@ -204,10 +204,10 @@ func main() {
 			return allocateHandle().AsStatelessDirectory(re_vfs.NewStaticDirectory(blobsDirectoryContents))
 		}
 
-		// Implementation of the Remote Output Service. The Remote
+		// Implementation of the Bazel Output Service. The Bazel
 		// Output Service allows Bazel to place its bazel-out/
-		// directories on a virtual file system, thereby allowing data
-		// to be loaded lazily.
+		// directories on a virtual file system, thereby
+		// allowing data to be loaded lazily.
 		symlinkFactory := re_vfs.NewHandleAllocatingSymlinkFactory(
 			re_vfs.BaseSymlinkFactory,
 			rootHandleAllocator.New())
@@ -247,7 +247,7 @@ func main() {
 				symlinkFactory)
 		}
 
-		outputsDirectory := cd_vfs.NewRemoteOutputServiceDirectory(
+		outputsDirectory := cd_vfs.NewBazelOutputServiceDirectory(
 			rootHandleAllocator,
 			outputPathFactory,
 			bareContentAddressableStorage,
@@ -319,7 +319,7 @@ func main() {
 						})))
 				remoteexecution.RegisterExecutionServer(s, buildQueue)
 
-				remoteoutputservice.RegisterRemoteOutputServiceServer(s, outputsDirectory)
+				bazeloutputservice.RegisterBazelOutputServiceServer(s, outputsDirectory)
 			},
 			siblingsGroup,
 		); err != nil {

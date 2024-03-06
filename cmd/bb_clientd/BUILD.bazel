@@ -17,7 +17,7 @@ go_library(
         "@com_github_buildbarn_bb_remote_execution//pkg/filesystem",
         "@com_github_buildbarn_bb_remote_execution//pkg/filesystem/virtual",
         "@com_github_buildbarn_bb_remote_execution//pkg/filesystem/virtual/configuration",
-        "@com_github_buildbarn_bb_remote_execution//pkg/proto/remoteoutputservice",
+        "@com_github_buildbarn_bb_remote_execution//pkg/proto/bazeloutputservice",
         "@com_github_buildbarn_bb_storage//pkg/blobstore/configuration",
         "@com_github_buildbarn_bb_storage//pkg/blobstore/grpcservers",
         "@com_github_buildbarn_bb_storage//pkg/builder",

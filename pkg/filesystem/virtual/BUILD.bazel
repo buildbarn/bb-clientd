@@ -3,6 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 go_library(
     name = "virtual",
     srcs = [
+        "bazel_output_service_directory.go",
         "blob_access_command_file_factory.go",
         "cas_directory.go",
         "cas_directory_factory.go",
@@ -16,7 +17,6 @@ go_library(
         "non_iterable_directory.go",
         "output_path_factory.go",
         "persistent_output_path_factory.go",
-        "remote_output_service_directory.go",
         "tree_cas_directory_factory.go",
     ],
     importpath = "github.com/buildbarn/bb-clientd/pkg/filesystem/virtual",
@@ -30,8 +30,9 @@ go_library(
         "@com_github_buildbarn_bb_remote_execution//pkg/cas",
         "@com_github_buildbarn_bb_remote_execution//pkg/filesystem",
         "@com_github_buildbarn_bb_remote_execution//pkg/filesystem/virtual",
+        "@com_github_buildbarn_bb_remote_execution//pkg/proto/bazeloutputservice",
+        "@com_github_buildbarn_bb_remote_execution//pkg/proto/bazeloutputservice/rev2",
         "@com_github_buildbarn_bb_remote_execution//pkg/proto/outputpathpersistency",
-        "@com_github_buildbarn_bb_remote_execution//pkg/proto/remoteoutputservice",
         "@com_github_buildbarn_bb_storage//pkg/blobstore",
         "@com_github_buildbarn_bb_storage//pkg/clock",
         "@com_github_buildbarn_bb_storage//pkg/digest",
@@ -40,7 +41,6 @@ go_library(
         "@com_github_buildbarn_bb_storage//pkg/util",
         "@org_golang_google_grpc//codes",
         "@org_golang_google_grpc//status",
-        "@org_golang_google_protobuf//types/known/emptypb",
         "@org_golang_google_protobuf//types/known/timestamppb",
         "@org_golang_x_sync//semaphore",
     ],
@@ -49,6 +49,7 @@ go_library(
 go_test(
     name = "virtual_test",
     srcs = [
+        "bazel_output_service_directory_test.go",
         "cas_directory_test.go",
         "decomposed_cas_directory_factory_test.go",
         "digest_parsing_directory_test.go",
@@ -56,7 +57,6 @@ go_test(
         "instance_name_parsing_directory_test.go",
         "local_file_uploading_output_path_factory_test.go",
         "persistent_output_path_factory_test.go",
-        "remote_output_service_directory_test.go",
         "tree_cas_directory_factory_test.go",
     ],
     deps = [
@@ -64,8 +64,9 @@ go_test(
         "//internal/mock",
         "@com_github_bazelbuild_remote_apis//build/bazel/remote/execution/v2:execution",
         "@com_github_buildbarn_bb_remote_execution//pkg/filesystem/virtual",
+        "@com_github_buildbarn_bb_remote_execution//pkg/proto/bazeloutputservice",
+        "@com_github_buildbarn_bb_remote_execution//pkg/proto/bazeloutputservice/rev2",
         "@com_github_buildbarn_bb_remote_execution//pkg/proto/outputpathpersistency",
-        "@com_github_buildbarn_bb_remote_execution//pkg/proto/remoteoutputservice",
         "@com_github_buildbarn_bb_storage//pkg/blobstore",
         "@com_github_buildbarn_bb_storage//pkg/blobstore/buffer",
         "@com_github_buildbarn_bb_storage//pkg/digest",
@@ -76,7 +77,7 @@ go_test(
         "@com_github_stretchr_testify//require",
         "@org_golang_google_grpc//codes",
         "@org_golang_google_grpc//status",
-        "@org_golang_google_protobuf//types/known/timestamppb",
+        "@org_golang_google_protobuf//types/known/anypb",
         "@org_golang_x_sync//semaphore",
     ],
 )

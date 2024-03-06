@@ -62,7 +62,7 @@ func (op *localFileUploadingOutputPath) FinalizeBuild(ctx context.Context, diges
 		blobstore.RecommendedFindMissingDigestsCount,
 		op.factory.concurrency)
 
-	// For the Remote Output Service use case it's not important
+	// For the Bazel Output Service use case it's not important
 	// enough to have a configurable delay here, because the time it
 	// takes until Bazel calls FinalizeBuild() is sufficiently high.
 	// Furthermore, if we upload files with missing contents, a

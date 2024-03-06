@@ -50,7 +50,7 @@ message ApplicationConfiguration {
   //   lazily. Using this feature gives the same performance
   //   improvements as --remote_download_minimal, with the added
   //   advantage that remote output files remain accessible locally.
-  //   More details: https://github.com/bazelbuild/bazel/pull/12823
+  //   More details: https://github.com/bazelbuild/bazel/discussions/20933
   //
   // scratch/:
   //   A writable directory where arbitrary path layouts may be

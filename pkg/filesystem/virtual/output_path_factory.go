@@ -22,7 +22,7 @@ type OutputPath interface {
 }
 
 // OutputPathFactory is an interface that is invoked by
-// RemoteOutputServiceDirectory to manage individual directories where
+// BazelOutputServiceDirectory to manage individual directories where
 // build results may be stored.
 type OutputPathFactory interface {
 	// StartInitialBuild() is called when a build is started that
@@ -30,16 +30,16 @@ type OutputPathFactory interface {
 	// was cleaned previously.
 	StartInitialBuild(outputBaseID path.Component, casFileFactory virtual.CASFileFactory, digestFunction digest.Function, errorLogger util.ErrorLogger) OutputPath
 
-	// Clean() is called when the RemoteOutputServiceDirectory
+	// Clean() is called when the BazelOutputServiceDirectory
 	// service is instructed to clean an output path that is not yet
-	// managed by the RemoteOutputServiceDirectory. This may occur
-	// if a 'bazel clean' is invoked right after startup. In that
-	// case the output path may not yet be attached, though we
-	// should clean up any persistent data associated with it.
+	// managed by the BazelOutputServiceDirectory. This may occur if
+	// a 'bazel clean' is invoked right after startup. In that case
+	// the output path may not yet be attached, though we should
+	// clean up any persistent data associated with it.
 	//
 	// Output paths that have already been returned by
 	// StartInitialBuild() will be cleaned by
-	// RemoteOutputServiceDirectory by calling
+	// BazelOutputServiceDirectory by calling
 	// PrepopulatedDirectory.RemoveAllChildren(true).
 	Clean(outputBaseID path.Component) error
 }
