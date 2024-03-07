@@ -606,11 +606,10 @@ func (d *BazelOutputServiceDirectory) BatchStat(ctx context.Context, request *ba
 	}
 	for _, statPath := range request.Paths {
 		statWalker := statWalker{
-			stack: util.NewNonEmptyStack[virtual.PrepopulatedDirectory](outputPathState.rootDirectory),
-			stat:  &bazeloutputservice.BatchStatResponse_Stat{},
+			digestFunction: &buildState.digestFunction,
+			stack:          util.NewNonEmptyStack[virtual.PrepopulatedDirectory](outputPathState.rootDirectory),
+			stat:           &bazeloutputservice.BatchStatResponse_Stat{},
 		}
-		statWalker.digestFunction = &buildState.digestFunction
-
 		resolvedPath, scopeWalker := path.EmptyBuilder.Join(
 			buildState.scopeWalkerFactory.New(path.NewLoopDetectingScopeWalker(&statWalker)))
 		if err := path.Resolve(statPath, scopeWalker); err == syscall.ENOENT {
