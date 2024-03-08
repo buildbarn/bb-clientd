@@ -59,8 +59,12 @@ github.com/buildbarn/bb-remote-execution v0.0.0-20240222085313-f5b199467dd6 h1:d
 github.com/buildbarn/bb-remote-execution v0.0.0-20240222085313-f5b199467dd6/go.mod h1:qwNvc1PxPWzRzcKiQ/Hq1MQmxB8fjWQ+Lv0h9r8aysU=
 github.com/buildbarn/bb-remote-execution v0.0.0-20240306174844-94b3776d5dba h1:pe9k/EHyywQK/OYEQkmHY7cYycG41kDEd6Ae+lHynkM=
 github.com/buildbarn/bb-remote-execution v0.0.0-20240306174844-94b3776d5dba/go.mod h1:qwNvc1PxPWzRzcKiQ/Hq1MQmxB8fjWQ+Lv0h9r8aysU=
+github.com/buildbarn/bb-remote-execution v0.0.0-20240307211444-6879a90a1d00 h1:Pz2SMTPFEbrxvfpGt2f0VMj6ZooIW5GMDH0MaIk6tIU=
+github.com/buildbarn/bb-remote-execution v0.0.0-20240307211444-6879a90a1d00/go.mod h1:R/PblhgyLNtqYySF5xvpjbMzfmGYW1HWrPvwN6q0FQU=
 github.com/buildbarn/bb-storage v0.0.0-20240227100204-0aa40dfdbead h1:fHapKnQQLgJaMxGiBAUCPVHNfD5vV1LDfXqmyClJ6Lc=
 github.com/buildbarn/bb-storage v0.0.0-20240227100204-0aa40dfdbead/go.mod h1:gHT0PInDFOV/JZjeeNwvqmn33MKHHyk3V18e4/Cs/jM=
+github.com/buildbarn/bb-storage v0.0.0-20240307194821-4d0d7a3d85b5 h1:tBbub4L03HT0PNKToki245kaXjwb+AOzyhfy8oosL6w=
+github.com/buildbarn/bb-storage v0.0.0-20240307194821-4d0d7a3d85b5/go.mod h1:0uISGKJD6Owt29w2sUlK0TeLtYdLWtBiC43yVHdgMAY=
 github.com/buildbarn/go-xdr v0.0.0-20231115101217-a9e2aa4cf64b h1:/sKWC0Fs5fXNo/t72BRZRLERg4v2gFoEeg2Mk+a8xak=
 github.com/buildbarn/go-xdr v0.0.0-20231115101217-a9e2aa4cf64b/go.mod h1:VwInghBSUyPtNBhl7o2oCUnxOCTGgySJnRTO1Kh7XuI=
 github.com/census-instrumentation/opencensus-proto v0.2.1/go.mod h1:f6KPmirojxKA12rnyqOA5BBL4O983OfeGPqjHWSTneU=
@@ -280,6 +284,7 @@ golang.org/x/sys v0.0.0-20220722155257-8c9f86f7a55f/go.mod h1:oPkhp1MJrh7nUepCBc
 golang.org/x/sys v0.0.0-20220908164124-27713097b956/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
 golang.org/x/sys v0.17.0 h1:25cE3gD+tdBA7lp7QfhuV+rJiE9YXTcS3VG1SqssI/Y=
 golang.org/x/sys v0.17.0/go.mod h1:/VUhepiaJMQUp4+oa/7Zr1D23ma6VTLIYjOOTFZPUcA=
+golang.org/x/sys v0.18.0/go.mod h1:/VUhepiaJMQUp4+oa/7Zr1D23ma6VTLIYjOOTFZPUcA=
 golang.org/x/term v0.0.0-20201126162022-7de9c90e9dd1/go.mod h1:bj7SfCRtBDWHUb9snDiAeCFNEtKQo2Wmx5Cou7ajbmo=
 golang.org/x/term v0.0.0-20210927222741-03fcf44c2211/go.mod h1:jbD1KX2456YbFQfuXm/mYQcufACuNUgVhRMnK/tPxf8=
 golang.org/x/text v0.3.0/go.mod h1:NqM8EUOU14njkJ3fqMW+pc6Ldnwhi/IjpwHt7yyuwOQ=

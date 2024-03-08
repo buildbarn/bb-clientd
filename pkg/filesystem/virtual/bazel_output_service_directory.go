@@ -248,8 +248,12 @@ func (d *BazelOutputServiceDirectory) StartBuild(ctx context.Context, request *b
 	// Compute the full output path and the output path suffix. The
 	// former needs to be used by us, while the latter is
 	// communicated back to the client.
+	outputPathPrefixParser, err := path.NewUNIXParser(request.OutputPathPrefix)
+	if err != nil {
+		return nil, util.StatusWrap(err, "Invalid output path prefix")
+	}
 	outputPath, scopeWalker := path.EmptyBuilder.Join(path.NewAbsoluteScopeWalker(path.VoidComponentWalker))
-	if err := path.Resolve(request.OutputPathPrefix, scopeWalker); err != nil {
+	if err := path.Resolve(outputPathPrefixParser, scopeWalker); err != nil {
 		return nil, util.StatusWrap(err, "Failed to resolve output path prefix")
 	}
 	outputPathSuffix, scopeWalker := path.EmptyBuilder.Join(path.VoidScopeWalker)
@@ -258,7 +262,7 @@ func (d *BazelOutputServiceDirectory) StartBuild(ctx context.Context, request *b
 	if !ok {
 		return nil, status.Error(codes.InvalidArgument, "Output base ID is not a valid filename")
 	}
-	componentWalker, err := scopeWalker.OnScope(false)
+	componentWalker, err := scopeWalker.OnRelative()
 	if err != nil {
 		return nil, util.StatusWrap(err, "Failed to resolve output path")
 	}
@@ -406,10 +410,14 @@ func (cw *parentDirectoryCreatingComponentWalker) OnUp() (path.ComponentWalker, 
 
 func (d *BazelOutputServiceDirectory) stageSingleArtifact(ctx context.Context, artifact *bazeloutputservice.StageArtifactsRequest_Artifact, outputPathState *outputPathState, buildState *buildState) error {
 	// Resolve the parent directory and filename of the artifact to create.
+	pathParser, err := path.NewUNIXParser(artifact.Path)
+	if err != nil {
+		return util.StatusWrap(err, "Invalid path")
+	}
 	outputParentCreator := parentDirectoryCreatingComponentWalker{
 		stack: util.NewNonEmptyStack[virtual.PrepopulatedDirectory](outputPathState.rootDirectory),
 	}
-	if err := path.Resolve(artifact.Path, path.NewRelativeScopeWalker(&outputParentCreator)); err != nil {
+	if err := path.Resolve(pathParser, path.NewRelativeScopeWalker(&outputParentCreator)); err != nil {
 		return util.StatusWrap(err, "Failed to resolve path")
 	}
 	name := outputParentCreator.TerminalName
@@ -515,10 +523,12 @@ type statWalker struct {
 	stat  *bazeloutputservice.BatchStatResponse_Stat
 }
 
-func (cw *statWalker) OnScope(absolute bool) (path.ComponentWalker, error) {
-	if absolute {
-		cw.stack.PopAll()
-	}
+func (cw *statWalker) OnAbsolute() (path.ComponentWalker, error) {
+	cw.stack.PopAll()
+	return cw.OnRelative()
+}
+
+func (cw *statWalker) OnRelative() (path.ComponentWalker, error) {
 	// Currently in a known directory.
 	cw.stat = &bazeloutputservice.BatchStatResponse_Stat{
 		Type: &bazeloutputservice.BatchStatResponse_Stat_Directory_{},
@@ -548,13 +558,17 @@ func (cw *statWalker) OnDirectory(name path.Component) (path.GotDirectoryOrSymli
 	} else if err != nil {
 		return nil, err
 	}
+	targetParser, err := path.NewUNIXParser(target)
+	if err != nil {
+		return nil, err
+	}
 
 	// Got a symbolic link in the middle of a path. Those should
 	// always be followed.
 	cw.stat = &bazeloutputservice.BatchStatResponse_Stat{}
 	return path.GotSymlink{
 		Parent: cw,
-		Target: target,
+		Target: targetParser,
 	}, nil
 }
 
@@ -605,6 +619,10 @@ func (d *BazelOutputServiceDirectory) BatchStat(ctx context.Context, request *ba
 		Responses: make([]*bazeloutputservice.BatchStatResponse_StatResponse, 0, len(request.Paths)),
 	}
 	for _, statPath := range request.Paths {
+		statPathParser, err := path.NewUNIXParser(statPath)
+		if err != nil {
+			return nil, util.StatusWrapf(err, "Invalid path %#v", statPath)
+		}
 		statWalker := statWalker{
 			digestFunction: &buildState.digestFunction,
 			stack:          util.NewNonEmptyStack[virtual.PrepopulatedDirectory](outputPathState.rootDirectory),
@@ -612,7 +630,7 @@ func (d *BazelOutputServiceDirectory) BatchStat(ctx context.Context, request *ba
 		}
 		resolvedPath, scopeWalker := path.EmptyBuilder.Join(
 			buildState.scopeWalkerFactory.New(path.NewLoopDetectingScopeWalker(&statWalker)))
-		if err := path.Resolve(statPath, scopeWalker); err == syscall.ENOENT {
+		if err := path.Resolve(statPathParser, scopeWalker); err == syscall.ENOENT {
 			// Path does not exist.
 			response.Responses = append(response.Responses, &bazeloutputservice.BatchStatResponse_StatResponse{})
 		} else if err != nil {
