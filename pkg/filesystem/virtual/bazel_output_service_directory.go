@@ -558,17 +558,13 @@ func (cw *statWalker) OnDirectory(name path.Component) (path.GotDirectoryOrSymli
 	} else if err != nil {
 		return nil, err
 	}
-	targetParser, err := path.NewUNIXParser(target)
-	if err != nil {
-		return nil, err
-	}
 
 	// Got a symbolic link in the middle of a path. Those should
 	// always be followed.
 	cw.stat = &bazeloutputservice.BatchStatResponse_Stat{}
 	return path.GotSymlink{
 		Parent: cw,
-		Target: targetParser,
+		Target: target,
 	}, nil
 }
 
