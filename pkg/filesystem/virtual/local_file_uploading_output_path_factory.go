@@ -97,7 +97,7 @@ type localFileUploader struct {
 func (u *localFileUploader) uploadLocalFilesRecursive(d virtual.PrepopulatedDirectory, dPath *path.Trace) error {
 	directories, leaves, err := d.LookupAllChildren()
 	if err != nil {
-		return util.StatusWrapf(err, "Failed to look up children of directory %#v in output path %#v", dPath.String(), u.outputBaseID.String())
+		return util.StatusWrapf(err, "Failed to look up children of directory %#v in output path %#v", dPath.GetUNIXString(), u.outputBaseID.String())
 	}
 	for _, entry := range directories {
 		err := u.uploadLocalFilesRecursive(entry.Child, dPath.Append(entry.Name))
@@ -108,7 +108,7 @@ func (u *localFileUploader) uploadLocalFilesRecursive(d virtual.PrepopulatedDire
 	for _, entry := range leaves {
 		_, err := entry.Child.UploadFile(u.context, u.contentAddressableStorage, u.digestFunction, u.writableFileUploadDelay)
 		if err != nil && status.Code(err) != codes.InvalidArgument {
-			return util.StatusWrapf(err, "Failed to upload local file %#v in output path %#v", dPath.Append(entry.Name).String(), u.outputBaseID.String())
+			return util.StatusWrapf(err, "Failed to upload local file %#v in output path %#v", dPath.Append(entry.Name).GetUNIXString(), u.outputBaseID.String())
 		}
 	}
 	return nil

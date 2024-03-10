@@ -7,8 +7,8 @@ replace github.com/grpc-ecosystem/grpc-gateway/v2 => github.com/grpc-ecosystem/g
 
 require (
 	github.com/bazelbuild/remote-apis v0.0.0-20240215191509-9ff14cecffe5
-	github.com/buildbarn/bb-remote-execution v0.0.0-20240308103551-b4cdefde2e35
-	github.com/buildbarn/bb-storage v0.0.0-20240308085957-e8fd6935d2ef
+	github.com/buildbarn/bb-remote-execution v0.0.0-20240310090416-28dbdbb0a6b0
+	github.com/buildbarn/bb-storage v0.0.0-20240310075825-20598f43e294
 	golang.org/x/sync v0.6.0
 	google.golang.org/genproto/googleapis/bytestream v0.0.0-20240228224816-df926f6c8641
 	google.golang.org/grpc v1.62.0

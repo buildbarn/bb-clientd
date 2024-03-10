@@ -49,16 +49,16 @@ func (sr *stateRestorer) restoreDirectoryRecursive(reader outputpathpersistency.
 	for _, entry := range contents.Directories {
 		component, ok := path.NewComponent(entry.Name)
 		if !ok {
-			return status.Errorf(codes.InvalidArgument, "Directory %#v inside directory %#v has an invalid name", entry.Name, dPath.String())
+			return status.Errorf(codes.InvalidArgument, "Directory %#v inside directory %#v has an invalid name", entry.Name, dPath.GetUNIXString())
 		}
 		childPath := dPath.Append(component)
 		childReader, childContents, err := reader.ReadDirectory(entry.FileRegion)
 		if err != nil {
-			return util.StatusWrapf(err, "Failed to load directory %#v", childPath.String())
+			return util.StatusWrapf(err, "Failed to load directory %#v", childPath.GetUNIXString())
 		}
 		childDirectory, err := d.CreateAndEnterPrepopulatedDirectory(component)
 		if err != nil {
-			return util.StatusWrapf(err, "Failed to create directory %#v", childPath.String())
+			return util.StatusWrapf(err, "Failed to create directory %#v", childPath.GetUNIXString())
 		}
 		if err := sr.restoreDirectoryRecursive(childReader, childContents, childDirectory, childPath); err != nil {
 			return err
@@ -78,7 +78,7 @@ func (sr *stateRestorer) restoreDirectoryRecursive(reader outputpathpersistency.
 	for _, entry := range contents.Files {
 		component, ok := path.NewComponent(entry.Name)
 		if !ok {
-			return status.Errorf(codes.InvalidArgument, "File %#v inside directory %#v has an invalid name", entry.Name, dPath.String())
+			return status.Errorf(codes.InvalidArgument, "File %#v inside directory %#v has an invalid name", entry.Name, dPath.GetUNIXString())
 		}
 		if _, ok := initialNodes[component]; ok {
 			return status.Errorf(codes.InvalidArgument, "Directory contains multiple children named %#v", entry.Name)
@@ -87,14 +87,14 @@ func (sr *stateRestorer) restoreDirectoryRecursive(reader outputpathpersistency.
 		childPath := dPath.Append(component)
 		childDigest, err := sr.digestFunction.NewDigestFromProto(entry.Digest)
 		if err != nil {
-			return util.StatusWrapf(err, "Failed to obtain digest for file %#v", childPath.String())
+			return util.StatusWrapf(err, "Failed to obtain digest for file %#v", childPath.GetUNIXString())
 		}
 		initialNodes[component] = virtual.InitialNode{}.FromLeaf(sr.casFileFactory.LookupFile(childDigest, entry.IsExecutable, nil))
 	}
 	for _, entry := range contents.Symlinks {
 		component, ok := path.NewComponent(entry.Name)
 		if !ok {
-			return status.Errorf(codes.InvalidArgument, "Symlink %#v inside directory %#v has an invalid name", entry.Name, dPath.String())
+			return status.Errorf(codes.InvalidArgument, "Symlink %#v inside directory %#v has an invalid name", entry.Name, dPath.GetUNIXString())
 		}
 		if _, ok := initialNodes[component]; ok {
 			return status.Errorf(codes.InvalidArgument, "Directory contains multiple children named %#v", entry.Name)
@@ -193,7 +193,7 @@ func (op *persistentOutputPath) saveOutputPath() error {
 func saveDirectoryRecursive(d virtual.PrepopulatedDirectory, dPath *path.Trace, w outputpathpersistency.Writer) (*outputpathpersistency_pb.Directory, error) {
 	directories, leaves, err := d.LookupAllChildren()
 	if err != nil {
-		return nil, util.StatusWrapf(err, "Failed to look up children of directory %#v", dPath.String())
+		return nil, util.StatusWrapf(err, "Failed to look up children of directory %#v", dPath.GetUNIXString())
 	}
 	var directory outputpathpersistency_pb.Directory
 	for _, entry := range directories {
@@ -204,7 +204,7 @@ func saveDirectoryRecursive(d virtual.PrepopulatedDirectory, dPath *path.Trace, 
 		}
 		fileRegion, err := w.WriteDirectory(childDirectory)
 		if err != nil {
-			return nil, util.StatusWrapf(err, "Failed to write directory %#v to state file", childPath.String())
+			return nil, util.StatusWrapf(err, "Failed to write directory %#v to state file", childPath.GetUNIXString())
 		}
 		directory.Directories = append(directory.Directories, &outputpathpersistency_pb.DirectoryNode{
 			Name:       entry.Name.String(),

@@ -273,7 +273,7 @@ func (d *BazelOutputServiceDirectory) StartBuild(ctx context.Context, request *b
 	// Create a virtual root based on the output path and provided
 	// aliases. This will be used to properly resolve targets of
 	// symbolic links stored in the output path.
-	scopeWalkerFactory, err := path.NewVirtualRootScopeWalkerFactory(outputPath.String(), request.OutputPathAliases)
+	scopeWalkerFactory, err := path.NewVirtualRootScopeWalkerFactory(outputPath, request.OutputPathAliases)
 	if err != nil {
 		return nil, err
 	}
@@ -361,7 +361,7 @@ func (d *BazelOutputServiceDirectory) StartBuild(ctx context.Context, request *b
 		// client can skip parts of its analysis. The easiest
 		// way to achieve this would be to freeze the contents
 		// of the output path between builds.
-		OutputPathSuffix: outputPathSuffix.String(),
+		OutputPathSuffix: outputPathSuffix.GetUNIXString(),
 	}, nil
 }
 
@@ -631,7 +631,7 @@ func (d *BazelOutputServiceDirectory) BatchStat(ctx context.Context, request *ba
 			response.Responses = append(response.Responses, &bazeloutputservice.BatchStatResponse_StatResponse{})
 		} else if err != nil {
 			// Some other error occurred.
-			return nil, util.StatusWrapf(err, "Failed to resolve path %#v beyond %#v", statPath, resolvedPath.String())
+			return nil, util.StatusWrapf(err, "Failed to resolve path %#v beyond %#v", statPath, resolvedPath.GetUNIXString())
 		} else {
 			response.Responses = append(response.Responses, &bazeloutputservice.BatchStatResponse_StatResponse{
 				Stat: statWalker.stat,
