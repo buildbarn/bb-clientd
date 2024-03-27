@@ -65,6 +65,8 @@ github.com/buildbarn/bb-remote-execution v0.0.0-20240308103551-b4cdefde2e35 h1:b
 github.com/buildbarn/bb-remote-execution v0.0.0-20240308103551-b4cdefde2e35/go.mod h1:eWUQ51dc8XX2eKM4re9wD8VBzJ8D21JZi87L7mfttus=
 github.com/buildbarn/bb-remote-execution v0.0.0-20240310090416-28dbdbb0a6b0 h1:wcGel3yU3FAENqRLzgZkg7xzuwlaY9H+Lphd46u5tyI=
 github.com/buildbarn/bb-remote-execution v0.0.0-20240310090416-28dbdbb0a6b0/go.mod h1:q3TGK8PD/HoADYpaOU0lup48IOusUuCoP0ilLi+BX7A=
+github.com/buildbarn/bb-remote-execution v0.0.0-20240327120038-7bcf9b5f081f h1:rFKH1HdOh6t2qqnYr/EWbP9Md4OuqiyUySPoYbgVkkg=
+github.com/buildbarn/bb-remote-execution v0.0.0-20240327120038-7bcf9b5f081f/go.mod h1:k4EPiIu814IXfvkXH89AQMyDZmFOcpt4KwihDNA4shs=
 github.com/buildbarn/bb-storage v0.0.0-20240227100204-0aa40dfdbead h1:fHapKnQQLgJaMxGiBAUCPVHNfD5vV1LDfXqmyClJ6Lc=
 github.com/buildbarn/bb-storage v0.0.0-20240227100204-0aa40dfdbead/go.mod h1:gHT0PInDFOV/JZjeeNwvqmn33MKHHyk3V18e4/Cs/jM=
 github.com/buildbarn/bb-storage v0.0.0-20240307194821-4d0d7a3d85b5 h1:tBbub4L03HT0PNKToki245kaXjwb+AOzyhfy8oosL6w=
@@ -73,6 +75,8 @@ github.com/buildbarn/bb-storage v0.0.0-20240308085957-e8fd6935d2ef h1:4Mq41hEzT6
 github.com/buildbarn/bb-storage v0.0.0-20240308085957-e8fd6935d2ef/go.mod h1:0uISGKJD6Owt29w2sUlK0TeLtYdLWtBiC43yVHdgMAY=
 github.com/buildbarn/bb-storage v0.0.0-20240310075825-20598f43e294 h1:Gs3nP150dcZ7Utk7OrYPpoV9/7oGZ9y1It0BGPonDnk=
 github.com/buildbarn/bb-storage v0.0.0-20240310075825-20598f43e294/go.mod h1:0uISGKJD6Owt29w2sUlK0TeLtYdLWtBiC43yVHdgMAY=
+github.com/buildbarn/bb-storage v0.0.0-20240326045855-53c12526d34e h1:9akyMjvUsqodoCvKKdUlN5i+GxfYa9OeZnNuenPBLfE=
+github.com/buildbarn/bb-storage v0.0.0-20240326045855-53c12526d34e/go.mod h1:0uISGKJD6Owt29w2sUlK0TeLtYdLWtBiC43yVHdgMAY=
 github.com/buildbarn/go-xdr v0.0.0-20231115101217-a9e2aa4cf64b h1:/sKWC0Fs5fXNo/t72BRZRLERg4v2gFoEeg2Mk+a8xak=
 github.com/buildbarn/go-xdr v0.0.0-20231115101217-a9e2aa4cf64b/go.mod h1:VwInghBSUyPtNBhl7o2oCUnxOCTGgySJnRTO1Kh7XuI=
 github.com/census-instrumentation/opencensus-proto v0.2.1/go.mod h1:f6KPmirojxKA12rnyqOA5BBL4O983OfeGPqjHWSTneU=
