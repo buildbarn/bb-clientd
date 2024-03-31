@@ -1,21 +1,23 @@
-load("@bazel_gazelle//:def.bzl", "gazelle")
+load("@gazelle//:def.bzl", "gazelle")
 load("@rules_pkg//:pkg.bzl", "pkg_deb", "pkg_tar")
 
+# gazelle:go_naming_convention_external import
 # gazelle:prefix github.com/buildbarn/bb-clientd
-# gazelle:resolve proto pkg/proto/configuration/blobstore/blobstore.proto @com_github_buildbarn_bb_storage//pkg/proto/configuration/blobstore:blobstore_proto
 # gazelle:resolve proto go pkg/proto/configuration/blobstore/blobstore.proto @com_github_buildbarn_bb_storage//pkg/proto/configuration/blobstore
-# gazelle:resolve proto pkg/proto/configuration/builder/builder.proto @com_github_buildbarn_bb_storage//pkg/proto/configuration/builder:builder_proto
 # gazelle:resolve proto go pkg/proto/configuration/builder/builder.proto @com_github_buildbarn_bb_storage//pkg/proto/configuration/builder
-# gazelle:resolve proto pkg/proto/configuration/cas/cas.proto @com_github_buildbarn_bb_remote_execution//pkg/proto/configuration/cas:cas_proto
 # gazelle:resolve proto go pkg/proto/configuration/cas/cas.proto @com_github_buildbarn_bb_remote_execution//pkg/proto/configuration/cas
-# gazelle:resolve proto pkg/proto/configuration/filesystem/filesystem.proto @com_github_buildbarn_bb_remote_execution//pkg/proto/configuration/filesystem:filesystem_proto
 # gazelle:resolve proto go pkg/proto/configuration/filesystem/filesystem.proto @com_github_buildbarn_bb_remote_execution//pkg/proto/configuration/filesystem
-# gazelle:resolve proto pkg/proto/configuration/filesystem/virtual/virtual.proto @com_github_buildbarn_bb_remote_execution//pkg/proto/configuration/filesystem/virtual:virtual_proto
 # gazelle:resolve proto go pkg/proto/configuration/filesystem/virtual/virtual.proto @com_github_buildbarn_bb_remote_execution//pkg/proto/configuration/filesystem/virtual
-# gazelle:resolve proto pkg/proto/configuration/global/global.proto @com_github_buildbarn_bb_storage//pkg/proto/configuration/global:global_proto
 # gazelle:resolve proto go pkg/proto/configuration/global/global.proto @com_github_buildbarn_bb_storage//pkg/proto/configuration/global
-# gazelle:resolve proto pkg/proto/configuration/grpc/grpc.proto @com_github_buildbarn_bb_storage//pkg/proto/configuration/grpc:grpc_proto
 # gazelle:resolve proto go pkg/proto/configuration/grpc/grpc.proto @com_github_buildbarn_bb_storage//pkg/proto/configuration/grpc
+# gazelle:resolve proto google/protobuf/duration.proto @protobuf//:duration_proto
+# gazelle:resolve proto pkg/proto/configuration/blobstore/blobstore.proto @com_github_buildbarn_bb_storage//pkg/proto/configuration/blobstore:blobstore_proto
+# gazelle:resolve proto pkg/proto/configuration/builder/builder.proto @com_github_buildbarn_bb_storage//pkg/proto/configuration/builder:builder_proto
+# gazelle:resolve proto pkg/proto/configuration/cas/cas.proto @com_github_buildbarn_bb_remote_execution//pkg/proto/configuration/cas:cas_proto
+# gazelle:resolve proto pkg/proto/configuration/filesystem/filesystem.proto @com_github_buildbarn_bb_remote_execution//pkg/proto/configuration/filesystem:filesystem_proto
+# gazelle:resolve proto pkg/proto/configuration/filesystem/virtual/virtual.proto @com_github_buildbarn_bb_remote_execution//pkg/proto/configuration/filesystem/virtual:virtual_proto
+# gazelle:resolve proto pkg/proto/configuration/global/global.proto @com_github_buildbarn_bb_storage//pkg/proto/configuration/global:global_proto
+# gazelle:resolve proto pkg/proto/configuration/grpc/grpc.proto @com_github_buildbarn_bb_storage//pkg/proto/configuration/grpc:grpc_proto
 gazelle(
     name = "gazelle",
 )

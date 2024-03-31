@@ -1,4 +1,4 @@
-local workflows_template = import 'external/com_github_buildbarn_bb_storage/tools/github_workflows/workflows_template.libsonnet';
+local workflows_template = import 'tools/github_workflows/workflows_template.libsonnet';
 
 workflows_template.getWorkflows(
   ['bb_clientd'],
@@ -12,7 +12,7 @@ workflows_template.getWorkflows(
         steps+: [
           {
             name: 'linux_amd64: build bb_clientd.deb',
-            run: 'bazel build --platforms=@io_bazel_rules_go//go/toolchain:linux_amd64 //:bb_clientd_deb',
+            run: 'bazel build --platforms=@rules_go//go/toolchain:linux_amd64 //:bb_clientd_deb',
           },
           {
             name: 'linux_amd64: copy bb_clientd.deb',
