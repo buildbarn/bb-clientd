@@ -1,4 +1,4 @@
-module(name = "com_github_buildbarn_bb_browser")
+module(name = "com_github_buildbarn_bb_clientd")
 
 bazel_dep(name = "com_github_buildbarn_bb_remote_execution")
 bazel_dep(name = "com_github_buildbarn_bb_storage")

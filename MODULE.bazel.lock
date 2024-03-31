@@ -1,6 +1,6 @@
 {
   "lockFileVersion": 6,
-  "moduleFileHash": "0f9ea21f863031e0c80df2e9f815d15859c6e158f27a2ff75b85c85f1c8b8637",
+  "moduleFileHash": "93e68ffb2eabad7be8c0509f132d23022f0e2aaf121a8c95fc224fb3a2f6bf53",
   "flags": {
     "cmdRegistries": [
       "https://bcr.bazel.build/"
@@ -17,10 +17,10 @@
   },
   "moduleDepGraph": {
     "<root>": {
-      "name": "com_github_buildbarn_bb_browser",
+      "name": "com_github_buildbarn_bb_clientd",
       "version": "",
       "key": "<root>",
-      "repoName": "com_github_buildbarn_bb_browser",
+      "repoName": "com_github_buildbarn_bb_clientd",
       "executionPlatformsToRegister": [],
       "toolchainsToRegister": [],
       "extensionUsages": [
