@@ -1,5 +1,5 @@
-load("@io_bazel_rules_go//extras:gomock.bzl", "gomock")
-load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("@rules_go//extras:gomock.bzl", "gomock")
+load("@rules_go//go:def.bzl", "go_library")
 
 gomock(
     name = "aliases",
@@ -151,6 +151,7 @@ go_library(
         "blobstore.go",
         "blobstore_slicing.go",
         "clock.go",
+        "dummy.go",
         "filesystem.go",
         "filesystem_virtual.go",
         "outputpathpersistency.go",
