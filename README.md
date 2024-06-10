@@ -251,7 +251,10 @@ directory. This means that you can enjoy the performance improvements of
 "Remote Builds without the Bytes", but not with the restrictions that it
 currently imposes.
 
-The Bazel Output Service protocol was added to the Bazel repository in
-[PR#21140](https://github.com/bazelbuild/bazel/pull/21140). It is
-expected that a client for the Bazel Output Service protocol is added to
-Bazel 7.2.
+Bazel 7.2 and later implement support for the Bazel Output Service.
+Bazel can be configured to use this feature by providing the following
+additional command line arguments:
+
+```
+--experimental_remote_output_service unix:${HOME}/.cache/bb_clientd/grpc --experimental_remote_output_service_output_path_prefix ${HOME}/bb_clientd/outputs
+```
