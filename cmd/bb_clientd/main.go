@@ -226,7 +226,7 @@ func main() {
 			}
 
 			// Enable persistent storage of bazel-out/ directories.
-			stateDirectory, err := filesystem.NewLocalDirectory(persistencyConfiguration.StateDirectoryPath)
+			stateDirectory, err := filesystem.NewLocalDirectory(path.NewLocalParser(persistencyConfiguration.StateDirectoryPath))
 			if err != nil {
 				return util.StatusWrapf(err, "Failed to open persistent output path state directory %#v", persistencyConfiguration.StateDirectoryPath)
 			}

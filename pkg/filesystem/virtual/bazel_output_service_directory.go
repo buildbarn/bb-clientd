@@ -248,12 +248,8 @@ func (d *BazelOutputServiceDirectory) StartBuild(ctx context.Context, request *b
 	// Compute the full output path and the output path suffix. The
 	// former needs to be used by us, while the latter is
 	// communicated back to the client.
-	outputPathPrefixParser, err := path.NewUNIXParser(request.OutputPathPrefix)
-	if err != nil {
-		return nil, util.StatusWrap(err, "Invalid output path prefix")
-	}
 	outputPath, scopeWalker := path.EmptyBuilder.Join(path.NewAbsoluteScopeWalker(path.VoidComponentWalker))
-	if err := path.Resolve(outputPathPrefixParser, scopeWalker); err != nil {
+	if err := path.Resolve(path.NewUNIXParser(request.OutputPathPrefix), scopeWalker); err != nil {
 		return nil, util.StatusWrap(err, "Failed to resolve output path prefix")
 	}
 	outputPathSuffix, scopeWalker := path.EmptyBuilder.Join(path.VoidScopeWalker)
@@ -410,14 +406,10 @@ func (cw *parentDirectoryCreatingComponentWalker) OnUp() (path.ComponentWalker, 
 
 func (d *BazelOutputServiceDirectory) stageSingleArtifact(ctx context.Context, artifact *bazeloutputservice.StageArtifactsRequest_Artifact, outputPathState *outputPathState, buildState *buildState) error {
 	// Resolve the parent directory and filename of the artifact to create.
-	pathParser, err := path.NewUNIXParser(artifact.Path)
-	if err != nil {
-		return util.StatusWrap(err, "Invalid path")
-	}
 	outputParentCreator := parentDirectoryCreatingComponentWalker{
 		stack: util.NewNonEmptyStack[virtual.PrepopulatedDirectory](outputPathState.rootDirectory),
 	}
-	if err := path.Resolve(pathParser, path.NewRelativeScopeWalker(&outputParentCreator)); err != nil {
+	if err := path.Resolve(path.NewUNIXParser(artifact.Path), path.NewRelativeScopeWalker(&outputParentCreator)); err != nil {
 		return util.StatusWrap(err, "Failed to resolve path")
 	}
 	name := outputParentCreator.TerminalName
@@ -536,6 +528,10 @@ func (cw *statWalker) OnRelative() (path.ComponentWalker, error) {
 	return cw, nil
 }
 
+func (cw *statWalker) OnDriveLetter(driveLetter rune) (path.ComponentWalker, error) {
+	return nil, status.Error(codes.Unimplemented, "Drive letters not supported")
+}
+
 func (cw *statWalker) OnDirectory(name path.Component) (path.GotDirectoryOrSymlink, error) {
 	child, err := cw.stack.Peek().LookupChild(name)
 	if err != nil {
@@ -615,10 +611,6 @@ func (d *BazelOutputServiceDirectory) BatchStat(ctx context.Context, request *ba
 		Responses: make([]*bazeloutputservice.BatchStatResponse_StatResponse, 0, len(request.Paths)),
 	}
 	for _, statPath := range request.Paths {
-		statPathParser, err := path.NewUNIXParser(statPath)
-		if err != nil {
-			return nil, util.StatusWrapf(err, "Invalid path %#v", statPath)
-		}
 		statWalker := statWalker{
 			digestFunction: &buildState.digestFunction,
 			stack:          util.NewNonEmptyStack[virtual.PrepopulatedDirectory](outputPathState.rootDirectory),
@@ -626,7 +618,7 @@ func (d *BazelOutputServiceDirectory) BatchStat(ctx context.Context, request *ba
 		}
 		resolvedPath, scopeWalker := path.EmptyBuilder.Join(
 			buildState.scopeWalkerFactory.New(path.NewLoopDetectingScopeWalker(&statWalker)))
-		if err := path.Resolve(statPathParser, scopeWalker); err == syscall.ENOENT {
+		if err := path.Resolve(path.NewUNIXParser(statPath), scopeWalker); err == syscall.ENOENT {
 			// Path does not exist.
 			response.Responses = append(response.Responses, &bazeloutputservice.BatchStatResponse_StatResponse{})
 		} else if err != nil {

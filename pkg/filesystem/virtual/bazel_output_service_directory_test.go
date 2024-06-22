@@ -832,7 +832,7 @@ func TestBazelOutputServiceDirectoryBatchStat(t *testing.T) {
 		outputPath.EXPECT().LookupChild(path.MustNewComponent("nested")).Return(re_vfs.PrepopulatedDirectoryChild{}.FromDirectory(directory2), nil)
 		leaf2 := mock.NewMockNativeLeaf(ctrl)
 		directory2.EXPECT().LookupChild(path.MustNewComponent("symlink_internal_relative_directory")).Return(re_vfs.PrepopulatedDirectoryChild{}.FromLeaf(leaf2), nil)
-		leaf2.EXPECT().Readlink().Return(path.MustNewUNIXParser(".."), nil)
+		leaf2.EXPECT().Readlink().Return(path.NewUNIXParser(".."), nil)
 
 		// Lookup of "nested/symlink_internal_absolute_path",
 		// being a symlink containing an absolute path starting
@@ -841,7 +841,7 @@ func TestBazelOutputServiceDirectoryBatchStat(t *testing.T) {
 		outputPath.EXPECT().LookupChild(path.MustNewComponent("nested")).Return(re_vfs.PrepopulatedDirectoryChild{}.FromDirectory(directory3), nil)
 		leaf3 := mock.NewMockNativeLeaf(ctrl)
 		directory3.EXPECT().LookupChild(path.MustNewComponent("symlink_internal_absolute_path")).Return(re_vfs.PrepopulatedDirectoryChild{}.FromLeaf(leaf3), nil)
-		leaf3.EXPECT().Readlink().Return(path.MustNewUNIXParser("/home/bob/bb_clientd/outputs/9da951b8cb759233037166e28f7ea186/hello"), nil)
+		leaf3.EXPECT().Readlink().Return(path.NewUNIXParser("/home/bob/bb_clientd/outputs/9da951b8cb759233037166e28f7ea186/hello"), nil)
 		directory4 := mock.NewMockPrepopulatedDirectory(ctrl)
 		outputPath.EXPECT().LookupChild(path.MustNewComponent("hello")).Return(re_vfs.PrepopulatedDirectoryChild{}.FromDirectory(directory4), nil)
 
@@ -852,7 +852,7 @@ func TestBazelOutputServiceDirectoryBatchStat(t *testing.T) {
 		outputPath.EXPECT().LookupChild(path.MustNewComponent("nested")).Return(re_vfs.PrepopulatedDirectoryChild{}.FromDirectory(directory5), nil)
 		leaf4 := mock.NewMockNativeLeaf(ctrl)
 		directory5.EXPECT().LookupChild(path.MustNewComponent("symlink_internal_absolute_alias")).Return(re_vfs.PrepopulatedDirectoryChild{}.FromLeaf(leaf4), nil)
-		leaf4.EXPECT().Readlink().Return(path.MustNewUNIXParser("/home/bob/.cache/bazel/_bazel_bob/9da951b8cb759233037166e28f7ea186/execroot/myproject/bazel-out/hello"), nil)
+		leaf4.EXPECT().Readlink().Return(path.NewUNIXParser("/home/bob/.cache/bazel/_bazel_bob/9da951b8cb759233037166e28f7ea186/execroot/myproject/bazel-out/hello"), nil)
 		directory6 := mock.NewMockPrepopulatedDirectory(ctrl)
 		outputPath.EXPECT().LookupChild(path.MustNewComponent("hello")).Return(re_vfs.PrepopulatedDirectoryChild{}.FromDirectory(directory6), nil)
 
@@ -863,7 +863,7 @@ func TestBazelOutputServiceDirectoryBatchStat(t *testing.T) {
 		outputPath.EXPECT().LookupChild(path.MustNewComponent("nested")).Return(re_vfs.PrepopulatedDirectoryChild{}.FromDirectory(directory7), nil)
 		leaf5 := mock.NewMockNativeLeaf(ctrl)
 		directory7.EXPECT().LookupChild(path.MustNewComponent("symlink_external")).Return(re_vfs.PrepopulatedDirectoryChild{}.FromLeaf(leaf5), nil)
-		leaf5.EXPECT().Readlink().Return(path.MustNewUNIXParser("/etc/passwd"), nil)
+		leaf5.EXPECT().Readlink().Return(path.NewUNIXParser("/etc/passwd"), nil)
 
 		// Lookup of "nonexistent".
 		outputPath.EXPECT().LookupChild(path.MustNewComponent("nonexistent")).Return(re_vfs.PrepopulatedDirectoryChild{}, syscall.ENOENT)
