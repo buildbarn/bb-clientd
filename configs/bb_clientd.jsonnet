@@ -35,6 +35,7 @@ local blobstoreConfig(authorizationHeader, proxyURL) = {
   },
 };
 
+local os = std.extVar('OS');
 local homeDirectory = std.extVar('HOME');
 local cacheDirectory = homeDirectory + '/.cache/bb_clientd';
 
@@ -57,7 +58,7 @@ local cacheDirectory = homeDirectory + '/.cache/bb_clientd';
   proxyURL:: '',
 
   // If enabled, use NFSv4 instead of FUSE.
-  useNFSv4:: std.extVar('OS') == 'Darwin',
+  useNFSv4:: os == 'Darwin',
 
   // Backends for the Action Cache and Content Addressable Storage.
   blobstore: {
@@ -188,8 +189,11 @@ local cacheDirectory = homeDirectory + '/.cache/bb_clientd';
     nfsv4: {
       enforcedLeaseTime: '120s',
       announcedLeaseTime: '60s',
-      darwin: { socketPath: cacheDirectory + '/nfsv4' },
-    },
+    } + {
+      // OS specific configuration options for NFSv4.
+      Darwin: { darwin: { socketPath: cacheDirectory + '/nfsv4' } },
+      Linux: { linux: { mountOptions: ['vers=4.1'] } },
+    }[os],
   } else {
     mountPath: homeDirectory + '/bb_clientd',
     fuse: {
