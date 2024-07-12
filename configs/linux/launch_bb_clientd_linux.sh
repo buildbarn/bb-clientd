@@ -6,18 +6,19 @@ set -eu
 fusermount -u ~/bb_clientd || true
 
 # Remove UNIX socket, so that builds will not attept to send gRPC traffic.
-rm -f ~/.cache/bb_clientd/grpc
+export XDG_CACHE_HOME=${XDG_CACHE_HOME:-~/.cache}
+rm -f ${XDG_CACHE_HOME}/bb_clientd/grpc
 
 if [ "$1" = "start" ]; then
   # Create directories that are used by bb_clientd.
   mkdir -p \
-      ~/.cache/bb_clientd/ac/persistent_state \
-      ~/.cache/bb_clientd/cas/persistent_state \
-      ~/.cache/bb_clientd/outputs \
+      ${XDG_CACHE_HOME}/bb_clientd/ac/persistent_state \
+      ${XDG_CACHE_HOME}/bb_clientd/cas/persistent_state \
+      ${XDG_CACHE_HOME}/bb_clientd/outputs \
       ~/bb_clientd
 
   # Discard logs of the previous invocation.
-  rm -f ~/.cache/bb_clientd/log
+  rm -f ${XDG_CACHE_HOME}/bb_clientd/log
 
   # Use either the user provided or system-wide configuration file, based
   # on whether the former is present.

@@ -36,8 +36,7 @@ local blobstoreConfig(authorizationHeader, proxyURL) = {
 };
 
 local os = std.extVar('OS');
-local homeDirectory = std.extVar('HOME');
-local cacheDirectory = homeDirectory + '/.cache/bb_clientd';
+local cacheDirectory = std.extVar('XDG_CACHE_HOME') + '/bb_clientd';
 
 {
   // Options that users can override.
@@ -184,8 +183,9 @@ local cacheDirectory = homeDirectory + '/.cache/bb_clientd';
   // The FUSE or NFSv4 file system through which data stored in the
   // Content Addressable Storage can be loaded lazily. This file system
   // relies on credentials captured through gRPC.
-  mount: if $.useNFSv4 then {
-    mountPath: homeDirectory + '/bb_clientd',
+  mount: {
+    mountPath: std.extVar('HOME') + '/bb_clientd',
+  } + if $.useNFSv4 then {
     nfsv4: {
       enforcedLeaseTime: '120s',
       announcedLeaseTime: '60s',
@@ -195,7 +195,6 @@ local cacheDirectory = homeDirectory + '/.cache/bb_clientd';
       Linux: { linux: { mountOptions: ['vers=4.1'] } },
     }[os],
   } else {
-    mountPath: homeDirectory + '/bb_clientd',
     fuse: {
       directoryEntryValidity: '300s',
       inodeAttributeValidity: '300s',
