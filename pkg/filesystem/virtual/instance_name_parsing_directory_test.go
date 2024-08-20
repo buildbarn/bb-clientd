@@ -12,8 +12,9 @@ import (
 	"github.com/buildbarn/bb-storage/pkg/digest"
 	"github.com/buildbarn/bb-storage/pkg/filesystem"
 	"github.com/buildbarn/bb-storage/pkg/filesystem/path"
-	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
+
+	"go.uber.org/mock/gomock"
 )
 
 func instanceNameParsingDirectoryExpectCreate(t *testing.T, ctrl *gomock.Controller, handleAllocator *mock.MockStatelessHandleAllocator, expectedIdentifier []byte) {

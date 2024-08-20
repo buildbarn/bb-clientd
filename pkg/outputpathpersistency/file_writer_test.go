@@ -8,10 +8,11 @@ import (
 	"github.com/buildbarn/bb-clientd/pkg/outputpathpersistency"
 	outputpathpersistency_pb "github.com/buildbarn/bb-remote-execution/pkg/proto/outputpathpersistency"
 	"github.com/buildbarn/bb-storage/pkg/testutil"
-	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
 
 	"google.golang.org/protobuf/types/known/timestamppb"
+
+	"go.uber.org/mock/gomock"
 )
 
 func TestFileWriter(t *testing.T) {
