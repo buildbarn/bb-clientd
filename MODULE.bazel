@@ -13,13 +13,13 @@ bazel_dep(name = "toolchains_llvm", version = "1.0.0")
 
 git_override(
     module_name = "com_github_buildbarn_bb_remote_execution",
-    commit = "0b3dad99295dde67cf17ac38592840e9cde96c2f",
+    commit = "a3a263e81ef01aa13b1a9ad5573cc81f928dd33e",
     remote = "https://github.com/buildbarn/bb-remote-execution.git",
 )
 
 git_override(
     module_name = "com_github_buildbarn_bb_storage",
-    commit = "a2eab49e3788f0e88bf394c43bda1837f95793b7",
+    commit = "a869915feea7333a85e92e7a9f7a4821969408d6",
     remote = "https://github.com/buildbarn/bb-storage.git",
 )
 
@@ -53,13 +53,13 @@ use_repo(
     "cc_mvdan_gofumpt",
     "com_github_bazelbuild_buildtools",
     "com_github_bazelbuild_remote_apis",
-    "com_github_golang_mock",
     "com_github_stretchr_testify",
     "org_golang_google_genproto_googleapis_bytestream",
     "org_golang_google_grpc",
     "org_golang_google_protobuf",
     "org_golang_x_lint",
     "org_golang_x_sync",
+    "org_uber_go_mock",
 )
 
 go_deps_dev = use_extension("@gazelle//:extensions.bzl", "go_deps", dev_dependency = True)
@@ -78,13 +78,6 @@ go_deps_dev.gazelle_override(
     path = "github.com/bazelbuild/remote-apis",
 )
 go_deps_dev.module_override(
-    patches = [
-        "@com_github_buildbarn_bb_remote_execution//:patches/com_github_golang_mock/generics.diff",
-        "@com_github_buildbarn_bb_storage//:patches/com_github_golang_mock/mocks-for-funcs.diff",
-    ],
-    path = "github.com/golang/mock",
-)
-go_deps_dev.module_override(
     patches = ["@com_github_buildbarn_bb_storage//:patches/com_github_grpc_ecosystem_go_grpc_prometheus/client-metrics-prevent-handled-twice.diff"],
     path = "github.com/grpc-ecosystem/go-grpc-prometheus",
 )
@@ -99,6 +92,13 @@ go_deps_dev.module_override(
 go_deps_dev.module_override(
     patches = ["@com_github_buildbarn_bb_storage//:patches/org_golang_google_genproto_googleapis_bytestream/service-registrar.diff"],
     path = "google.golang.org/genproto/googleapis/bytestream",
+)
+go_deps_dev.module_override(
+    patches = [
+        "@com_github_buildbarn_bb_remote_execution//:patches/org_uber_go_mock/generics.diff",
+        "@com_github_buildbarn_bb_storage//:patches/org_uber_go_mock/mocks-for-funcs.diff",
+    ],
+    path = "go.uber.org/mock",
 )
 
 llvm = use_extension("@toolchains_llvm//toolchain/extensions:llvm.bzl", "llvm", dev_dependency = True)

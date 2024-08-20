@@ -10,12 +10,13 @@ import (
 	"github.com/buildbarn/bb-storage/pkg/filesystem"
 	"github.com/buildbarn/bb-storage/pkg/filesystem/path"
 	"github.com/buildbarn/bb-storage/pkg/testutil"
-	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
+
+	"go.uber.org/mock/gomock"
 )
 
 func TestDirectoryBackedStoreRead(t *testing.T) {
