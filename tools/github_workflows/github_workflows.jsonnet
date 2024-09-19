@@ -20,7 +20,7 @@ workflows_template.getWorkflows(
           },
           {
             name: 'linux_amd64: upload bb_clientd.deb',
-            uses: 'actions/upload-artifact@v2-preview',
+            uses: 'actions/upload-artifact@v4',
             with: {
               name: 'bb_clientd.linux_amd64.deb',
               path: 'bb_clientd.deb',
