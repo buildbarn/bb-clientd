@@ -8,7 +8,6 @@ import (
 	"github.com/buildbarn/bb-clientd/internal/mock"
 	cd_vfs "github.com/buildbarn/bb-clientd/pkg/filesystem/virtual"
 	re_vfs "github.com/buildbarn/bb-remote-execution/pkg/filesystem/virtual"
-	"github.com/buildbarn/bb-storage/pkg/blobstore"
 	"github.com/buildbarn/bb-storage/pkg/blobstore/buffer"
 	"github.com/buildbarn/bb-storage/pkg/digest"
 	"github.com/buildbarn/bb-storage/pkg/filesystem/path"
@@ -90,15 +89,19 @@ func TestLocalFileUploadingOutputPathFactory(t *testing.T) {
 		digestFunction := digest.MustNewFunction("example", remoteexecution.DigestFunction_SHA256)
 		baseOutputPath.EXPECT().FinalizeBuild(ctx, gomock.Any())
 
-		leaf := mock.NewMockNativeLeaf(ctrl)
+		leaf := mock.NewMockLinkableLeaf(ctrl)
 		baseOutputPath.EXPECT().LookupAllChildren().Return(
 			nil,
 			[]re_vfs.LeafPrepopulatedDirEntry{
 				{Name: path.MustNewComponent("leaf"), Child: leaf},
 			},
 			nil)
-		leaf.EXPECT().UploadFile(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
-			Return(digest.BadDigest, status.Error(codes.Internal, "Cannot compute digest due to read failure"))
+		leaf.EXPECT().VirtualApply(gomock.Any()).
+			Do(func(data any) {
+				p := data.(*re_vfs.ApplyUploadFile)
+				p.Err = status.Error(codes.Internal, "Cannot compute digest due to read failure")
+			}).
+			Return(true)
 		globalErrorLogger.EXPECT().Log(testutil.EqStatus(t, status.Error(codes.Internal, "Failed to upload local file \"leaf\" in output path \"15c974d0b2820c3ae15a237e186cd84b\": Cannot compute digest due to read failure")))
 
 		outputPath.FinalizeBuild(ctx, digestFunction)
@@ -108,7 +111,7 @@ func TestLocalFileUploadingOutputPathFactory(t *testing.T) {
 		digestFunction := digest.MustNewFunction("example", remoteexecution.DigestFunction_SHA256)
 		baseOutputPath.EXPECT().FinalizeBuild(ctx, gomock.Any())
 
-		leaf := mock.NewMockNativeLeaf(ctrl)
+		leaf := mock.NewMockLinkableLeaf(ctrl)
 		baseOutputPath.EXPECT().LookupAllChildren().Return(
 			nil,
 			[]re_vfs.LeafPrepopulatedDirEntry{
@@ -116,11 +119,13 @@ func TestLocalFileUploadingOutputPathFactory(t *testing.T) {
 			},
 			nil)
 		leafDigest := digest.MustNewDigest("example", remoteexecution.DigestFunction_SHA256, "64ec88ca00b268e5ba1a35678a1b5316d212f4f366b2477232534a8aeca37f3c", 11)
-		leaf.EXPECT().UploadFile(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
-			func(ctx context.Context, contentAddressableStorage blobstore.BlobAccess, digestFunction digest.Function, writableFileUploadDelay <-chan struct{}) (digest.Digest, error) {
-				require.NoError(t, contentAddressableStorage.Put(ctx, leafDigest, buffer.NewValidatedBufferFromByteSlice([]byte("Hello world"))))
-				return leafDigest, nil
-			})
+		leaf.EXPECT().VirtualApply(gomock.Any()).
+			Do(func(data any) {
+				p := data.(*re_vfs.ApplyUploadFile)
+				require.NoError(t, p.ContentAddressableStorage.Put(p.Context, leafDigest, buffer.NewValidatedBufferFromByteSlice([]byte("Hello world"))))
+				p.Digest = leafDigest
+			}).
+			Return(true)
 		contentAddressableStorage.EXPECT().FindMissing(
 			gomock.Any(),
 			leafDigest.ToSingletonSet(),
@@ -136,7 +141,7 @@ func TestLocalFileUploadingOutputPathFactory(t *testing.T) {
 
 		// Traverse the file system.
 		subDirectory := mock.NewMockPrepopulatedDirectory(ctrl)
-		symlink := mock.NewMockNativeLeaf(ctrl)
+		symlink := mock.NewMockLinkableLeaf(ctrl)
 		baseOutputPath.EXPECT().LookupAllChildren().Return(
 			[]re_vfs.DirectoryPrepopulatedDirEntry{
 				{Name: path.MustNewComponent("subdirectory"), Child: subDirectory},
@@ -146,9 +151,9 @@ func TestLocalFileUploadingOutputPathFactory(t *testing.T) {
 			},
 			nil)
 
-		missingLocalFile := mock.NewMockNativeLeaf(ctrl)
-		presentLocalFile := mock.NewMockNativeLeaf(ctrl)
-		remoteFile := mock.NewMockNativeLeaf(ctrl)
+		missingLocalFile := mock.NewMockLinkableLeaf(ctrl)
+		presentLocalFile := mock.NewMockLinkableLeaf(ctrl)
+		remoteFile := mock.NewMockLinkableLeaf(ctrl)
 		subDirectory.EXPECT().LookupAllChildren().Return(
 			nil,
 			[]re_vfs.LeafPrepopulatedDirEntry{
@@ -162,26 +167,34 @@ func TestLocalFileUploadingOutputPathFactory(t *testing.T) {
 		// of those are not uploadable, or they don't result in
 		// calls against the Content Addressable Storage due to
 		// them already being remote.
-		symlink.EXPECT().UploadFile(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
-			func(ctx context.Context, contentAddressableStorage blobstore.BlobAccess, digestFunction digest.Function, writableFileUploadDelay <-chan struct{}) (digest.Digest, error) {
-				return digest.BadDigest, status.Error(codes.InvalidArgument, "This file cannot be uploaded, as it is a symbolic link")
-			})
+		symlink.EXPECT().VirtualApply(gomock.Any()).
+			Do(func(data any) {
+				p := data.(*re_vfs.ApplyUploadFile)
+				p.Err = status.Error(codes.InvalidArgument, "This file cannot be uploaded, as it is a symbolic link")
+			}).
+			Return(true)
 		missingLocalFileDigest := digest.MustNewDigest("example", remoteexecution.DigestFunction_SHA256, "64ec88ca00b268e5ba1a35678a1b5316d212f4f366b2477232534a8aeca37f3c", 11)
-		missingLocalFile.EXPECT().UploadFile(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
-			func(ctx context.Context, contentAddressableStorage blobstore.BlobAccess, digestFunction digest.Function, writableFileUploadDelay <-chan struct{}) (digest.Digest, error) {
-				require.NoError(t, contentAddressableStorage.Put(ctx, missingLocalFileDigest, buffer.NewValidatedBufferFromByteSlice([]byte("Hello world"))))
-				return missingLocalFileDigest, nil
-			})
+		missingLocalFile.EXPECT().VirtualApply(gomock.Any()).
+			Do(func(data any) {
+				p := data.(*re_vfs.ApplyUploadFile)
+				require.NoError(t, p.ContentAddressableStorage.Put(p.Context, missingLocalFileDigest, buffer.NewValidatedBufferFromByteSlice([]byte("Hello world"))))
+				p.Digest = missingLocalFileDigest
+			}).
+			Return(true)
 		presentLocalFileDigest := digest.MustNewDigest("example", remoteexecution.DigestFunction_SHA256, "b4dabda568d0368a42a46108e8c669e1d9b18c0dad248de2068b07a730f524a2", 13)
-		presentLocalFile.EXPECT().UploadFile(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
-			func(ctx context.Context, contentAddressableStorage blobstore.BlobAccess, digestFunction digest.Function, writableFileUploadDelay <-chan struct{}) (digest.Digest, error) {
-				require.NoError(t, contentAddressableStorage.Put(ctx, presentLocalFileDigest, buffer.NewValidatedBufferFromByteSlice([]byte("Goodbye world"))))
-				return presentLocalFileDigest, nil
-			})
-		remoteFile.EXPECT().UploadFile(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
-			func(ctx context.Context, contentAddressableStorage blobstore.BlobAccess, digestFunction digest.Function, writableFileUploadDelay <-chan struct{}) (digest.Digest, error) {
-				return digest.MustNewDigest("example", remoteexecution.DigestFunction_SHA256, "888ddbf1e9cd5b201f67629d4efa9a4a0fb1cf5a910e9a44209eb07485f5f99d", 123), nil
-			})
+		presentLocalFile.EXPECT().VirtualApply(gomock.Any()).
+			Do(func(data any) {
+				p := data.(*re_vfs.ApplyUploadFile)
+				require.NoError(t, p.ContentAddressableStorage.Put(p.Context, presentLocalFileDigest, buffer.NewValidatedBufferFromByteSlice([]byte("Goodbye world"))))
+				p.Digest = presentLocalFileDigest
+			}).
+			Return(true)
+		remoteFile.EXPECT().VirtualApply(gomock.Any()).
+			Do(func(data any) {
+				p := data.(*re_vfs.ApplyUploadFile)
+				p.Digest = digest.MustNewDigest("example", remoteexecution.DigestFunction_SHA256, "888ddbf1e9cd5b201f67629d4efa9a4a0fb1cf5a910e9a44209eb07485f5f99d", 123)
+			}).
+			Return(true)
 
 		// Transfer files that are missing.
 		contentAddressableStorage.EXPECT().FindMissing(

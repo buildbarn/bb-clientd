@@ -61,7 +61,7 @@
             },
             {
                "name": "linux_amd64: upload bb_clientd",
-               "uses": "actions/upload-artifact@v2-preview",
+               "uses": "actions/upload-artifact@v4",
                "with": {
                   "name": "bb_clientd.linux_amd64",
                   "path": "bb_clientd"
@@ -77,7 +77,7 @@
             },
             {
                "name": "linux_386: upload bb_clientd",
-               "uses": "actions/upload-artifact@v2-preview",
+               "uses": "actions/upload-artifact@v4",
                "with": {
                   "name": "bb_clientd.linux_386",
                   "path": "bb_clientd"
@@ -93,7 +93,7 @@
             },
             {
                "name": "linux_arm: upload bb_clientd",
-               "uses": "actions/upload-artifact@v2-preview",
+               "uses": "actions/upload-artifact@v4",
                "with": {
                   "name": "bb_clientd.linux_arm",
                   "path": "bb_clientd"
@@ -109,7 +109,7 @@
             },
             {
                "name": "linux_arm64: upload bb_clientd",
-               "uses": "actions/upload-artifact@v2-preview",
+               "uses": "actions/upload-artifact@v4",
                "with": {
                   "name": "bb_clientd.linux_arm64",
                   "path": "bb_clientd"
@@ -125,7 +125,7 @@
             },
             {
                "name": "darwin_amd64: upload bb_clientd",
-               "uses": "actions/upload-artifact@v2-preview",
+               "uses": "actions/upload-artifact@v4",
                "with": {
                   "name": "bb_clientd.darwin_amd64",
                   "path": "bb_clientd"
@@ -141,7 +141,7 @@
             },
             {
                "name": "darwin_arm64: upload bb_clientd",
-               "uses": "actions/upload-artifact@v2-preview",
+               "uses": "actions/upload-artifact@v4",
                "with": {
                   "name": "bb_clientd.darwin_arm64",
                   "path": "bb_clientd"
@@ -157,7 +157,7 @@
             },
             {
                "name": "freebsd_amd64: upload bb_clientd",
-               "uses": "actions/upload-artifact@v2-preview",
+               "uses": "actions/upload-artifact@v4",
                "with": {
                   "name": "bb_clientd.freebsd_amd64",
                   "path": "bb_clientd"
@@ -173,7 +173,7 @@
             },
             {
                "name": "windows_amd64: upload bb_clientd",
-               "uses": "actions/upload-artifact@v2-preview",
+               "uses": "actions/upload-artifact@v4",
                "with": {
                   "name": "bb_clientd.windows_amd64",
                   "path": "bb_clientd.exe"

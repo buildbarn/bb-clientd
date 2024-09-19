@@ -167,7 +167,7 @@ func TestPersistentOutputPathFactoryStartInitialBuild(t *testing.T) {
 				},
 			},
 		}, nil)
-		file1 := mock.NewMockNativeLeaf(ctrl)
+		file1 := mock.NewMockLinkableLeaf(ctrl)
 		casFileFactory.EXPECT().LookupFile(
 			digest.MustNewDigest("default", remoteexecution.DigestFunction_SHA256, "f132632084ca4e2124fbc88223901e3976e126ebb8f8cc5a09116a0191369d9b", 34),
 			/* isExecutable = */ false,
@@ -217,19 +217,19 @@ func TestPersistentOutputPathFactoryStartInitialBuild(t *testing.T) {
 				},
 			},
 		}, nil)
-		file1 := mock.NewMockNativeLeaf(ctrl)
+		file1 := mock.NewMockLinkableLeaf(ctrl)
 		casFileFactory.EXPECT().LookupFile(
 			digest.MustNewDigest("default", remoteexecution.DigestFunction_SHA256, "f132632084ca4e2124fbc88223901e3976e126ebb8f8cc5a09116a0191369d9b", 34),
 			/* isExecutable = */ false,
 			/* readMonitor = */ nil,
 		).Return(file1)
-		file2 := mock.NewMockNativeLeaf(ctrl)
+		file2 := mock.NewMockLinkableLeaf(ctrl)
 		casFileFactory.EXPECT().LookupFile(
 			digest.MustNewDigest("default", remoteexecution.DigestFunction_SHA256, "ce22e2423b7d501d45f6b8aeab15cb40f28c73fb2edfe03e0f3cd450583fcef8", 42),
 			/* isExecutable = */ true,
 			/* readMonitor = */ nil,
 		).Return(file2)
-		symlink1 := mock.NewMockNativeLeaf(ctrl)
+		symlink1 := mock.NewMockLinkableLeaf(ctrl)
 		symlinkFactory.EXPECT().LookupSymlink([]byte("target1")).Return(symlink1)
 		baseOutputPath.EXPECT().CreateChildren(map[path.Component]re_vfs.InitialNode{
 			path.MustNewComponent("file1"):    re_vfs.InitialNode{}.FromLeaf(file1),

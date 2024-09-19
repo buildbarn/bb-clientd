@@ -46,8 +46,8 @@ func casDirectoryExpectLookupSymlink(t *testing.T, ctrl *gomock.Controller, hand
 		require.Equal(t, expectedIdentifier, actualIdentifier.Bytes())
 		return handleAllocation
 	})
-	handleAllocation.EXPECT().AsNativeLeaf(gomock.Any()).
-		DoAndReturn(func(leaf re_vfs.NativeLeaf) re_vfs.NativeLeaf { return leaf })
+	handleAllocation.EXPECT().AsLinkableLeaf(gomock.Any()).
+		DoAndReturn(func(leaf re_vfs.LinkableLeaf) re_vfs.LinkableLeaf { return leaf })
 }
 
 func TestCASDirectoryVirtualLookup(t *testing.T) {
@@ -182,7 +182,7 @@ func TestCASDirectoryVirtualLookup(t *testing.T) {
 
 	t.Run("SuccessExecutable", func(t *testing.T) {
 		// Successfully looking up an executable file.
-		childLeaf := mock.NewMockNativeLeaf(ctrl)
+		childLeaf := mock.NewMockLinkableLeaf(ctrl)
 		directoryContext.EXPECT().LookupFile(
 			digest.MustNewDigest("example", remoteexecution.DigestFunction_SHA256, "d3dda0e30611a0b3e98ee84a6c64d3eb7f174cd197a3713d0c44a35228bb33a7", 12),
 			/* isExecutable = */ true,
@@ -205,7 +205,7 @@ func TestCASDirectoryVirtualLookup(t *testing.T) {
 
 	t.Run("SuccessFile", func(t *testing.T) {
 		// Successfully looking up a non-executable file.
-		childLeaf := mock.NewMockNativeLeaf(ctrl)
+		childLeaf := mock.NewMockLinkableLeaf(ctrl)
 		directoryContext.EXPECT().LookupFile(
 			digest.MustNewDigest("example", remoteexecution.DigestFunction_SHA256, "059458af6543753150ceb7bcd4cc215e8aaabd61934ff6c67acdd9e7fb4cc96d", 34),
 			/* isExecutable = */ false,
@@ -413,7 +413,7 @@ func TestCASDirectoryVirtualReadDir(t *testing.T) {
 			re_vfs.DirectoryChild{}.FromDirectory(childDirectory),
 			(&re_vfs.Attributes{}).SetInodeNumber(123),
 		).Return(true)
-		childLeaf1 := mock.NewMockNativeLeaf(ctrl)
+		childLeaf1 := mock.NewMockLinkableLeaf(ctrl)
 		directoryContext.EXPECT().LookupFile(
 			digest.MustNewDigest("example", remoteexecution.DigestFunction_SHA256, "473b6cb5358c3f8a086db591259ac33eac875d1ae3e37737bce210c1e9ea3503", 100),
 			/* isExecutable = */ true,
@@ -432,7 +432,7 @@ func TestCASDirectoryVirtualReadDir(t *testing.T) {
 			re_vfs.DirectoryChild{}.FromLeaf(childLeaf1),
 			(&re_vfs.Attributes{}).SetInodeNumber(100),
 		).Return(true)
-		childLeaf2 := mock.NewMockNativeLeaf(ctrl)
+		childLeaf2 := mock.NewMockLinkableLeaf(ctrl)
 		directoryContext.EXPECT().LookupFile(
 			digest.MustNewDigest("example", remoteexecution.DigestFunction_SHA256, "0ac567103ab10e4b6bfca9b1d3387baad93dee899be5e5cbc3859e01363fbdaa", 200),
 			/* isExecutable = */ false,
@@ -467,7 +467,7 @@ func TestCASDirectoryVirtualReadDir(t *testing.T) {
 
 	t.Run("Partial", func(t *testing.T) {
 		reporter := mock.NewMockDirectoryEntryReporter(ctrl)
-		childLeaf := mock.NewMockNativeLeaf(ctrl)
+		childLeaf := mock.NewMockLinkableLeaf(ctrl)
 		directoryContext.EXPECT().LookupFile(
 			digest.MustNewDigest("example", remoteexecution.DigestFunction_SHA256, "0ac567103ab10e4b6bfca9b1d3387baad93dee899be5e5cbc3859e01363fbdaa", 200),
 			/* isExecutable = */ false,

@@ -106,9 +106,17 @@ func (u *localFileUploader) uploadLocalFilesRecursive(d virtual.PrepopulatedDire
 		}
 	}
 	for _, entry := range leaves {
-		_, err := entry.Child.UploadFile(u.context, u.contentAddressableStorage, u.digestFunction, u.writableFileUploadDelay)
-		if err != nil && status.Code(err) != codes.InvalidArgument {
-			return util.StatusWrapf(err, "Failed to upload local file %#v in output path %#v", dPath.Append(entry.Name).GetUNIXString(), u.outputBaseID.String())
+		p := virtual.ApplyUploadFile{
+			Context:                   u.context,
+			ContentAddressableStorage: u.contentAddressableStorage,
+			DigestFunction:            u.digestFunction,
+			WritableFileUploadDelay:   u.writableFileUploadDelay,
+		}
+		if !entry.Child.VirtualApply(&p) {
+			panic("output path contains leaves that don't support ApplyUploadFile")
+		}
+		if p.Err != nil && status.Code(p.Err) != codes.InvalidArgument {
+			return util.StatusWrapf(p.Err, "Failed to upload local file %#v in output path %#v", dPath.Append(entry.Name).GetUNIXString(), u.outputBaseID.String())
 		}
 	}
 	return nil

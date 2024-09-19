@@ -6,7 +6,7 @@ go_library(
     importpath = "github.com/buildbarn/bb-clientd/pkg/cas",
     visibility = ["//visibility:public"],
     deps = [
-        "@com_github_bazelbuild_remote_apis//build/bazel/remote/execution/v2:execution",
+        "@bazel_remote_apis//build/bazel/remote/execution/v2:remote_execution_go_proto",
         "@com_github_buildbarn_bb_remote_execution//pkg/cas",
         "@com_github_buildbarn_bb_storage//pkg/digest",
     ],
@@ -18,7 +18,7 @@ go_test(
     deps = [
         ":cas",
         "//internal/mock",
-        "@com_github_bazelbuild_remote_apis//build/bazel/remote/execution/v2:execution",
+        "@bazel_remote_apis//build/bazel/remote/execution/v2:remote_execution_go_proto",
         "@com_github_buildbarn_bb_storage//pkg/digest",
         "@com_github_buildbarn_bb_storage//pkg/testutil",
         "@com_github_stretchr_testify//require",

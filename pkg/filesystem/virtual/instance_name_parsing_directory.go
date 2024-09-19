@@ -110,3 +110,7 @@ func (d *instanceNameParsingDirectory) VirtualOpenChild(ctx context.Context, nam
 	// either EEXIST or EISDIR.
 	return virtual.ReadOnlyDirectoryOpenChildWrongFileType(existingOptions, virtual.StatusErrIsDir)
 }
+
+func (instanceNameParsingDirectory) VirtualApply(data any) bool {
+	return false
+}

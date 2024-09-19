@@ -184,7 +184,11 @@ func (d *BazelOutputServiceDirectory) filterMissingChildren(ctx context.Context,
 		// this file or directory depends.
 		var digests digest.Set
 		if directory, leaf := node.GetPair(); leaf != nil {
-			digests = leaf.GetContainingDigests()
+			var p virtual.ApplyGetContainingDigests
+			if !leaf.VirtualApply(&p) {
+				panic("output path contains leaves that don't support ApplyGetContainingDigests")
+			}
+			digests = p.ContainingDigests
 		} else if digests, savedErr = directory.GetContainingDigests(ctx); savedErr != nil {
 			// Can't compute the set of digests underneath
 			// this directory. Remove the directory
@@ -249,7 +253,7 @@ func (d *BazelOutputServiceDirectory) StartBuild(ctx context.Context, request *b
 	// former needs to be used by us, while the latter is
 	// communicated back to the client.
 	outputPath, scopeWalker := path.EmptyBuilder.Join(path.NewAbsoluteScopeWalker(path.VoidComponentWalker))
-	if err := path.Resolve(path.NewUNIXParser(request.OutputPathPrefix), scopeWalker); err != nil {
+	if err := path.Resolve(path.UNIXFormat.NewParser(request.OutputPathPrefix), scopeWalker); err != nil {
 		return nil, util.StatusWrap(err, "Failed to resolve output path prefix")
 	}
 	outputPathSuffix, scopeWalker := path.EmptyBuilder.Join(path.VoidScopeWalker)
@@ -409,7 +413,7 @@ func (d *BazelOutputServiceDirectory) stageSingleArtifact(ctx context.Context, a
 	outputParentCreator := parentDirectoryCreatingComponentWalker{
 		stack: util.NewNonEmptyStack[virtual.PrepopulatedDirectory](outputPathState.rootDirectory),
 	}
-	if err := path.Resolve(path.NewUNIXParser(artifact.Path), path.NewRelativeScopeWalker(&outputParentCreator)); err != nil {
+	if err := path.Resolve(path.UNIXFormat.NewParser(artifact.Path), path.NewRelativeScopeWalker(&outputParentCreator)); err != nil {
 		return util.StatusWrap(err, "Failed to resolve path")
 	}
 	name := outputParentCreator.TerminalName
@@ -548,11 +552,14 @@ func (cw *statWalker) OnDirectory(name path.Component) (path.GotDirectoryOrSymli
 		}, nil
 	}
 
-	target, err := leaf.Readlink()
-	if err == syscall.EINVAL {
+	var p virtual.ApplyReadlink
+	if !leaf.VirtualApply(&p) {
+		panic("output path contains leaves that don't support ApplyReadlink")
+	}
+	if p.Err == syscall.EINVAL {
 		return nil, syscall.ENOTDIR
-	} else if err != nil {
-		return nil, err
+	} else if p.Err != nil {
+		return nil, p.Err
 	}
 
 	// Got a symbolic link in the middle of a path. Those should
@@ -560,7 +567,7 @@ func (cw *statWalker) OnDirectory(name path.Component) (path.GotDirectoryOrSymli
 	cw.stat = &bazeloutputservice.BatchStatResponse_Stat{}
 	return path.GotSymlink{
 		Parent: cw,
-		Target: target,
+		Target: p.Target,
 	}, nil
 }
 
@@ -577,11 +584,16 @@ func (cw *statWalker) OnTerminal(name path.Component) (*path.GotSymlink, error) 
 		return nil, nil
 	}
 
-	stat, err := leaf.GetBazelOutputServiceStat(cw.digestFunction)
-	if err != nil {
-		return nil, err
+	p := virtual.ApplyGetBazelOutputServiceStat{
+		DigestFunction: cw.digestFunction,
 	}
-	cw.stat = stat
+	if !leaf.VirtualApply(&p) {
+		panic("output path contains leaves that don't support ApplyGetBazelOutputServiceStat")
+	}
+	if p.Err != nil {
+		return nil, p.Err
+	}
+	cw.stat = p.Stat
 	return nil, nil
 }
 
@@ -618,7 +630,7 @@ func (d *BazelOutputServiceDirectory) BatchStat(ctx context.Context, request *ba
 		}
 		resolvedPath, scopeWalker := path.EmptyBuilder.Join(
 			buildState.scopeWalkerFactory.New(path.NewLoopDetectingScopeWalker(&statWalker)))
-		if err := path.Resolve(path.NewUNIXParser(statPath), scopeWalker); err == syscall.ENOENT {
+		if err := path.Resolve(path.UNIXFormat.NewParser(statPath), scopeWalker); err == syscall.ENOENT {
 			// Path does not exist.
 			response.Responses = append(response.Responses, &bazeloutputservice.BatchStatResponse_StatResponse{})
 		} else if err != nil {
@@ -730,4 +742,11 @@ func (d *BazelOutputServiceDirectory) VirtualReadDir(ctx context.Context, firstC
 		}
 	}
 	return virtual.StatusOK
+}
+
+// VirtualApply can be used to apply any custom operations against the
+// directory object. For this directory type, no custom operations are
+// defined.
+func (BazelOutputServiceDirectory) VirtualApply(data any) bool {
+	return false
 }

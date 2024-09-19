@@ -58,11 +58,11 @@ func (d *casDirectory) createSelf() virtual.Directory {
 	return d.handleAllocator.New(bytes.NewBuffer([]byte{0})).AsStatelessDirectory(d)
 }
 
-func (d *casDirectory) createSymlink(index uint64, target string) virtual.NativeLeaf {
+func (d *casDirectory) createSymlink(index uint64, target string) virtual.LinkableLeaf {
 	var encodedIndex [binary.MaxVarintLen64]byte
 	return d.handleAllocator.
 		New(bytes.NewBuffer(encodedIndex[:binary.PutUvarint(encodedIndex[:], index+1)])).
-		AsNativeLeaf(virtual.BaseSymlinkFactory.LookupSymlink([]byte(target)))
+		AsLinkableLeaf(virtual.BaseSymlinkFactory.LookupSymlink([]byte(target)))
 }
 
 func (d *casDirectory) resolveHandle(r io.ByteReader) (virtual.DirectoryChild, virtual.Status) {
@@ -249,4 +249,8 @@ func (d *casDirectory) VirtualReadDir(ctx context.Context, firstCookie uint64, r
 	}
 
 	return virtual.StatusOK
+}
+
+func (casDirectory) VirtualApply(data any) bool {
+	return false
 }

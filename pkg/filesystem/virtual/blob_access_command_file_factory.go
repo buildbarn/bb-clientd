@@ -142,6 +142,10 @@ func (f *commandFile) VirtualWrite(buf []byte, offset uint64) (int, virtual.Stat
 	panic("Request to write to read-only file should have been intercepted")
 }
 
+func (commandFile) VirtualApply(data any) bool {
+	return false
+}
+
 type sizeCountingWriter struct {
 	size uint64
 }
