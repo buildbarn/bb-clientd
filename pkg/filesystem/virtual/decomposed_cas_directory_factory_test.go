@@ -171,14 +171,14 @@ func TestDecomposedCASDirectoryFactoryLookupDirectory(t *testing.T) {
 				0xe0, 0x01,
 			},
 			[]byte{0})
-		executable := mock.NewMockNativeLeaf(ctrl)
+		executable := mock.NewMockLinkableLeaf(ctrl)
 		casFileFactory.EXPECT().LookupFile(
 			digest.MustNewDigest("hello", remoteexecution.DigestFunction_SHA256, "32d757ab2b5c09e11daf0b0c04a3ba9da78e96fd24f9f838be0333f093354c82", 42),
 			/* isExecutable = */ true,
 			/* readMonitor = */ nil,
 		).Return(executable)
 		executable.EXPECT().VirtualGetAttributes(ctx, re_vfs.AttributesMask(0), gomock.Any())
-		file := mock.NewMockNativeLeaf(ctrl)
+		file := mock.NewMockLinkableLeaf(ctrl)
 		casFileFactory.EXPECT().LookupFile(
 			digest.MustNewDigest("hello", remoteexecution.DigestFunction_SHA256, "64ec88ca00b268e5ba1a35678a1b5316d212f4f366b2477232534a8aeca37f3c", 11),
 			/* isExecutable = */ false,

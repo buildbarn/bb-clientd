@@ -223,7 +223,13 @@ func saveDirectoryRecursive(d virtual.PrepopulatedDirectory, dPath *path.Trace, 
 				continue
 			}
 		}
-		entry.Child.AppendOutputPathPersistencyDirectoryNode(&directory, entry.Name)
+		p := virtual.ApplyAppendOutputPathPersistencyDirectoryNode{
+			Directory: &directory,
+			Name:      entry.Name,
+		}
+		if !entry.Child.VirtualApply(&p) {
+			panic("output path contains leaves that don't support ApplyAppendOutputPathPersistencyDirectoryNode")
+		}
 	}
 	return &directory, nil
 }

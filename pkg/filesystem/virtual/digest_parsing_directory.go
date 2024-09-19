@@ -96,3 +96,7 @@ func (d *digestParsingDirectory) VirtualOpenChild(ctx context.Context, name path
 	s = leaf.VirtualOpenSelf(ctx, shareAccess, existingOptions, requested, openedFileAttributes)
 	return leaf, existingOptions.ToAttributesMask(), virtual.ChangeInfo{}, s
 }
+
+func (digestParsingDirectory) VirtualApply(data any) bool {
+	return false
+}
