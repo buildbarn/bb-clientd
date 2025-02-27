@@ -283,9 +283,14 @@ func TestBazelOutputServiceDirectoryStartBuild(t *testing.T) {
 			// the Content Addressable Storage.
 			outputPath.EXPECT().FilterChildren(gomock.Any()).DoAndReturn(func(childFilter re_vfs.ChildFilter) error {
 				child := mock.NewMockInitialContentsFetcher(ctrl)
-				child.EXPECT().GetContainingDigests(ctx).Return(digest.EmptySet, status.Error(codes.Unavailable, "Tree \"4fb75adebd02251c9663125582e51102\": CAS unavailable"))
+				child.EXPECT().VirtualApply(gomock.Any()).
+					Do(func(data any) {
+						p := data.(*re_vfs.ApplyGetContainingDigests)
+						p.Err = status.Error(codes.Unavailable, "Tree \"4fb75adebd02251c9663125582e51102\": CAS unavailable")
+					}).
+					Return(true)
 				remover := mock.NewMockChildRemover(ctrl)
-				require.False(t, childFilter(re_vfs.InitialNode{}.FromDirectory(child), remover.Call))
+				require.False(t, childFilter(re_vfs.InitialChild{}.FromDirectory(child), remover.Call))
 				return nil
 			})
 
@@ -308,10 +313,15 @@ func TestBazelOutputServiceDirectoryStartBuild(t *testing.T) {
 			// fails due to local storage errors.
 			outputPath.EXPECT().FilterChildren(gomock.Any()).DoAndReturn(func(childFilter re_vfs.ChildFilter) error {
 				child := mock.NewMockInitialContentsFetcher(ctrl)
-				child.EXPECT().GetContainingDigests(ctx).Return(digest.EmptySet, status.Error(codes.NotFound, "Tree \"4fb75adebd02251c9663125582e51102\": Object not found"))
+				child.EXPECT().VirtualApply(gomock.Any()).
+					Do(func(data any) {
+						p := data.(*re_vfs.ApplyGetContainingDigests)
+						p.Err = status.Error(codes.NotFound, "Tree \"4fb75adebd02251c9663125582e51102\": Object not found")
+					}).
+					Return(true)
 				remover := mock.NewMockChildRemover(ctrl)
 				remover.EXPECT().Call().Return(status.Error(codes.Internal, "Disk on fire"))
-				require.False(t, childFilter(re_vfs.InitialNode{}.FromDirectory(child), remover.Call))
+				require.False(t, childFilter(re_vfs.InitialChild{}.FromDirectory(child), remover.Call))
 				return nil
 			})
 
@@ -342,7 +352,7 @@ func TestBazelOutputServiceDirectoryStartBuild(t *testing.T) {
 					Return(true)
 				remover := mock.NewMockChildRemover(ctrl)
 				remover.EXPECT().Call().Return(status.Error(codes.Internal, "Disk on fire"))
-				require.False(t, childFilter(re_vfs.InitialNode{}.FromLeaf(child), remover.Call))
+				require.False(t, childFilter(re_vfs.InitialChild{}.FromLeaf(child), remover.Call))
 				return nil
 			})
 
@@ -372,7 +382,7 @@ func TestBazelOutputServiceDirectoryStartBuild(t *testing.T) {
 					}).
 					Return(true)
 				remover := mock.NewMockChildRemover(ctrl)
-				require.True(t, childFilter(re_vfs.InitialNode{}.FromLeaf(child), remover.Call))
+				require.True(t, childFilter(re_vfs.InitialChild{}.FromLeaf(child), remover.Call))
 				return nil
 			})
 			bareContentAddressableStorage.EXPECT().FindMissing(ctx, digests).
@@ -409,7 +419,7 @@ func TestBazelOutputServiceDirectoryStartBuild(t *testing.T) {
 						p.ContainingDigests = digests
 					}).
 					Return(true)
-				require.True(t, childFilter(re_vfs.InitialNode{}.FromLeaf(child), remover.Call))
+				require.True(t, childFilter(re_vfs.InitialChild{}.FromLeaf(child), remover.Call))
 				return nil
 			})
 			bareContentAddressableStorage.EXPECT().FindMissing(ctx, digests).Return(digests, nil)
@@ -447,7 +457,7 @@ func TestBazelOutputServiceDirectoryStartBuild(t *testing.T) {
 					Return(true)
 				remover1 := mock.NewMockChildRemover(ctrl)
 				remover1.EXPECT().Call()
-				require.True(t, childFilter(re_vfs.InitialNode{}.FromLeaf(child1), remover1.Call))
+				require.True(t, childFilter(re_vfs.InitialChild{}.FromLeaf(child1), remover1.Call))
 
 				// Serve a file that uses a different
 				// hashing algorithm. It should also get
@@ -461,7 +471,7 @@ func TestBazelOutputServiceDirectoryStartBuild(t *testing.T) {
 					Return(true)
 				remover2 := mock.NewMockChildRemover(ctrl)
 				remover2.EXPECT().Call()
-				require.True(t, childFilter(re_vfs.InitialNode{}.FromLeaf(child2), remover2.Call))
+				require.True(t, childFilter(re_vfs.InitialChild{}.FromLeaf(child2), remover2.Call))
 
 				// A file which we'll later report as present.
 				child3 := mock.NewMockLinkableLeaf(ctrl)
@@ -472,7 +482,7 @@ func TestBazelOutputServiceDirectoryStartBuild(t *testing.T) {
 					}).
 					Return(true)
 				remover3 := mock.NewMockChildRemover(ctrl)
-				require.True(t, childFilter(re_vfs.InitialNode{}.FromLeaf(child3), remover3.Call))
+				require.True(t, childFilter(re_vfs.InitialChild{}.FromLeaf(child3), remover3.Call))
 
 				// A file which we'll later report as missing.
 				child4 := mock.NewMockLinkableLeaf(ctrl)
@@ -482,37 +492,48 @@ func TestBazelOutputServiceDirectoryStartBuild(t *testing.T) {
 						p.ContainingDigests = digest.MustNewDigest("my-cluster", remoteexecution.DigestFunction_MD5, "9435918583fd2e37882751bbc51f4085", 4).ToSingletonSet()
 					}).
 					Return(true)
-				require.True(t, childFilter(re_vfs.InitialNode{}.FromLeaf(child4), remover4.Call))
+				require.True(t, childFilter(re_vfs.InitialChild{}.FromLeaf(child4), remover4.Call))
 
 				// A directory that no longer exists. It
 				// should be removed immediately.
 				child5 := mock.NewMockInitialContentsFetcher(ctrl)
-				child5.EXPECT().GetContainingDigests(ctx).Return(digest.EmptySet, status.Error(codes.NotFound, "Tree \"4fb75adebd02251c9663125582e51102\": Object not found"))
+				child5.EXPECT().VirtualApply(gomock.Any()).
+					Do(func(data any) {
+						p := data.(*re_vfs.ApplyGetContainingDigests)
+						p.Err = status.Error(codes.NotFound, "Tree \"4fb75adebd02251c9663125582e51102\": Object not found")
+					}).
+					Return(true)
 				remover5 := mock.NewMockChildRemover(ctrl)
 				remover5.EXPECT().Call()
-				require.True(t, childFilter(re_vfs.InitialNode{}.FromDirectory(child5), remover5.Call))
+				require.True(t, childFilter(re_vfs.InitialChild{}.FromDirectory(child5), remover5.Call))
 
 				// A directory for which all files exist.
 				child6 := mock.NewMockInitialContentsFetcher(ctrl)
-				child6.EXPECT().GetContainingDigests(ctx).Return(
-					digest.NewSetBuilder().
-						Add(digest.MustNewDigest("my-cluster", remoteexecution.DigestFunction_MD5, "23fef0c2a3414dd562ca70e4a4717609", 5)).
-						Add(digest.MustNewDigest("my-cluster", remoteexecution.DigestFunction_MD5, "a60ffc49592e5045a61a8c99f3c86b4f", 6)).
-						Build(),
-					nil)
+				child6.EXPECT().VirtualApply(gomock.Any()).
+					Do(func(data any) {
+						p := data.(*re_vfs.ApplyGetContainingDigests)
+						p.ContainingDigests = digest.NewSetBuilder().
+							Add(digest.MustNewDigest("my-cluster", remoteexecution.DigestFunction_MD5, "23fef0c2a3414dd562ca70e4a4717609", 5)).
+							Add(digest.MustNewDigest("my-cluster", remoteexecution.DigestFunction_MD5, "a60ffc49592e5045a61a8c99f3c86b4f", 6)).
+							Build()
+					}).
+					Return(true)
 				remover6 := mock.NewMockChildRemover(ctrl)
-				require.True(t, childFilter(re_vfs.InitialNode{}.FromDirectory(child6), remover6.Call))
+				require.True(t, childFilter(re_vfs.InitialChild{}.FromDirectory(child6), remover6.Call))
 
 				// A directory for which one file does not
 				// exist. It should be removed later on.
 				child7 := mock.NewMockInitialContentsFetcher(ctrl)
-				child7.EXPECT().GetContainingDigests(ctx).Return(
-					digest.NewSetBuilder().
-						Add(digest.MustNewDigest("my-cluster", remoteexecution.DigestFunction_MD5, "2c0f843d40e00603f0d71e0d11a6e045", 7)).
-						Add(digest.MustNewDigest("my-cluster", remoteexecution.DigestFunction_MD5, "6b9105a7125cb9f190a3e44ab5f22663", 8)).
-						Build(),
-					nil)
-				require.True(t, childFilter(re_vfs.InitialNode{}.FromDirectory(child7), remover7.Call))
+				child7.EXPECT().VirtualApply(gomock.Any()).
+					Do(func(data any) {
+						p := data.(*re_vfs.ApplyGetContainingDigests)
+						p.ContainingDigests = digest.NewSetBuilder().
+							Add(digest.MustNewDigest("my-cluster", remoteexecution.DigestFunction_MD5, "2c0f843d40e00603f0d71e0d11a6e045", 7)).
+							Add(digest.MustNewDigest("my-cluster", remoteexecution.DigestFunction_MD5, "6b9105a7125cb9f190a3e44ab5f22663", 8)).
+							Build()
+					}).
+					Return(true)
+				require.True(t, childFilter(re_vfs.InitialChild{}.FromDirectory(child7), remover7.Call))
 				return nil
 			})
 
@@ -659,7 +680,7 @@ func TestBazelOutputServiceDirectoryStageArtifacts(t *testing.T) {
 	})
 
 	// The creation of actual files and directories is hard to test,
-	// as the InitialNode arguments provided to CreateChildren()
+	// as the InitialChild arguments provided to CreateChildren()
 	// contain objects that are hard to compare. At least provide a
 	// test for the success case.
 
@@ -673,8 +694,8 @@ func TestBazelOutputServiceDirectoryStageArtifacts(t *testing.T) {
 		casFileHandleAllocator.EXPECT().New(gomock.Any()).Return(casFileHandleAllocation)
 		file := mock.NewMockLinkableLeaf(ctrl)
 		casFileHandleAllocation.EXPECT().AsLinkableLeaf(gomock.Any()).Return(file)
-		child.EXPECT().CreateChildren(map[path.Component]re_vfs.InitialNode{
-			path.MustNewComponent("file"): re_vfs.InitialNode{}.FromLeaf(file),
+		child.EXPECT().CreateChildren(map[path.Component]re_vfs.InitialChild{
+			path.MustNewComponent("file"): re_vfs.InitialChild{}.FromLeaf(file),
 		}, true)
 
 		// Creation of "directory".

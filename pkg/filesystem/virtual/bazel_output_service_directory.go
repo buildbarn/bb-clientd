@@ -179,29 +179,26 @@ func (d *BazelOutputServiceDirectory) findMissingAndRemove(ctx context.Context, 
 func (d *BazelOutputServiceDirectory) filterMissingChildren(ctx context.Context, rootDirectory virtual.PrepopulatedDirectory, digestFunction digest.Function) error {
 	queue := map[digest.Digest][]func() error{}
 	var savedErr error
-	if err := rootDirectory.FilterChildren(func(node virtual.InitialNode, removeFunc virtual.ChildRemover) bool {
+	if err := rootDirectory.FilterChildren(func(node virtual.InitialChild, removeFunc virtual.ChildRemover) bool {
 		// Obtain the transitive closure of digests on which
 		// this file or directory depends.
-		var digests digest.Set
-		if directory, leaf := node.GetPair(); leaf != nil {
-			var p virtual.ApplyGetContainingDigests
-			if !leaf.VirtualApply(&p) {
-				panic("output path contains leaves that don't support ApplyGetContainingDigests")
-			}
-			digests = p.ContainingDigests
-		} else if digests, savedErr = directory.GetContainingDigests(ctx); savedErr != nil {
+		var p virtual.ApplyGetContainingDigests
+		if !node.GetNode().VirtualApply(&p) {
+			panic("output path contains nodes that don't support ApplyGetContainingDigests")
+		}
+		if p.Err != nil {
 			// Can't compute the set of digests underneath
 			// this directory. Remove the directory
 			// entirely.
-			if status.Code(savedErr) == codes.NotFound {
-				savedErr = nil
-				if err := removeFunc(); err != nil {
-					savedErr = util.StatusWrap(err, "Failed to remove non-existent directory")
-					return false
-				}
-				return true
+			if status.Code(p.Err) != codes.NotFound {
+				savedErr = p.Err
+				return false
 			}
-			return false
+			if err := removeFunc(); err != nil {
+				savedErr = util.StatusWrap(err, "Failed to remove non-existent directory")
+				return false
+			}
+			return true
 		}
 
 		// Remove files that use a different instance name or
@@ -210,7 +207,7 @@ func (d *BazelOutputServiceDirectory) filterMissingChildren(ctx context.Context,
 		// the build client to copy files between clusters, or
 		// reupload them with a different hash. This may be
 		// slower than requiring a rebuild.
-		for _, blobDigest := range digests.Items() {
+		for _, blobDigest := range p.ContainingDigests.Items() {
 			if !blobDigest.UsesDigestFunction(digestFunction) {
 				if err := removeFunc(); err != nil {
 					savedErr = util.StatusWrapf(err, "Failed to remove file with different instance name or digest function with digest %#v", blobDigest.String())
@@ -220,7 +217,7 @@ func (d *BazelOutputServiceDirectory) filterMissingChildren(ctx context.Context,
 			}
 		}
 
-		for _, blobDigest := range digests.Items() {
+		for _, blobDigest := range p.ContainingDigests.Items() {
 			if len(queue) >= blobstore.RecommendedFindMissingDigestsCount {
 				// Maximum number of digests reached.
 				savedErr = d.findMissingAndRemove(ctx, queue)
@@ -434,8 +431,8 @@ func (d *BazelOutputServiceDirectory) stageSingleArtifact(ctx context.Context, a
 		}
 
 		return outputParentCreator.stack.Peek().CreateChildren(
-			map[path.Component]virtual.InitialNode{
-				*name: virtual.InitialNode{}.FromLeaf(
+			map[path.Component]virtual.InitialChild{
+				*name: virtual.InitialChild{}.FromLeaf(
 					outputPathState.casFileFactory.LookupFile(
 						childDigest,
 						/* isExecutable = */ true,
@@ -464,8 +461,8 @@ func (d *BazelOutputServiceDirectory) stageSingleArtifact(ctx context.Context, a
 		}
 
 		return outputParentCreator.stack.Peek().CreateChildren(
-			map[path.Component]virtual.InitialNode{
-				*name: virtual.InitialNode{}.FromDirectory(
+			map[path.Component]virtual.InitialChild{
+				*name: virtual.InitialChild{}.FromDirectory(
 					virtual.NewCASInitialContentsFetcher(
 						context.Background(),
 						cd_cas.NewTreeDirectoryWalker(d.directoryFetcher, childDigest, rootDirectoryDigest),

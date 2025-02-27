@@ -322,6 +322,7 @@ func main() {
 				bazeloutputservice.RegisterBazelOutputServiceServer(s, outputsDirectory)
 			},
 			siblingsGroup,
+			grpcClientFactory,
 		); err != nil {
 			return util.StatusWrap(err, "gRPC server failure")
 		}
