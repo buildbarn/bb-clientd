@@ -1,44 +1,14 @@
-// List of clusters to which bb_clientd is permitted to connect.
-local clusters = {
-  'mycluster-prod.example.com': 'api.mycluster-prod.example.com',
-  'mycluster-qa.example.com': 'api.mycluster-qa.example.com',
-  'mycluster-dev.example.com': 'api.mycluster-dev.example.com',
-};
-
-local grpcClient(hostname, authorizationHeader, proxyURL) = {
-  address: hostname + ':443',
-  tls: {},
-  [if authorizationHeader != null then 'addMetadata']: [
-    { header: 'authorization', values: [authorizationHeader] },
-  ],
-  addMetadataJmespathExpression: '{"build.bazel.remote.execution.v2.requestmetadata-bin": incomingGRPCMetadata."build.bazel.remote.execution.v2.requestmetadata-bin"}',
-  // Enable gRPC keepalives. Make sure to tune these settings based on
-  // what your cluster permits.
-  keepalive: {
-    time: '60s',
-    timeout: '30s',
-  },
-  proxyUrl: proxyURL,
-};
-
-// Route requests to one of the clusters listed above by parsing the
-// prefix of the instance name. This prefix will be stripped on outgoing
-// requests.
-local blobstoreConfig(authorizationHeader, proxyURL) = {
-  demultiplexing: {
-    instanceNamePrefixes: {
-      [cluster]: { backend: {
-        grpc: grpcClient(clusters[cluster], authorizationHeader, proxyURL),
-      } }
-      for cluster in std.objectFields(clusters)
-    },
-  },
-};
-
 local os = std.extVar('OS');
 local cacheDirectory = std.extVar('XDG_CACHE_HOME') + '/bb_clientd';
 
 {
+  // List of clusters to which bb_clientd is permitted to connect.
+  clusters:: {
+    'mycluster-prod.example.com': 'api.mycluster-prod.example.com',
+    'mycluster-qa.example.com': 'api.mycluster-qa.example.com',
+    'mycluster-dev.example.com': 'api.mycluster-dev.example.com',
+  },
+
   // Options that users can override.
   casKeyLocationMapSizeBytes:: 512 * 1024 * 1024,
   casBlocksSizeBytes:: 100 * 1024 * 1024 * 1024,
@@ -58,6 +28,36 @@ local cacheDirectory = std.extVar('XDG_CACHE_HOME') + '/bb_clientd';
 
   // If enabled, use NFSv4 instead of FUSE.
   useNFSv4:: os == 'Darwin',
+
+  grpcClient:: function(hostname, authorizationHeader, proxyURL) {
+    address: hostname + ':443',
+    tls: {},
+    [if authorizationHeader != null then 'addMetadata']: [
+      { header: 'authorization', values: [authorizationHeader] },
+    ],
+    addMetadataJmespathExpression: '{"build.bazel.remote.execution.v2.requestmetadata-bin": incomingGRPCMetadata."build.bazel.remote.execution.v2.requestmetadata-bin"}',
+    // Enable gRPC keepalives. Make sure to tune these settings based on
+    // what your cluster permits.
+    keepalive: {
+      time: '60s',
+      timeout: '30s',
+    },
+    proxyUrl: proxyURL,
+  },
+
+  // Route requests to one of the clusters listed above by parsing the
+  // prefix of the instance name. This prefix will be stripped on outgoing
+  // requests.
+  blobstoreConfig:: function(authorizationHeader, proxyURL) {
+    demultiplexing: {
+      instanceNamePrefixes: {
+        [cluster]: { backend: {
+          grpc: $.grpcClient($.clusters[cluster], authorizationHeader, proxyURL),
+        } }
+        for cluster in std.objectFields($.clusters)
+      },
+    },
+  },
 
   // Backends for the Action Cache and Content Addressable Storage.
   blobstore: {
@@ -87,7 +87,7 @@ local cacheDirectory = std.extVar('XDG_CACHE_HOME') + '/bb_clientd';
         },
       } } },
       // Other instance names are assumed to correspond to remote clusters.
-      '': { backend: blobstoreConfig($.authorizationHeader, $.proxyURL) },
+      '': { backend: $.blobstoreConfig($.authorizationHeader, $.proxyURL) },
     } } },
     contentAddressableStorage: { withLabels: {
       backend: { demultiplexing: { instanceNamePrefixes: {
@@ -158,7 +158,7 @@ local cacheDirectory = std.extVar('XDG_CACHE_HOME') + '/bb_clientd';
             minimumEpochInterval: '300s',
           },
         } },
-        clustersCAS: blobstoreConfig($.authorizationHeader, $.proxyURL),
+        clustersCAS: $.blobstoreConfig($.authorizationHeader, $.proxyURL),
       },
     } },
   },
@@ -167,9 +167,9 @@ local cacheDirectory = std.extVar('XDG_CACHE_HOME') + '/bb_clientd';
   // routing policy as the storage configuration above.
   schedulers: {
     [cluster]: {
-      endpoint: grpcClient(clusters[cluster], $.authorizationHeader, $.proxyURL),
+      endpoint: $.grpcClient($.clusters[cluster], $.authorizationHeader, $.proxyURL),
     }
-    for cluster in std.objectFields(clusters)
+    for cluster in std.objectFields($.clusters)
   },
 
   // A gRPC server to which Bazel can send requests, as opposed to
