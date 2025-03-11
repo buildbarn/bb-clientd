@@ -184,7 +184,9 @@ func (d *BazelOutputServiceDirectory) filterMissingChildren(ctx context.Context,
 		// this file or directory depends.
 		var p virtual.ApplyGetContainingDigests
 		if !node.GetNode().VirtualApply(&p) {
-			panic("output path contains nodes that don't support ApplyGetContainingDigests")
+			// This node type does not depend on any digests, e.g. a file in the
+			// file pool.
+			return true
 		}
 		if p.Err != nil {
 			// Can't compute the set of digests underneath
