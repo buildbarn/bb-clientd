@@ -10,9 +10,19 @@ local cacheDirectory = std.extVar('XDG_CACHE_HOME') + '/bb_clientd';
   },
 
   // Options that users can override.
-  casKeyLocationMapSizeBytes:: 512 * 1024 * 1024,
   casBlocksSizeBytes:: 100 * 1024 * 1024 * 1024,
   filePoolSizeBytes:: 100 * 1024 * 1024 * 1024,
+
+  // The key location map entries are 66 bytes and calculate with 50% fill ratio.
+  averageCasBlobSizeBytes:: 5 * 1024,
+  casKeyLocationMapSizeBytes:: std.ceil((self.casBlocksSizeBytes * 66) / (self.averageCasBlobSizeBytes * 0.5)),
+
+  // The action cache is used as a system local cache if the instance name
+  // 'local' is choosen.
+  acBlocksSizeBytes:: 1024 * 1024 * 1024,
+  // The key location map entries are 66 bytes and calculate with 50% fill ratio.
+  averageAcBlobSizeBytes:: 1024,
+  acKeyLocationMapSizeBytes:: std.ceil((self.acBlocksSizeBytes * 66) / (self.averageAcBlobSizeBytes * 0.5)),
 
   // Maximum supported Protobuf message size.
   maximumMessageSizeBytes: 16 * 1024 * 1024,
@@ -67,7 +77,7 @@ local cacheDirectory = std.extVar('XDG_CACHE_HOME') + '/bb_clientd';
       'local': { backend: { 'local': {
         keyLocationMapOnBlockDevice: { file: {
           path: cacheDirectory + '/ac/key_location_map',
-          sizeBytes: 128 * 1024 * 1024,
+          sizeBytes: $.acKeyLocationMapSizeBytes,
         } },
         keyLocationMapMaximumGetAttempts: 16,
         keyLocationMapMaximumPutAttempts: 64,
@@ -77,7 +87,7 @@ local cacheDirectory = std.extVar('XDG_CACHE_HOME') + '/bb_clientd';
         blocksOnBlockDevice: {
           source: { file: {
             path: cacheDirectory + '/ac/blocks',
-            sizeBytes: 1024 * 1024 * 1024,
+            sizeBytes: $.acBlocksSizeBytes,
           } },
           spareBlocks: 1,
         },
