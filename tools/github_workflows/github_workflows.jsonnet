@@ -12,7 +12,7 @@ workflows_template.getWorkflows(
         steps+: [
           {
             name: 'linux_amd64: build bb_clientd.deb',
-            run: 'bazel build --platforms=@rules_go//go/toolchain:linux_amd64 //:bb_clientd_deb',
+            run: 'bazel build --stamp --platforms=@rules_go//go/toolchain:linux_amd64 //:bb_clientd_deb',
           },
           {
             name: 'linux_amd64: copy bb_clientd.deb',

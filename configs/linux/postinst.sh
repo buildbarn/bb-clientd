@@ -13,11 +13,20 @@ else
   # Restarting systemd-logind.service effectively kills user sessions and the
   # users' desktop environment, so let the user get a hint about reboot
   # instead.
-  /usr/share/update-notifier/notify-reboot-required
-  if [ -e /var/run/reboot-required ]; then
-    cat /var/run/reboot-required
+  if [ "$#" -ge 2 ] && [ "$1" = "configure" ]; then
+    old_version=$2
+  else
+    old_version=""
   fi
-  echo "Please reboot to apply changes to /etc/logind.conf"
+  # In the future, the old version can determine if reboot is required:
+  # if dpkg --compare-versions "$old_version" lt "20250312T094712Z-2b641c6"; then
+  if [ -z "$old_version" ]; then
+    /usr/share/update-notifier/notify-reboot-required
+    if [ -e /var/run/reboot-required ]; then
+      cat /var/run/reboot-required
+    fi
+    echo "Please reboot to apply changes to /etc/logind.conf"
+  fi
 fi
 
 # Pick up changes to the systemd service.
