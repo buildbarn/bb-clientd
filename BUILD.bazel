@@ -1,3 +1,4 @@
+load("@aspect_bazel_lib//lib:expand_template.bzl", "expand_template")
 load("@gazelle//:def.bzl", "gazelle")
 load("@rules_pkg//:pkg.bzl", "pkg_deb", "pkg_tar")
 
@@ -35,15 +36,30 @@ pkg_tar(
     },
 )
 
+# When built with --stamp, creates a non-deterministic output file for pushing images to a remote registry.
+# With --nostamp, produces a deterministic output so dependents get cache hits.
+expand_template(
+    name = "deb_version_file",
+    out = "_deb_version.txt",
+    stamp_substitutions = {"_TAG_": "{{BUILD_SCM_TIMESTAMP}}-{{BUILD_SCM_REVISION}}"},
+    substitutions = {"_TAG_": "0~unknown"},
+    template = ["_TAG_"],
+    visibility = ["//visibility:public"],
+)
+
 pkg_deb(
     name = "bb_clientd_deb",
-    architecture = "amd64",
+    architecture = select({
+        "@platforms//cpu:x86_64": "amd64",
+        "//conditions:default": "unknown",
+    }),
     data = ":bb_clientd_deb_data",
     depends = ["fuse"],
     description = "The Buildbarn client daemon",
     homepage = "https://github.com/buildbarn/bb-clientd",
     maintainer = "The Buildbarn team",
     package = "bb-clientd",
+    package_file_name = "bb-clientd.deb",
     postinst = "configs/linux/postinst.sh",
-    version = "0.0.0",
+    version_file = ":deb_version_file",
 )
