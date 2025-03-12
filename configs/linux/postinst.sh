@@ -7,7 +7,18 @@ if ! grep -q '^user_allow_other$' /etc/fuse.conf; then
 fi
 
 # Pick up changes to /etc/logind.conf.
-systemctl restart systemd-logind.service
+if [ -z "$(loginctl --no-legend list-sessions)" ]; then
+  systemctl restart systemd-logind.service
+else
+  # Restarting systemd-logind.service effectively kills user sessions and the
+  # users' desktop environment, so let the user get a hint about reboot
+  # instead.
+  /usr/share/update-notifier/notify-reboot-required
+  if [ -e /var/run/reboot-required ]; then
+    cat /var/run/reboot-required
+  fi
+  echo "Please reboot to apply changes to /etc/logind.conf"
+fi
 
 # Pick up changes to the systemd service.
 systemctl daemon-reload
