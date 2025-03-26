@@ -78,8 +78,8 @@ journalctl --user -u bb_clientd -f
 
 By default, bb\_clientd will use the configuration file that is also
 shipped with this repository. It is possible to override configuration
-options by creating a file named `~/.config/bb_clientd.jsonnet` that
-uses the following structure:
+options by creating a file named `~/.config/bb_clientd/bb_clientd.jsonnet`
+that uses the following structure:
 
 ```jsonnet
 local defaultConfiguration = import 'bb_clientd_defaults.jsonnet';

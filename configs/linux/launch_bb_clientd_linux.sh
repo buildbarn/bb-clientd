@@ -23,9 +23,19 @@ if [ "$1" = "start" ]; then
   # Use either the user provided or system-wide configuration file, based
   # on whether the former is present.
   config_file=/usr/lib/bb_clientd/bb_clientd.jsonnet
-  personal_config_file="${HOME}/.config/bb_clientd.jsonnet"
+  personal_config_file="${HOME}/.config/bb_clientd/bb_clientd.jsonnet"
+
+  # TODO: 2025-04-08 Remove migration code after a year.
+  old_personal_config_file="${HOME}/.config/bb_clientd.jsonnet"
+  if [ -f "$old_personal_config_file" ]; then
+    echo "Found ${old_personal_config_file}, moving it to ${personal_config_file}"
+    mkdir -p "${HOME}/.config/bb_clientd"
+    mv "$old_personal_config_file" "$personal_config_file"
+  fi
+  rm -f "${HOME}/.config/bb_clientd_defaults.jsonnet"
+
   if [ -f "${personal_config_file}" ]; then
-    ln -sf "${config_file}" "${HOME}/.config/bb_clientd_defaults.jsonnet"
+    ln -sf "${config_file}" "${HOME}/.config/bb_clientd/bb_clientd_defaults.jsonnet"
     config_file="${personal_config_file}"
   fi
 
