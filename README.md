@@ -37,13 +37,13 @@ bb\_clientd:
 
 ```sh
 umount ~/bb_clientd; fusermount -u ~/bb_clientd
-export XDG_CACHE_HOME=${XDG_CACHE_HOME:-~/.cache}
+export XDG_CACHE_HOME="${XDG_CACHE_HOME:-${HOME}/.cache}"
 mkdir -p \
-    ${XDG_CACHE_HOME}/bb_clientd/ac/persistent_state \
-    ${XDG_CACHE_HOME}/bb_clientd/cas/persistent_state \
-    ${XDG_CACHE_HOME}/bb_clientd/outputs \
+    "${XDG_CACHE_HOME}/bb_clientd/ac/persistent_state" \
+    "${XDG_CACHE_HOME}/bb_clientd/cas/persistent_state" \
+    "${XDG_CACHE_HOME}/bb_clientd/outputs" \
     ~/bb_clientd
-OS=$(uname) bazel run //cmd/bb_clientd $(bazel info workspace)/configs/bb_clientd.jsonnet
+OS="$(uname)" bazel run //cmd/bb_clientd "$(bazel info workspace)/configs/bb_clientd.jsonnet"
 ```
 
 You may validate that bb\_clientd is running by inspecting the top-level
@@ -119,7 +119,7 @@ bazel build --remote_executor mycluster-prod.example.com --remote_instance_name 
 You can let it use bb\_clientd by running it like this instead:
 
 ```
-bazel build --remote_executor unix:${XDG_CACHE_HOME:-~/.cache}/bb_clientd/grpc --remote_instance_name mycluster-prod.example.com/hello [more options]
+bazel build --remote_executor "unix:${XDG_CACHE_HOME:-${HOME}/.cache}/bb_clientd/grpc" --remote_instance_name mycluster-prod.example.com/hello [more options]
 ```
 
 Notice how the hostname of the cluster has become a prefix of
@@ -131,7 +131,7 @@ traffic needs to be routed.
 You may wish to add `--remote_bytestream_uri_prefix` to the `bazel build`
 command with the URI of the _real_ remote executor. This will cause Bazel's
 build event stream to emit URIs with this prefix rather than
-`${XDG_CACHE_HOME:-~/.cache}/bb_clientd/grpc`. Some build event
+`${XDG_CACHE_HOME:-${HOME}/.cache}/bb_clientd/grpc`. Some build event
 consumers offer features that require access to the remote cache; this
 is necssary for those features to access the canonical remote.
 
@@ -143,7 +143,7 @@ name acts as its own namespace. This means that if you want to cache the
 results of a build performed locally, you may run Bazel as follows:
 
 ```
-bazel build --remote_cache unix:${XDG_CACHE_HOME:-~/.cache}/bb_clientd/grpc --remote_instance_name local/some/project --remote_upload_local_results=true [more options]
+bazel build --remote_cache "unix:${XDG_CACHE_HOME:-${HOME}/.cache}/bb_clientd/grpc" --remote_instance_name local/some/project --remote_upload_local_results=true [more options]
 ```
 
 The advantage of this option over Bazel's own `--disk_cache` flag is
@@ -257,5 +257,5 @@ Bazel can be configured to use this feature by providing the following
 additional command line arguments:
 
 ```
---experimental_remote_output_service unix:${XDG_CACHE_HOME:-~/.cache}/bb_clientd/grpc --experimental_remote_output_service_output_path_prefix ${HOME}/bb_clientd/outputs
+--experimental_remote_output_service "unix:${XDG_CACHE_HOME:-${HOME}/.cache}/bb_clientd/grpc" --experimental_remote_output_service_output_path_prefix "${HOME}/bb_clientd/outputs"
 ```
