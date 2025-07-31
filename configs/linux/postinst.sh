@@ -8,7 +8,7 @@ fi
 
 # Pick up changes to /etc/logind.conf.
 if [ -z "$(loginctl --no-legend list-sessions)" ]; then
-  systemctl restart systemd-logind.service
+  deb-systemd-invoke --system restart systemd-logind.service
 else
   # Restarting systemd-logind.service effectively kills user sessions and the
   # users' desktop environment, so let the user get a hint about reboot
@@ -21,7 +21,9 @@ else
   # In the future, the old version can determine if reboot is required:
   # if dpkg --compare-versions "$old_version" lt "20250312T094712Z-2b641c6"; then
   if [ -z "$old_version" ]; then
-    /usr/share/update-notifier/notify-reboot-required
+    if [ -x /usr/share/update-notifier/notify-reboot-required ]; then
+      /usr/share/update-notifier/notify-reboot-required
+    fi
     if [ -e /var/run/reboot-required ]; then
       cat /var/run/reboot-required
     fi
@@ -30,7 +32,7 @@ else
 fi
 
 # Pick up changes to the systemd service.
-systemctl daemon-reload
+deb-systemd-invoke --system daemon-reload
 
 # Multiple users may have enabled bb_clientd as a systemd user service.
 # Force a restart of all of these instances to ensure they do not run an
