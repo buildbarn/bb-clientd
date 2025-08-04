@@ -11,6 +11,7 @@ import (
 	"github.com/buildbarn/bb-storage/pkg/blobstore/buffer"
 	"github.com/buildbarn/bb-storage/pkg/digest"
 	"github.com/buildbarn/bb-storage/pkg/testutil"
+	"github.com/buildbarn/bb-storage/pkg/util"
 	"github.com/stretchr/testify/require"
 
 	"google.golang.org/grpc/codes"
@@ -38,7 +39,7 @@ func TestErrorRetryingBlobAccessGet(t *testing.T) {
 	helloDigest := digest.MustNewDigest("instance_name", remoteexecution.DigestFunction_MD5, "8b1a9953c4611296a827abf8c47804d7", 5)
 	helloDigestSet := helloDigest.ToSingletonSet()
 	llDigest := digest.MustNewDigest("instance_name", remoteexecution.DigestFunction_MD5, "5b54c0a045f179bcbbbc9abcb8b5cd4c", 2)
-	instanceName := digest.MustNewInstanceName("instance_name")
+	instanceName := util.Must(digest.NewInstanceName("instance_name"))
 
 	t.Run("GetNonRetriableError", func(t *testing.T) {
 		// Errors for codes other than INTERNAL, UNAVAILABLE and

@@ -12,6 +12,7 @@ import (
 	"github.com/buildbarn/bb-storage/pkg/digest"
 	"github.com/buildbarn/bb-storage/pkg/filesystem"
 	"github.com/buildbarn/bb-storage/pkg/filesystem/path"
+	"github.com/buildbarn/bb-storage/pkg/util"
 	"github.com/stretchr/testify/require"
 
 	"go.uber.org/mock/gomock"
@@ -89,7 +90,7 @@ func TestInstanceNameParsingDirectory(t *testing.T) {
 			out1)
 
 		mockChildDirectory := mock.NewMockVirtualDirectory(ctrl)
-		lookupFunc.EXPECT().Call(digest.MustNewInstanceName("hello")).Return(mockChildDirectory)
+		lookupFunc.EXPECT().Call(util.Must(digest.NewInstanceName("hello"))).Return(mockChildDirectory)
 		mockChildDirectory.EXPECT().VirtualGetAttributes(
 			ctx,
 			re_vfs.AttributesMaskInodeNumber,
@@ -141,7 +142,7 @@ func TestInstanceNameParsingDirectory(t *testing.T) {
 			out2)
 
 		mockChildDirectory := mock.NewMockVirtualDirectory(ctrl)
-		lookupFunc.EXPECT().Call(digest.MustNewInstanceName("hello/world")).Return(mockChildDirectory)
+		lookupFunc.EXPECT().Call(util.Must(digest.NewInstanceName("hello/world"))).Return(mockChildDirectory)
 		mockChildDirectory.EXPECT().VirtualGetAttributes(
 			ctx,
 			re_vfs.AttributesMaskInodeNumber,

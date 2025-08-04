@@ -14,7 +14,7 @@ import (
 	"github.com/buildbarn/bb-clientd/pkg/outputpathpersistency"
 	"github.com/buildbarn/bb-clientd/pkg/proto/configuration/bb_clientd"
 	re_cas "github.com/buildbarn/bb-remote-execution/pkg/cas"
-	re_filesystem "github.com/buildbarn/bb-remote-execution/pkg/filesystem"
+	"github.com/buildbarn/bb-remote-execution/pkg/filesystem/pool"
 	re_vfs "github.com/buildbarn/bb-remote-execution/pkg/filesystem/virtual"
 	virtual_configuration "github.com/buildbarn/bb-remote-execution/pkg/filesystem/virtual/configuration"
 	"github.com/buildbarn/bb-remote-execution/pkg/proto/bazeloutputservice"
@@ -71,7 +71,7 @@ func main() {
 		}
 
 		// Storage of files created through the virtual file system.
-		filePool, err := re_filesystem.NewFilePoolFromConfiguration(configuration.FilePool)
+		filePool, err := pool.NewFilePoolFromConfiguration(configuration.FilePool)
 		if err != nil {
 			return util.StatusWrap(err, "Failed to create file pool")
 		}
@@ -283,7 +283,10 @@ func main() {
 						rootHandleAllocator,
 						sort.Sort,
 						/* hiddenFilesMatcher = */ func(string) bool { return false },
-						clock.SystemClock)),
+						clock.SystemClock,
+						/* defaultAttributesSetter = */ func(requested re_vfs.AttributesMask, attributes *re_vfs.Attributes) {},
+					),
+				),
 			}))
 
 		if err := mount.Expose(siblingsGroup, rootDirectory); err != nil {
