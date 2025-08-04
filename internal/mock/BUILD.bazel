@@ -118,10 +118,10 @@ gomock(
 )
 
 gomock(
-    name = "re_filesystem",
-    out = "re_filesystem.go",
+    name = "re_filesystem_pool",
+    out = "re_filesystem_pool.go",
     interfaces = ["FilePool"],
-    library = "@com_github_buildbarn_bb_remote_execution//pkg/filesystem",
+    library = "@com_github_buildbarn_bb_remote_execution//pkg/filesystem/pool",
     mockgen_model_library = "@org_uber_go_mock//mockgen/model",
     mockgen_tool = "@org_uber_go_mock//mockgen",
     package = "mock",
@@ -181,7 +181,7 @@ go_library(
         "outputpathpersistency.go",
         "random.go",
         "re_cas.go",
-        "re_filesystem.go",
+        "re_filesystem_pool.go",
         "re_filesystem_virtual.go",
         "storage_util.go",
     ],

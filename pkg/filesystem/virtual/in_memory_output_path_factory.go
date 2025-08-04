@@ -3,7 +3,7 @@ package virtual
 import (
 	"context"
 
-	"github.com/buildbarn/bb-remote-execution/pkg/filesystem"
+	"github.com/buildbarn/bb-remote-execution/pkg/filesystem/pool"
 	"github.com/buildbarn/bb-remote-execution/pkg/filesystem/virtual"
 	"github.com/buildbarn/bb-storage/pkg/clock"
 	"github.com/buildbarn/bb-storage/pkg/digest"
@@ -12,7 +12,7 @@ import (
 )
 
 type inMemoryOutputPathFactory struct {
-	filePool              filesystem.FilePool
+	filePool              pool.FilePool
 	symlinkFactory        virtual.SymlinkFactory
 	handleAllocator       virtual.StatefulHandleAllocator
 	initialContentsSorter virtual.Sorter
@@ -21,7 +21,7 @@ type inMemoryOutputPathFactory struct {
 
 // NewInMemoryOutputPathFactory creates an OutputPathFactory that simply
 // creates output paths that store all of their data in memory.
-func NewInMemoryOutputPathFactory(filePool filesystem.FilePool, symlinkFactory virtual.SymlinkFactory, handleAllocator virtual.StatefulHandleAllocator, initialContentsSorter virtual.Sorter, clock clock.Clock) OutputPathFactory {
+func NewInMemoryOutputPathFactory(filePool pool.FilePool, symlinkFactory virtual.SymlinkFactory, handleAllocator virtual.StatefulHandleAllocator, initialContentsSorter virtual.Sorter, clock clock.Clock) OutputPathFactory {
 	return &inMemoryOutputPathFactory{
 		filePool:              filePool,
 		symlinkFactory:        symlinkFactory,
@@ -44,7 +44,9 @@ func (opf *inMemoryOutputPathFactory) StartInitialBuild(outputBaseID path.Compon
 			opf.handleAllocator,
 			opf.initialContentsSorter,
 			/* hiddenFilesMatcher = */ func(string) bool { return false },
-			opf.clock),
+			opf.clock,
+			/* defaultAttributesSetter = */ func(requested virtual.AttributesMask, attributes *virtual.Attributes) {},
+		),
 	}
 }
 
