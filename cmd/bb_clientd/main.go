@@ -9,6 +9,7 @@ import (
 	"time"
 
 	remoteexecution "github.com/bazelbuild/remote-apis/build/bazel/remote/execution/v2"
+	"github.com/bazelbuild/remote-apis/build/bazel/semver"
 	cd_blobstore "github.com/buildbarn/bb-clientd/pkg/blobstore"
 	cd_vfs "github.com/buildbarn/bb-clientd/pkg/filesystem/virtual"
 	"github.com/buildbarn/bb-clientd/pkg/outputpathpersistency"
@@ -48,7 +49,7 @@ func main() {
 		if err := util.UnmarshalConfigurationFromFile(os.Args[1], &configuration); err != nil {
 			return util.StatusWrapf(err, "Failed to read configuration from %s", os.Args[1])
 		}
-		lifecycleState, grpcClientFactory, err := global.ApplyConfiguration(configuration.Global)
+		lifecycleState, grpcClientFactory, err := global.ApplyConfiguration(configuration.Global, dependenciesGroup)
 		if err != nil {
 			return util.StatusWrap(err, "Failed to apply global configuration options")
 		}
@@ -65,7 +66,7 @@ func main() {
 
 		// Create a demultiplexing build queue that forwards traffic to
 		// one or more schedulers specified in the configuration file.
-		buildQueue, err := builder.NewDemultiplexingBuildQueueFromConfiguration(configuration.Schedulers, grpcClientFactory)
+		buildQueue, err := builder.NewDemultiplexingBuildQueueFromConfiguration(configuration.Schedulers, dependenciesGroup, grpcClientFactory)
 		if err != nil {
 			return err
 		}
@@ -101,7 +102,9 @@ func main() {
 			"bb_clientd",
 			/* rootDirectory = */ virtual_configuration.LongAttributeCaching,
 			/* childDirectories = */ virtual_configuration.NoAttributeCaching,
-			/* leaves = */ virtual_configuration.LongAttributeCaching)
+			/* leaves = */ virtual_configuration.LongAttributeCaching,
+			/* caseSensitive = */ true,
+		)
 		if err != nil {
 			return util.StatusWrap(err, "Failed to create virtual file system mount")
 		}
@@ -167,6 +170,7 @@ func main() {
 				}
 				blobsDirectoryContents[path.MustNewComponent(strings.ToLower(digestFunctionValue.String()))] = re_vfs.DirectoryChild{}.FromDirectory(
 					allocateHandle().AsStatelessDirectory(re_vfs.NewStaticDirectory(
+						re_vfs.CaseSensitiveComponentNormalizer,
 						map[path.Component]re_vfs.DirectoryChild{
 							path.MustNewComponent("command"): re_vfs.DirectoryChild{}.FromDirectory(
 								allocateHandle().AsStatelessDirectory(cd_vfs.NewDigestParsingDirectory(
@@ -201,7 +205,7 @@ func main() {
 									}))),
 						})))
 			}
-			return allocateHandle().AsStatelessDirectory(re_vfs.NewStaticDirectory(blobsDirectoryContents))
+			return allocateHandle().AsStatelessDirectory(re_vfs.NewStaticDirectory(re_vfs.CaseSensitiveComponentNormalizer, blobsDirectoryContents))
 		}
 
 		// Implementation of the Bazel Output Service. The Bazel
@@ -262,7 +266,24 @@ func main() {
 		// - "cas": raw access to the Content Addressable Storage.
 		// - "outputs": outputs of builds performed using Bazel.
 		// - "scratch": a writable directory for testing.
+		defaultAttributesSetter := func(requested re_vfs.AttributesMask, attributes *re_vfs.Attributes) {}
+		namedAttributesFactory := re_vfs.NewInMemoryNamedAttributesFactory(
+			re_vfs.NewHandleAllocatingFileAllocator(
+				re_vfs.NewPoolBackedFileAllocator(
+					filePool,
+					util.DefaultErrorLogger,
+					defaultAttributesSetter,
+					re_vfs.InNamedAttributeDirectoryNamedAttributesFactory,
+				),
+				rootHandleAllocator,
+			),
+			symlinkFactory,
+			util.DefaultErrorLogger,
+			rootHandleAllocator,
+			clock.SystemClock,
+		)
 		rootDirectory := rootHandleAllocator.New().AsStatelessDirectory(re_vfs.NewStaticDirectory(
+			re_vfs.CaseSensitiveComponentNormalizer,
 			map[path.Component]re_vfs.DirectoryChild{
 				path.MustNewComponent("cas"): re_vfs.DirectoryChild{}.FromDirectory(
 					cd_vfs.NewInstanceNameParsingDirectory(
@@ -276,15 +297,21 @@ func main() {
 						re_vfs.NewHandleAllocatingFileAllocator(
 							re_vfs.NewPoolBackedFileAllocator(
 								filePool,
-								util.DefaultErrorLogger),
-							rootHandleAllocator),
+								util.DefaultErrorLogger,
+								defaultAttributesSetter,
+								namedAttributesFactory,
+							),
+							rootHandleAllocator,
+						),
 						symlinkFactory,
 						util.DefaultErrorLogger,
 						rootHandleAllocator,
 						sort.Sort,
 						/* hiddenFilesMatcher = */ func(string) bool { return false },
 						clock.SystemClock,
-						/* defaultAttributesSetter = */ func(requested re_vfs.AttributesMask, attributes *re_vfs.Attributes) {},
+						re_vfs.CaseSensitiveComponentNormalizer,
+						defaultAttributesSetter,
+						namedAttributesFactory,
 					),
 				),
 			}))
@@ -319,6 +346,11 @@ func main() {
 							bareContentAddressableStorage,
 							actionCache,
 							buildQueue,
+							capabilities.NewStaticProvider(&remoteexecution.ServerCapabilities{
+								DeprecatedApiVersion: &semver.SemVer{Major: 2, Minor: 0},
+								LowApiVersion:        &semver.SemVer{Major: 2, Minor: 0},
+								HighApiVersion:       &semver.SemVer{Major: 2, Minor: 11},
+							}),
 						})))
 				remoteexecution.RegisterExecutionServer(s, buildQueue)
 

@@ -142,6 +142,13 @@ func (f *commandFile) VirtualWrite(buf []byte, offset uint64) (int, virtual.Stat
 	panic("Request to write to read-only file should have been intercepted")
 }
 
+func (commandFile) VirtualOpenNamedAttributes(ctx context.Context, createDirectory bool, requested virtual.AttributesMask, attributes *virtual.Attributes) (virtual.Directory, virtual.Status) {
+	if createDirectory {
+		return nil, virtual.StatusErrAccess
+	}
+	return nil, virtual.StatusErrNoEnt
+}
+
 func (commandFile) VirtualApply(data any) bool {
 	return false
 }

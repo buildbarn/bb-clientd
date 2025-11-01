@@ -1,0 +1,263 @@
+{
+   "jobs": {
+      "build_and_test": {
+         "name": "build_and_test ${{ matrix.host.os }}",
+         "runs-on": "${{ matrix.host.os }}",
+         "steps": [
+            {
+               "name": "Check out source code",
+               "uses": "actions/checkout@v1"
+            },
+            {
+               "name": "Installing Bazel",
+               "run": "v=$(cat .bazelversion) && curl -L https://github.com/bazelbuild/bazel/releases/download/${v}/bazel-${v}-${{matrix.host.bazel_os}}-x86_64 > ~/bazel && chmod +x ~/bazel && echo ~ >> ${GITHUB_PATH}",
+               "shell": "bash"
+            },
+            {
+               "if": "matrix.host.platform_name == 'windows_amd64'",
+               "name": "Override .bazelrc",
+               "run": "echo \"startup --output_base=D:/bazel_output\" >> .bazelrc"
+            },
+            {
+               "if": "matrix.host.cross_compile || matrix.host.platform_name == 'linux_amd64'",
+               "name": "linux_amd64: build${{ matrix.host.platform_name == 'linux_amd64' && ' and test' || '' }}",
+               "run": "bazel ${{ matrix.host.platform_name == 'linux_amd64' && 'test --test_output=errors' || 'build' }} --platforms=@rules_go//go/toolchain:linux_amd64 //..."
+            },
+            {
+               "if": "matrix.host.upload",
+               "name": "linux_amd64: copy bb_clientd",
+               "run": "rm -f bb_clientd && bazel run --run_under cp --platforms=@rules_go//go/toolchain:linux_amd64 //cmd/bb_clientd $(pwd)/bb_clientd"
+            },
+            {
+               "if": "matrix.host.upload",
+               "name": "linux_amd64: upload bb_clientd",
+               "uses": "actions/upload-artifact@v4",
+               "with": {
+                  "name": "bb_clientd.linux_amd64",
+                  "path": "bb_clientd"
+               }
+            },
+            {
+               "if": "matrix.host.cross_compile || matrix.host.platform_name == 'linux_386'",
+               "name": "linux_386: build${{ matrix.host.platform_name == 'linux_amd64' && ' and test' || '' }}",
+               "run": "bazel ${{ matrix.host.platform_name == 'linux_amd64' && 'test --test_output=errors' || 'build' }} --platforms=@rules_go//go/toolchain:linux_386 //..."
+            },
+            {
+               "if": "matrix.host.upload",
+               "name": "linux_386: copy bb_clientd",
+               "run": "rm -f bb_clientd && bazel run --run_under cp --platforms=@rules_go//go/toolchain:linux_386 //cmd/bb_clientd $(pwd)/bb_clientd"
+            },
+            {
+               "if": "matrix.host.upload",
+               "name": "linux_386: upload bb_clientd",
+               "uses": "actions/upload-artifact@v4",
+               "with": {
+                  "name": "bb_clientd.linux_386",
+                  "path": "bb_clientd"
+               }
+            },
+            {
+               "if": "matrix.host.cross_compile || matrix.host.platform_name == 'linux_arm'",
+               "name": "linux_arm: build${{ matrix.host.platform_name == 'linux_arm' && ' and test' || '' }}",
+               "run": "bazel ${{ matrix.host.platform_name == 'linux_arm' && 'test --test_output=errors' || 'build' }} --platforms=@rules_go//go/toolchain:linux_arm //..."
+            },
+            {
+               "if": "matrix.host.upload",
+               "name": "linux_arm: copy bb_clientd",
+               "run": "rm -f bb_clientd && bazel run --run_under cp --platforms=@rules_go//go/toolchain:linux_arm //cmd/bb_clientd $(pwd)/bb_clientd"
+            },
+            {
+               "if": "matrix.host.upload",
+               "name": "linux_arm: upload bb_clientd",
+               "uses": "actions/upload-artifact@v4",
+               "with": {
+                  "name": "bb_clientd.linux_arm",
+                  "path": "bb_clientd"
+               }
+            },
+            {
+               "if": "matrix.host.cross_compile || matrix.host.platform_name == 'linux_arm64'",
+               "name": "linux_arm64: build${{ matrix.host.platform_name == 'linux_arm64' && ' and test' || '' }}",
+               "run": "bazel ${{ matrix.host.platform_name == 'linux_arm64' && 'test --test_output=errors' || 'build' }} --platforms=@rules_go//go/toolchain:linux_arm64 //..."
+            },
+            {
+               "if": "matrix.host.upload",
+               "name": "linux_arm64: copy bb_clientd",
+               "run": "rm -f bb_clientd && bazel run --run_under cp --platforms=@rules_go//go/toolchain:linux_arm64 //cmd/bb_clientd $(pwd)/bb_clientd"
+            },
+            {
+               "if": "matrix.host.upload",
+               "name": "linux_arm64: upload bb_clientd",
+               "uses": "actions/upload-artifact@v4",
+               "with": {
+                  "name": "bb_clientd.linux_arm64",
+                  "path": "bb_clientd"
+               }
+            },
+            {
+               "if": "matrix.host.cross_compile || matrix.host.platform_name == 'darwin_amd64'",
+               "name": "darwin_amd64: build${{ matrix.host.platform_name == 'darwin_amd64' && ' and test' || '' }}",
+               "run": "bazel ${{ matrix.host.platform_name == 'darwin_amd64' && 'test --test_output=errors' || 'build' }} --platforms=@rules_go//go/toolchain:darwin_amd64 //..."
+            },
+            {
+               "if": "matrix.host.upload",
+               "name": "darwin_amd64: copy bb_clientd",
+               "run": "rm -f bb_clientd && bazel run --run_under cp --platforms=@rules_go//go/toolchain:darwin_amd64 //cmd/bb_clientd $(pwd)/bb_clientd"
+            },
+            {
+               "if": "matrix.host.upload",
+               "name": "darwin_amd64: upload bb_clientd",
+               "uses": "actions/upload-artifact@v4",
+               "with": {
+                  "name": "bb_clientd.darwin_amd64",
+                  "path": "bb_clientd"
+               }
+            },
+            {
+               "if": "matrix.host.cross_compile || matrix.host.platform_name == 'darwin_arm64'",
+               "name": "darwin_arm64: build${{ matrix.host.platform_name == 'darwin_arm64' && ' and test' || '' }}",
+               "run": "bazel ${{ matrix.host.platform_name == 'darwin_arm64' && 'test --test_output=errors' || 'build' }} --platforms=@rules_go//go/toolchain:darwin_arm64 //..."
+            },
+            {
+               "if": "matrix.host.upload",
+               "name": "darwin_arm64: copy bb_clientd",
+               "run": "rm -f bb_clientd && bazel run --run_under cp --platforms=@rules_go//go/toolchain:darwin_arm64 //cmd/bb_clientd $(pwd)/bb_clientd"
+            },
+            {
+               "if": "matrix.host.upload",
+               "name": "darwin_arm64: upload bb_clientd",
+               "uses": "actions/upload-artifact@v4",
+               "with": {
+                  "name": "bb_clientd.darwin_arm64",
+                  "path": "bb_clientd"
+               }
+            },
+            {
+               "if": "matrix.host.cross_compile || matrix.host.platform_name == 'freebsd_amd64'",
+               "name": "freebsd_amd64: build${{ matrix.host.platform_name == 'freebsd_amd64' && ' and test' || '' }}",
+               "run": "bazel ${{ matrix.host.platform_name == 'freebsd_amd64' && 'test --test_output=errors' || 'build' }} --platforms=@rules_go//go/toolchain:freebsd_amd64 //..."
+            },
+            {
+               "if": "matrix.host.upload",
+               "name": "freebsd_amd64: copy bb_clientd",
+               "run": "rm -f bb_clientd && bazel run --run_under cp --platforms=@rules_go//go/toolchain:freebsd_amd64 //cmd/bb_clientd $(pwd)/bb_clientd"
+            },
+            {
+               "if": "matrix.host.upload",
+               "name": "freebsd_amd64: upload bb_clientd",
+               "uses": "actions/upload-artifact@v4",
+               "with": {
+                  "name": "bb_clientd.freebsd_amd64",
+                  "path": "bb_clientd"
+               }
+            },
+            {
+               "if": "matrix.host.cross_compile || matrix.host.platform_name == 'windows_amd64'",
+               "name": "windows_amd64: build${{ matrix.host.platform_name == 'windows_amd64' && ' and test' || '' }}",
+               "run": "bazel ${{ matrix.host.platform_name == 'windows_amd64' && 'test --test_output=errors' || 'build' }} --platforms=@rules_go//go/toolchain:windows_amd64 //..."
+            },
+            {
+               "if": "matrix.host.upload",
+               "name": "windows_amd64: copy bb_clientd",
+               "run": "rm -f bb_clientd.exe && bazel run --run_under cp --platforms=@rules_go//go/toolchain:windows_amd64 //cmd/bb_clientd $(pwd)/bb_clientd.exe"
+            },
+            {
+               "if": "matrix.host.upload",
+               "name": "windows_amd64: upload bb_clientd",
+               "uses": "actions/upload-artifact@v4",
+               "with": {
+                  "name": "bb_clientd.windows_amd64",
+                  "path": "bb_clientd.exe"
+               }
+            },
+            {
+               "env": {
+                  "GITHUB_TOKEN": "${{ secrets.GITHUB_TOKEN }}"
+               },
+               "if": "matrix.host.upload",
+               "name": "Install Docker credentials",
+               "run": "echo \"${GITHUB_TOKEN}\" | docker login ghcr.io -u $ --password-stdin"
+            },
+            {
+               "if": "matrix.host.upload",
+               "name": "Push container bb_clientd:bb_clientd",
+               "run": "bazel run --stamp //cmd/bb_clientd:bb_clientd_container_push"
+            },
+            {
+               "if": "matrix.host.cross_compile || matrix.host.platform_name == 'linux_amd64'",
+               "name": "linux_amd64: build bb_clientd.deb",
+               "run": "bazel build --stamp --platforms=@rules_go//go/toolchain:linux_amd64 //:bb_clientd_deb"
+            },
+            {
+               "if": "matrix.host.upload",
+               "name": "linux_amd64: copy bb_clientd.deb",
+               "run": "rm -f bb_clientd.deb && cp bazel-bin/bb_clientd_deb.deb bb_clientd.deb"
+            },
+            {
+               "if": "matrix.host.upload",
+               "name": "linux_amd64: upload bb_clientd.deb",
+               "uses": "actions/upload-artifact@v4",
+               "with": {
+                  "name": "bb_clientd.linux_amd64.deb",
+                  "path": "bb_clientd.deb"
+               }
+            }
+         ],
+         "strategy": {
+            "matrix": {
+               "host": [
+                  {
+                     "bazel_os": "linux",
+                     "cross_compile": true,
+                     "os": "ubuntu-latest",
+                     "platform_name": "linux_amd64",
+                     "upload": true
+                  },
+                  {
+                     "bazel_os": "windows",
+                     "cross_compile": false,
+                     "os": "windows-latest",
+                     "platform_name": "windows_amd64",
+                     "upload": false
+                  }
+               ]
+            }
+         }
+      },
+      "lint": {
+         "name": "lint",
+         "runs-on": "ubuntu-latest",
+         "steps": [
+            {
+               "name": "Check out source code",
+               "uses": "actions/checkout@v1"
+            },
+            {
+               "name": "Installing Bazel",
+               "run": "v=$(cat .bazelversion) && curl -L https://github.com/bazelbuild/bazel/releases/download/${v}/bazel-${v}-linux-x86_64 > ~/bazel && chmod +x ~/bazel && echo ~ >> ${GITHUB_PATH}",
+               "shell": "bash"
+            },
+            {
+               "name": "Reformat",
+               "run": "bazel run @com_github_buildbarn_bb_storage//tools:reformat"
+            },
+            {
+               "name": "Test style conformance",
+               "run": "git add . && git diff --exit-code HEAD --"
+            },
+            {
+               "name": "Golint",
+               "run": "bazel run @org_golang_x_lint//golint -- -set_exit_status $(pwd)/..."
+            }
+         ]
+      }
+   },
+   "name": "main",
+   "on": {
+      "push": {
+         "branches": [
+            "main"
+         ]
+      }
+   }
+}
