@@ -22,7 +22,7 @@ type offsetWriter struct {
 func (w *offsetWriter) Write(p []byte) (n int, err error) {
 	n, err = w.w.WriteAt(p, w.offsetBytes)
 	w.offsetBytes += int64(n)
-	return
+	return n, err
 }
 
 type fileWriter struct {

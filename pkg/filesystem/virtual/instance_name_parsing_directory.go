@@ -28,7 +28,7 @@ func (p instanceNameParsingPath) WriteTo(w io.Writer) (nTotal int64, err error) 
 
 	n, _ := w.Write([]byte("/"))
 	nTotal += int64(n)
-	return
+	return nTotal, err
 }
 
 // InstanceNameLookupFunc is called by directories created using

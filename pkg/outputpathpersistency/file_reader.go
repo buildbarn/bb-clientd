@@ -23,7 +23,7 @@ type offsetReader struct {
 func (r *offsetReader) Read(p []byte) (n int, err error) {
 	n, err = r.r.ReadAt(p, r.offset)
 	r.offset += int64(n)
-	return
+	return n, err
 }
 
 type fileReader struct {
