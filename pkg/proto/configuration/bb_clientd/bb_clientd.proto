@@ -3,13 +3,13 @@ syntax = "proto3";
 package buildbarn.configuration.bb_clientd;
 
 import "google/protobuf/duration.proto";
-import "pkg/proto/configuration/blobstore/blobstore.proto";
-import "pkg/proto/configuration/builder/builder.proto";
-import "pkg/proto/configuration/cas/cas.proto";
-import "pkg/proto/configuration/filesystem/filesystem.proto";
-import "pkg/proto/configuration/filesystem/virtual/virtual.proto";
-import "pkg/proto/configuration/global/global.proto";
-import "pkg/proto/configuration/grpc/grpc.proto";
+import "github.com/buildbarn/bb-remote-execution/pkg/proto/configuration/cas/cas.proto";
+import "github.com/buildbarn/bb-remote-execution/pkg/proto/configuration/filesystem/filesystem.proto";
+import "github.com/buildbarn/bb-remote-execution/pkg/proto/configuration/filesystem/virtual/virtual.proto";
+import "github.com/buildbarn/bb-storage/pkg/proto/configuration/blobstore/blobstore.proto";
+import "github.com/buildbarn/bb-storage/pkg/proto/configuration/builder/builder.proto";
+import "github.com/buildbarn/bb-storage/pkg/proto/configuration/global/global.proto";
+import "github.com/buildbarn/bb-storage/pkg/proto/configuration/grpc/grpc.proto";
 
 option go_package = "github.com/buildbarn/bb-clientd/pkg/proto/configuration/bb_clientd";
 

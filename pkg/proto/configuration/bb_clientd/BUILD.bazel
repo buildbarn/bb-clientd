@@ -5,6 +5,7 @@ load("@rules_proto//proto:defs.bzl", "proto_library")
 proto_library(
     name = "bb_clientd_proto",
     srcs = ["bb_clientd.proto"],
+    import_prefix = "github.com/buildbarn/bb-clientd",
     visibility = ["//visibility:public"],
     deps = [
         "@com_github_buildbarn_bb_remote_execution//pkg/proto/configuration/cas:cas_proto",

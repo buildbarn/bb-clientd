@@ -596,6 +596,10 @@ func (cw *statWalker) OnTerminal(name path.Component) (*path.GotSymlink, error) 
 	return nil, nil
 }
 
+func (cw *statWalker) OnShare(server, share string) (path.ComponentWalker, error) {
+	return nil, status.Error(codes.Unimplemented, "Shares not supported")
+}
+
 func (cw *statWalker) OnUp() (path.ComponentWalker, error) {
 	if _, ok := cw.stack.PopSingle(); !ok {
 		cw.stat = &bazeloutputservice.BatchStatResponse_Stat{}

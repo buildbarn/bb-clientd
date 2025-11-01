@@ -32,12 +32,31 @@ func NewInMemoryOutputPathFactory(filePool pool.FilePool, symlinkFactory virtual
 }
 
 func (opf *inMemoryOutputPathFactory) StartInitialBuild(outputBaseID path.Component, casFileFactory virtual.CASFileFactory, digestFunction digest.Function, errorLogger util.ErrorLogger) OutputPath {
+	defaultAttributesSetter := func(requested virtual.AttributesMask, attributes *virtual.Attributes) {}
+	namedAttributesFactory := virtual.NewInMemoryNamedAttributesFactory(
+		virtual.NewHandleAllocatingFileAllocator(
+			virtual.NewPoolBackedFileAllocator(
+				opf.filePool,
+				errorLogger,
+				defaultAttributesSetter,
+				virtual.InNamedAttributeDirectoryNamedAttributesFactory,
+			),
+			opf.handleAllocator,
+		),
+		opf.symlinkFactory,
+		errorLogger,
+		opf.handleAllocator,
+		opf.clock,
+	)
 	return inMemoryOutputPath{
 		PrepopulatedDirectory: virtual.NewInMemoryPrepopulatedDirectory(
 			virtual.NewHandleAllocatingFileAllocator(
 				virtual.NewPoolBackedFileAllocator(
 					opf.filePool,
-					errorLogger),
+					errorLogger,
+					defaultAttributesSetter,
+					namedAttributesFactory,
+				),
 				opf.handleAllocator),
 			opf.symlinkFactory,
 			errorLogger,
@@ -45,7 +64,9 @@ func (opf *inMemoryOutputPathFactory) StartInitialBuild(outputBaseID path.Compon
 			opf.initialContentsSorter,
 			/* hiddenFilesMatcher = */ func(string) bool { return false },
 			opf.clock,
-			/* defaultAttributesSetter = */ func(requested virtual.AttributesMask, attributes *virtual.Attributes) {},
+			virtual.CaseSensitiveComponentNormalizer,
+			defaultAttributesSetter,
+			namedAttributesFactory,
 		),
 	}
 }

@@ -1,4 +1,4 @@
-# The Buildbarn client daemon [![Build status](https://github.com/buildbarn/bb-clientd/workflows/master/badge.svg)](https://github.com/buildbarn/bb-clientd/actions) [![PkgGoDev](https://pkg.go.dev/badge/github.com/buildbarn/bb-clientd)](https://pkg.go.dev/github.com/buildbarn/bb-clientd) [![Go Report Card](https://goreportcard.com/badge/github.com/buildbarn/bb-clientd)](https://goreportcard.com/report/github.com/buildbarn/bb-clientd)
+# The Buildbarn client daemon [![Build status](https://github.com/buildbarn/bb-clientd/workflows/main/badge.svg)](https://github.com/buildbarn/bb-clientd/actions) [![PkgGoDev](https://pkg.go.dev/badge/github.com/buildbarn/bb-clientd)](https://pkg.go.dev/github.com/buildbarn/bb-clientd) [![Go Report Card](https://goreportcard.com/badge/github.com/buildbarn/bb-clientd)](https://goreportcard.com/report/github.com/buildbarn/bb-clientd)
 
 Whereas most of the other Buildbarn repositories provide server-side
 infrastructure, this repository provides a tool that's intended to be
@@ -21,7 +21,7 @@ features.
 There are various ways in which a copy of bb\_clientd may be obtained:
 
 - By running `bazel run //cmd/bb_clientd` inside this repository.
-- By downloading [a precompiled binary or package built through GitHub Actions](https://github.com/buildbarn/bb-clientd/actions?query=workflow%3Amaster).
+- By downloading [a precompiled binary or package built through GitHub Actions](https://github.com/buildbarn/bb-clientd/actions?query=workflow%3Amain).
 - By downloading [a container image from the GitHub Packages page](https://github.com/buildbarn/bb-remote-execution/pkgs/container/bb-clientd).
   Keep in mind that running bb\_clientd inside a Docker container may
   require it to be privileged, as bb\_clientd creates a FUSE mount.
@@ -59,7 +59,7 @@ drwxrwxrwx  1 root  wheel  0 Jan  1  2000 scratch
 
 ### ... as a systemd service
 
-After installing the bb\_clientd Debian package ([available through GitHub Actions](https://github.com/buildbarn/bb-clientd/actions?query=workflow%3Amaster))
+After installing the bb\_clientd Debian package ([available through GitHub Actions](https://github.com/buildbarn/bb-clientd/actions?query=workflow%3Amain))
 you may launch it for any user on the system by running the following
 commands:
 
