@@ -89,10 +89,12 @@ func (d *casDirectory) resolveHandle(r io.ByteReader) (virtual.DirectoryChild, v
 
 func (d *casDirectory) VirtualGetAttributes(ctx context.Context, requested virtual.AttributesMask, attributes *virtual.Attributes) {
 	attributes.SetChangeID(0)
+	attributes.SetFileType(filesystem.FileTypeDirectory)
+	attributes.SetHasNamedAttributes(false)
+	attributes.SetIsInNamedAttributeDirectory(false)
 	// This should be 2 + nDirectories, but that requires us to load
 	// the directory. This is highly inefficient and error prone.
 	attributes.SetLinkCount(virtual.ImplicitDirectoryLinkCount)
-	attributes.SetFileType(filesystem.FileTypeDirectory)
 	attributes.SetPermissions(virtual.PermissionsRead | virtual.PermissionsExecute)
 	attributes.SetSizeBytes(d.sizeBytes)
 }

@@ -78,6 +78,8 @@ func NewInstanceNameParsingDirectory(handleAllocation virtual.StatelessHandleAll
 func (d *instanceNameParsingDirectory) VirtualGetAttributes(ctx context.Context, requested virtual.AttributesMask, attributes *virtual.Attributes) {
 	attributes.SetChangeID(0)
 	attributes.SetFileType(filesystem.FileTypeDirectory)
+	attributes.SetHasNamedAttributes(false)
+	attributes.SetIsInNamedAttributeDirectory(false)
 	attributes.SetLinkCount(virtual.ImplicitDirectoryLinkCount)
 	attributes.SetPermissions(virtual.PermissionsExecute)
 	attributes.SetSizeBytes(0)

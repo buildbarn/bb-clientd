@@ -115,6 +115,8 @@ func TestDecomposedCASDirectoryFactoryLookupDirectory(t *testing.T) {
 		(&re_vfs.Attributes{}).
 			SetChangeID(0).
 			SetFileType(filesystem.FileTypeDirectory).
+			SetHasNamedAttributes(false).
+			SetIsInNamedAttributeDirectory(false).
 			SetInodeNumber(0).
 			SetLinkCount(re_vfs.ImplicitDirectoryLinkCount).
 			SetPermissions(re_vfs.PermissionsRead|re_vfs.PermissionsExecute).

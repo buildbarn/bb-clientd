@@ -84,6 +84,8 @@ func TestInstanceNameParsingDirectory(t *testing.T) {
 			*(&re_vfs.Attributes{}).
 				SetChangeID(0).
 				SetFileType(filesystem.FileTypeDirectory).
+				SetHasNamedAttributes(false).
+				SetIsInNamedAttributeDirectory(false).
 				SetLinkCount(re_vfs.ImplicitDirectoryLinkCount).
 				SetPermissions(re_vfs.PermissionsExecute).
 				SetSizeBytes(0),
@@ -120,6 +122,8 @@ func TestInstanceNameParsingDirectory(t *testing.T) {
 			*(&re_vfs.Attributes{}).
 				SetChangeID(0).
 				SetFileType(filesystem.FileTypeDirectory).
+				SetHasNamedAttributes(false).
+				SetIsInNamedAttributeDirectory(false).
 				SetLinkCount(re_vfs.ImplicitDirectoryLinkCount).
 				SetPermissions(re_vfs.PermissionsExecute).
 				SetSizeBytes(0),
@@ -136,6 +140,8 @@ func TestInstanceNameParsingDirectory(t *testing.T) {
 			*(&re_vfs.Attributes{}).
 				SetChangeID(0).
 				SetFileType(filesystem.FileTypeDirectory).
+				SetHasNamedAttributes(false).
+				SetIsInNamedAttributeDirectory(false).
 				SetLinkCount(re_vfs.ImplicitDirectoryLinkCount).
 				SetPermissions(re_vfs.PermissionsExecute).
 				SetSizeBytes(0),
@@ -174,6 +180,8 @@ func TestInstanceNameParsingDirectory(t *testing.T) {
 			*(&re_vfs.Attributes{}).
 				SetChangeID(0).
 				SetFileType(filesystem.FileTypeDirectory).
+				SetHasNamedAttributes(false).
+				SetIsInNamedAttributeDirectory(false).
 				SetLinkCount(re_vfs.ImplicitDirectoryLinkCount).
 				SetPermissions(re_vfs.PermissionsExecute).
 				SetSizeBytes(0),
