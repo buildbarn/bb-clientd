@@ -45,7 +45,13 @@ local cacheDirectory = std.extVar('XDG_CACHE_HOME') + '/bb_clientd';
     [if authorizationHeader != null then 'addMetadata']: [
       { header: 'authorization', values: [authorizationHeader] },
     ],
-    addMetadataJmespathExpression: '{"build.bazel.remote.execution.v2.requestmetadata-bin": incomingGRPCMetadata."build.bazel.remote.execution.v2.requestmetadata-bin"}',
+    addMetadataJmespathExpression: {
+      expression: |||
+        {
+          "build.bazel.remote.execution.v2.requestmetadata-bin": incomingGRPCMetadata."build.bazel.remote.execution.v2.requestmetadata-bin"
+        }
+      |||,
+    },
     // Enable gRPC keepalives. Make sure to tune these settings based on
     // what your cluster permits.
     keepalive: {
