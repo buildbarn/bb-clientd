@@ -1,4 +1,4 @@
-run --workspace_status_command="bash tools/workspace-status.sh"
+common --workspace_status_command="bash tools/workspace-status.sh"
 common --enable_platform_specific_config
 common --incompatible_enable_proto_toolchain_resolution
 common --protocopt=--fatal_warnings
