@@ -32,6 +32,7 @@ import (
 	"github.com/buildbarn/bb-storage/pkg/program"
 	"github.com/buildbarn/bb-storage/pkg/random"
 	"github.com/buildbarn/bb-storage/pkg/util"
+	"github.com/buildbarn/bb-storage/pkg/zstd"
 
 	"golang.org/x/sync/semaphore"
 	"google.golang.org/genproto/googleapis/bytestream"
@@ -55,11 +56,14 @@ func main() {
 		}
 
 		// Storage access.
+		zstdPool := zstd.NewPoolFromConfiguration(configuration.ZstdPool)
 		bareContentAddressableStorage, actionCache, err := blobstore_configuration.NewCASAndACBlobAccessFromConfiguration(
 			dependenciesGroup,
 			configuration.Blobstore,
 			grpcClientFactory,
-			int(configuration.MaximumMessageSizeBytes))
+			int(configuration.MaximumMessageSizeBytes),
+			zstdPool,
+		)
 		if err != nil {
 			return err
 		}
@@ -338,7 +342,10 @@ func main() {
 					s,
 					grpcservers.NewByteStreamServer(
 						bareContentAddressableStorage,
-						1<<16))
+						/* readChunkSizeBytes = */ 1<<16,
+						zstdPool,
+					),
+				)
 				remoteexecution.RegisterCapabilitiesServer(
 					s,
 					capabilities.NewServer(

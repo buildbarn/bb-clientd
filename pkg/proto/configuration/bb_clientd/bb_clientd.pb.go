@@ -14,6 +14,7 @@ import (
 	builder "github.com/buildbarn/bb-storage/pkg/proto/configuration/builder"
 	global "github.com/buildbarn/bb-storage/pkg/proto/configuration/global"
 	grpc "github.com/buildbarn/bb-storage/pkg/proto/configuration/grpc"
+	zstd "github.com/buildbarn/bb-storage/pkg/proto/configuration/zstd"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	durationpb "google.golang.org/protobuf/types/known/durationpb"
@@ -42,6 +43,7 @@ type ApplicationConfiguration struct {
 	OutputPathPersistency       *OutputPathPersistencyConfiguration        `protobuf:"bytes,8,opt,name=output_path_persistency,json=outputPathPersistency,proto3" json:"output_path_persistency,omitempty"`
 	MaximumFileSystemRetryDelay *durationpb.Duration                       `protobuf:"bytes,9,opt,name=maximum_file_system_retry_delay,json=maximumFileSystemRetryDelay,proto3" json:"maximum_file_system_retry_delay,omitempty"`
 	DirectoryCache              *cas.CachingDirectoryFetcherConfiguration  `protobuf:"bytes,10,opt,name=directory_cache,json=directoryCache,proto3" json:"directory_cache,omitempty"`
+	ZstdPool                    *zstd.PoolConfiguration                    `protobuf:"bytes,12,opt,name=zstd_pool,json=zstdPool,proto3" json:"zstd_pool,omitempty"`
 	unknownFields               protoimpl.UnknownFields
 	sizeCache                   protoimpl.SizeCache
 }
@@ -153,6 +155,13 @@ func (x *ApplicationConfiguration) GetDirectoryCache() *cas.CachingDirectoryFetc
 	return nil
 }
 
+func (x *ApplicationConfiguration) GetZstdPool() *zstd.PoolConfiguration {
+	if x != nil {
+		return x.ZstdPool
+	}
+	return nil
+}
+
 type OutputPathPersistencyConfiguration struct {
 	state                      protoimpl.MessageState `protogen:"open.v1"`
 	StateDirectoryPath         string                 `protobuf:"bytes,1,opt,name=state_directory_path,json=stateDirectoryPath,proto3" json:"state_directory_path,omitempty"`
@@ -225,7 +234,7 @@ var File_github_com_buildbarn_bb_clientd_pkg_proto_configuration_bb_clientd_bb_c
 
 const file_github_com_buildbarn_bb_clientd_pkg_proto_configuration_bb_clientd_bb_clientd_proto_rawDesc = "" +
 	"\n" +
-	"Sgithub.com/buildbarn/bb-clientd/pkg/proto/configuration/bb_clientd/bb_clientd.proto\x12\"buildbarn.configuration.bb_clientd\x1a\x1egoogle/protobuf/duration.proto\x1aNgithub.com/buildbarn/bb-remote-execution/pkg/proto/configuration/cas/cas.proto\x1a\\github.com/buildbarn/bb-remote-execution/pkg/proto/configuration/filesystem/filesystem.proto\x1aagithub.com/buildbarn/bb-remote-execution/pkg/proto/configuration/filesystem/virtual/virtual.proto\x1aQgithub.com/buildbarn/bb-storage/pkg/proto/configuration/blobstore/blobstore.proto\x1aMgithub.com/buildbarn/bb-storage/pkg/proto/configuration/builder/builder.proto\x1aKgithub.com/buildbarn/bb-storage/pkg/proto/configuration/global/global.proto\x1aGgithub.com/buildbarn/bb-storage/pkg/proto/configuration/grpc/grpc.proto\"\xe5\b\n" +
+	"Sgithub.com/buildbarn/bb-clientd/pkg/proto/configuration/bb_clientd/bb_clientd.proto\x12\"buildbarn.configuration.bb_clientd\x1a\x1egoogle/protobuf/duration.proto\x1aNgithub.com/buildbarn/bb-remote-execution/pkg/proto/configuration/cas/cas.proto\x1a\\github.com/buildbarn/bb-remote-execution/pkg/proto/configuration/filesystem/filesystem.proto\x1aagithub.com/buildbarn/bb-remote-execution/pkg/proto/configuration/filesystem/virtual/virtual.proto\x1aQgithub.com/buildbarn/bb-storage/pkg/proto/configuration/blobstore/blobstore.proto\x1aMgithub.com/buildbarn/bb-storage/pkg/proto/configuration/builder/builder.proto\x1aKgithub.com/buildbarn/bb-storage/pkg/proto/configuration/global/global.proto\x1aGgithub.com/buildbarn/bb-storage/pkg/proto/configuration/grpc/grpc.proto\x1aGgithub.com/buildbarn/bb-storage/pkg/proto/configuration/zstd/zstd.proto\"\xb3\t\n" +
 	"\x18ApplicationConfiguration\x12W\n" +
 	"\tblobstore\x18\x01 \x01(\v29.buildbarn.configuration.blobstore.BlobstoreConfigurationR\tblobstore\x12;\n" +
 	"\x1amaximum_message_size_bytes\x18\x02 \x01(\x03R\x17maximumMessageSizeBytes\x125\n" +
@@ -240,7 +249,8 @@ const file_github_com_buildbarn_bb_clientd_pkg_proto_configuration_bb_clientd_bb
 	"\x17output_path_persistency\x18\b \x01(\v2F.buildbarn.configuration.bb_clientd.OutputPathPersistencyConfigurationR\x15outputPathPersistency\x12_\n" +
 	"\x1fmaximum_file_system_retry_delay\x18\t \x01(\v2\x19.google.protobuf.DurationR\x1bmaximumFileSystemRetryDelay\x12j\n" +
 	"\x0fdirectory_cache\x18\n" +
-	" \x01(\v2A.buildbarn.configuration.cas.CachingDirectoryFetcherConfigurationR\x0edirectoryCache\x1av\n" +
+	" \x01(\v2A.buildbarn.configuration.cas.CachingDirectoryFetcherConfigurationR\x0edirectoryCache\x12L\n" +
+	"\tzstd_pool\x18\f \x01(\v2/.buildbarn.configuration.zstd.PoolConfigurationR\bzstdPool\x1av\n" +
 	"\x0fSchedulersEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12M\n" +
 	"\x05value\x18\x02 \x01(\v27.buildbarn.configuration.builder.SchedulerConfigurationR\x05value:\x028\x01\"\xab\x02\n" +
@@ -274,7 +284,8 @@ var file_github_com_buildbarn_bb_clientd_pkg_proto_configuration_bb_clientd_bb_c
 	(*filesystem.FilePoolConfiguration)(nil),         // 7: buildbarn.configuration.filesystem.FilePoolConfiguration
 	(*durationpb.Duration)(nil),                      // 8: google.protobuf.Duration
 	(*cas.CachingDirectoryFetcherConfiguration)(nil), // 9: buildbarn.configuration.cas.CachingDirectoryFetcherConfiguration
-	(*builder.SchedulerConfiguration)(nil),           // 10: buildbarn.configuration.builder.SchedulerConfiguration
+	(*zstd.PoolConfiguration)(nil),                   // 10: buildbarn.configuration.zstd.PoolConfiguration
+	(*builder.SchedulerConfiguration)(nil),           // 11: buildbarn.configuration.builder.SchedulerConfiguration
 }
 var file_github_com_buildbarn_bb_clientd_pkg_proto_configuration_bb_clientd_bb_clientd_proto_depIdxs = []int32{
 	3,  // 0: buildbarn.configuration.bb_clientd.ApplicationConfiguration.blobstore:type_name -> buildbarn.configuration.blobstore.BlobstoreConfiguration
@@ -286,13 +297,14 @@ var file_github_com_buildbarn_bb_clientd_pkg_proto_configuration_bb_clientd_bb_c
 	1,  // 6: buildbarn.configuration.bb_clientd.ApplicationConfiguration.output_path_persistency:type_name -> buildbarn.configuration.bb_clientd.OutputPathPersistencyConfiguration
 	8,  // 7: buildbarn.configuration.bb_clientd.ApplicationConfiguration.maximum_file_system_retry_delay:type_name -> google.protobuf.Duration
 	9,  // 8: buildbarn.configuration.bb_clientd.ApplicationConfiguration.directory_cache:type_name -> buildbarn.configuration.cas.CachingDirectoryFetcherConfiguration
-	8,  // 9: buildbarn.configuration.bb_clientd.OutputPathPersistencyConfiguration.maximum_state_file_age:type_name -> google.protobuf.Duration
-	10, // 10: buildbarn.configuration.bb_clientd.ApplicationConfiguration.SchedulersEntry.value:type_name -> buildbarn.configuration.builder.SchedulerConfiguration
-	11, // [11:11] is the sub-list for method output_type
-	11, // [11:11] is the sub-list for method input_type
-	11, // [11:11] is the sub-list for extension type_name
-	11, // [11:11] is the sub-list for extension extendee
-	0,  // [0:11] is the sub-list for field type_name
+	10, // 9: buildbarn.configuration.bb_clientd.ApplicationConfiguration.zstd_pool:type_name -> buildbarn.configuration.zstd.PoolConfiguration
+	8,  // 10: buildbarn.configuration.bb_clientd.OutputPathPersistencyConfiguration.maximum_state_file_age:type_name -> google.protobuf.Duration
+	11, // 11: buildbarn.configuration.bb_clientd.ApplicationConfiguration.SchedulersEntry.value:type_name -> buildbarn.configuration.builder.SchedulerConfiguration
+	12, // [12:12] is the sub-list for method output_type
+	12, // [12:12] is the sub-list for method input_type
+	12, // [12:12] is the sub-list for extension type_name
+	12, // [12:12] is the sub-list for extension extendee
+	0,  // [0:12] is the sub-list for field type_name
 }
 
 func init() {

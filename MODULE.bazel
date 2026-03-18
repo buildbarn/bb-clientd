@@ -18,19 +18,19 @@ bazel_dep(name = "toolchains_llvm", version = "1.6.0")
 
 git_override(
     module_name = "bazel_remote_apis",
-    commit = "9e084d0e43e717128ee72b5be584a7ba33e8006b",
+    commit = "715b73f3f9e4c70b22854e3cf8a927a9077dde1c",
     remote = "https://github.com/bazelbuild/remote-apis.git",
 )
 
 git_override(
     module_name = "com_github_buildbarn_bb_remote_execution",
-    commit = "c453f856a032db62a4a99332b71fa67105b9cc9c",
+    commit = "9b1e3637cd58e1d59992f97012ab47d9d9af6cd6",
     remote = "https://github.com/buildbarn/bb-remote-execution.git",
 )
 
 git_override(
     module_name = "com_github_buildbarn_bb_storage",
-    commit = "33893b3cf43dc7927e2a388200a55f54b3979e82",
+    commit = "dc342e1799d72bd927ffc0af1f429e7044118b07",
     remote = "https://github.com/buildbarn/bb-storage.git",
 )
 
@@ -51,6 +51,7 @@ git_override(
     patches = [
         "//:patches/rules_antlr/antlr-4.10.diff",
         "//:patches/rules_antlr/bzlmod.diff",
+        "//:patches/rules_antlr/load.diff",
     ],
     remote = "https://github.com/marcohu/rules_antlr.git",
 )
