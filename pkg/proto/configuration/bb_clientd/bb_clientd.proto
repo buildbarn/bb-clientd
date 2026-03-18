@@ -10,6 +10,7 @@ import "github.com/buildbarn/bb-storage/pkg/proto/configuration/blobstore/blobst
 import "github.com/buildbarn/bb-storage/pkg/proto/configuration/builder/builder.proto";
 import "github.com/buildbarn/bb-storage/pkg/proto/configuration/global/global.proto";
 import "github.com/buildbarn/bb-storage/pkg/proto/configuration/grpc/grpc.proto";
+import "github.com/buildbarn/bb-storage/pkg/proto/configuration/zstd/zstd.proto";
 
 option go_package = "github.com/buildbarn/bb-clientd/pkg/proto/configuration/bb_clientd";
 
@@ -90,6 +91,11 @@ message ApplicationConfiguration {
   // through "cas", but also when instantiated under "outputs".
   buildbarn.configuration.cas.CachingDirectoryFetcherConfiguration
       directory_cache = 10;
+
+  // ZSTD encoder/decoder pool configuration. When set, creates a
+  // process-wide pool shared by all gRPC CAS clients and the
+  // ByteStream server.
+  buildbarn.configuration.zstd.PoolConfiguration zstd_pool = 12;
 }
 
 message OutputPathPersistencyConfiguration {
