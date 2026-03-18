@@ -68,7 +68,9 @@ local cacheDirectory = std.extVar('XDG_CACHE_HOME') + '/bb_clientd';
     demultiplexing: {
       instanceNamePrefixes: {
         [cluster]: { backend: {
-          grpc: $.grpcClient($.clusters[cluster], authorizationHeader, proxyURL),
+          grpc: {
+            client: $.grpcClient($.clusters[cluster], authorizationHeader, proxyURL),
+          },
         } }
         for cluster in std.objectFields($.clusters)
       },
