@@ -512,6 +512,7 @@ func (d *BazelOutputServiceDirectory) StageArtifacts(ctx context.Context, reques
 // corresponding to a requested path. It is capable of expanding
 // symbolic links, if encountered.
 type statWalker struct {
+	context        context.Context
 	digestFunction *digest.Function
 
 	stack util.NonEmptyStack[virtual.PrepopulatedDirectory]
@@ -551,14 +552,11 @@ func (cw *statWalker) OnDirectory(name path.Component) (path.GotDirectoryOrSymli
 		}, nil
 	}
 
-	var p virtual.ApplyReadlink
-	if !leaf.VirtualApply(&p) {
-		panic("output path contains leaves that don't support ApplyReadlink")
-	}
-	if p.Err == syscall.EINVAL {
+	var attributes virtual.Attributes
+	leaf.VirtualGetAttributes(cw.context, virtual.AttributesMaskSymlinkTarget, &attributes)
+	target, ok := attributes.GetSymlinkTarget()
+	if !ok {
 		return nil, syscall.ENOTDIR
-	} else if p.Err != nil {
-		return nil, p.Err
 	}
 
 	// Got a symbolic link in the middle of a path. Those should
@@ -566,7 +564,7 @@ func (cw *statWalker) OnDirectory(name path.Component) (path.GotDirectoryOrSymli
 	cw.stat = &bazeloutputservice.BatchStatResponse_Stat{}
 	return path.GotSymlink{
 		Parent: cw,
-		Target: p.Target,
+		Target: target,
 	}, nil
 }
 
@@ -627,6 +625,7 @@ func (d *BazelOutputServiceDirectory) BatchStat(ctx context.Context, request *ba
 	}
 	for _, statPath := range request.Paths {
 		statWalker := statWalker{
+			context:        ctx,
 			digestFunction: &buildState.digestFunction,
 			stack:          util.NewNonEmptyStack[virtual.PrepopulatedDirectory](outputPathState.rootDirectory),
 			stat:           &bazeloutputservice.BatchStatResponse_Stat{},

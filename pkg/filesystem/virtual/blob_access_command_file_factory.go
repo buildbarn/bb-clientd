@@ -134,10 +134,6 @@ func (f *commandFile) VirtualRead(buf []byte, offset uint64) (int, bool, virtual
 	return len(buf), eof, virtual.StatusOK
 }
 
-func (f *commandFile) VirtualReadlink(ctx context.Context) ([]byte, virtual.Status) {
-	return nil, virtual.StatusErrInval
-}
-
 func (f *commandFile) VirtualClose(shareAccess virtual.ShareMask) {}
 
 func (f *commandFile) VirtualWrite(buf []byte, offset uint64) (int, virtual.Status) {

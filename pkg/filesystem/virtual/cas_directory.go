@@ -58,11 +58,17 @@ func (d *casDirectory) createSelf() virtual.Directory {
 	return d.handleAllocator.New(bytes.NewBuffer([]byte{0})).AsStatelessDirectory(d)
 }
 
-func (d *casDirectory) createSymlink(index uint64, target string) virtual.LinkableLeaf {
+func (d *casDirectory) createSymlink(index uint64, target string) (virtual.LinkableLeaf, virtual.Status) {
+	symlink, err := virtual.BaseSymlinkFactory.LookupSymlink(path.UNIXFormat.NewParser(target))
+	if err != nil {
+		d.directoryContext.LogError(util.StatusWrapf(err, "Failed to create symbolic link with target %#v", target))
+		return nil, virtual.StatusErrIO
+	}
+
 	var encodedIndex [binary.MaxVarintLen64]byte
 	return d.handleAllocator.
 		New(bytes.NewBuffer(encodedIndex[:binary.PutUvarint(encodedIndex[:], index+1)])).
-		AsLinkableLeaf(virtual.BaseSymlinkFactory.LookupSymlink([]byte(target)))
+		AsLinkableLeaf(symlink), virtual.StatusOK
 }
 
 func (d *casDirectory) resolveHandle(r io.ByteReader) (virtual.DirectoryChild, virtual.Status) {
@@ -73,6 +79,7 @@ func (d *casDirectory) resolveHandle(r io.ByteReader) (virtual.DirectoryChild, v
 	if index == 0 {
 		return virtual.DirectoryChild{}.FromDirectory(d.createSelf()), virtual.StatusOK
 	}
+
 	// If a suffix is provided, it corresponds to a symbolic link
 	// inside this directory. Files and directories will be
 	// resolvable through other means.
@@ -84,7 +91,11 @@ func (d *casDirectory) resolveHandle(r io.ByteReader) (virtual.DirectoryChild, v
 	if index >= uint64(len(directory.Symlinks)) {
 		return virtual.DirectoryChild{}, virtual.StatusErrBadHandle
 	}
-	return virtual.DirectoryChild{}.FromLeaf(d.createSymlink(index, directory.Symlinks[index].Target)), virtual.StatusOK
+	symlink, s := d.createSymlink(index, directory.Symlinks[index].Target)
+	if s != virtual.StatusOK {
+		return virtual.DirectoryChild{}, s
+	}
+	return virtual.DirectoryChild{}.FromLeaf(symlink), virtual.StatusOK
 }
 
 func (d *casDirectory) VirtualGetAttributes(ctx context.Context, requested virtual.AttributesMask, attributes *virtual.Attributes) {
@@ -137,7 +148,10 @@ func (d *casDirectory) VirtualLookup(ctx context.Context, name path.Component, r
 
 	symlinks := directory.Symlinks
 	if i := sort.Search(len(symlinks), func(i int) bool { return symlinks[i].Name >= n }); i < len(symlinks) && symlinks[i].Name == n {
-		f := d.createSymlink(uint64(i), symlinks[i].Target)
+		f, s := d.createSymlink(uint64(i), symlinks[i].Target)
+		if s != virtual.StatusOK {
+			return virtual.DirectoryChild{}, s
+		}
 		f.VirtualGetAttributes(ctx, requested, out)
 		return virtual.DirectoryChild{}.FromLeaf(f), virtual.StatusOK
 	}
@@ -242,7 +256,10 @@ func (d *casDirectory) VirtualReadDir(ctx context.Context, firstCookie uint64, r
 			d.directoryContext.LogError(status.Errorf(codes.InvalidArgument, "Symbolic link %#v has an invalid name", entry.Name))
 			return virtual.StatusErrIO
 		}
-		child := d.createSymlink(i, entry.Target)
+		child, s := d.createSymlink(i, entry.Target)
+		if s != virtual.StatusOK {
+			return s
+		}
 		var attributes virtual.Attributes
 		child.VirtualGetAttributes(ctx, requested, &attributes)
 		if !reporter.ReportEntry(nextCookieOffset+i, name, virtual.DirectoryChild{}.FromLeaf(child), &attributes) {

@@ -821,23 +821,6 @@ func TestBazelOutputServiceDirectoryBatchStat(t *testing.T) {
 		testutil.RequireEqualStatus(t, status.Error(codes.Internal, "Failed to resolve path \"stdio/printf.o\" beyond \".\": Disk failure"), err)
 	})
 
-	t.Run("OnDirectoryReadlinkFailure", func(t *testing.T) {
-		leaf := mock.NewMockLinkableLeaf(ctrl)
-		outputPath.EXPECT().LookupChild(path.MustNewComponent("stdio")).Return(re_vfs.PrepopulatedDirectoryChild{}.FromLeaf(leaf), nil)
-		leaf.EXPECT().VirtualApply(gomock.Any()).
-			Do(func(data any) {
-				p := data.(*re_vfs.ApplyReadlink)
-				p.Err = status.Error(codes.Internal, "Disk failure")
-			}).
-			Return(true)
-
-		_, err := d.BatchStat(ctx, &bazeloutputservice.BatchStatRequest{
-			BuildId: "37f5dbef-b117-4fb6-bce8-5c147cb603b4",
-			Paths:   []string{"stdio/printf.o"},
-		})
-		testutil.RequireEqualStatus(t, status.Error(codes.Internal, "Failed to resolve path \"stdio/printf.o\" beyond \".\": Disk failure"), err)
-	})
-
 	t.Run("OnTerminalLookupFailure", func(t *testing.T) {
 		outputPath.EXPECT().LookupChild(path.MustNewComponent("printf.o")).Return(re_vfs.PrepopulatedDirectoryChild{}, status.Error(codes.Internal, "Disk failure"))
 
@@ -899,12 +882,10 @@ func TestBazelOutputServiceDirectoryBatchStat(t *testing.T) {
 		outputPath.EXPECT().LookupChild(path.MustNewComponent("nested")).Return(re_vfs.PrepopulatedDirectoryChild{}.FromDirectory(directory2), nil)
 		leaf2 := mock.NewMockLinkableLeaf(ctrl)
 		directory2.EXPECT().LookupChild(path.MustNewComponent("symlink_internal_relative_directory")).Return(re_vfs.PrepopulatedDirectoryChild{}.FromLeaf(leaf2), nil)
-		leaf2.EXPECT().VirtualApply(gomock.Any()).
-			Do(func(data any) {
-				p := data.(*re_vfs.ApplyReadlink)
-				p.Target = path.UNIXFormat.NewParser("..")
-			}).
-			Return(true)
+		leaf2.EXPECT().VirtualGetAttributes(gomock.Any(), re_vfs.AttributesMaskSymlinkTarget, gomock.Any()).
+			Do(func(ctx context.Context, requested re_vfs.AttributesMask, attributes *re_vfs.Attributes) {
+				attributes.SetSymlinkTarget(path.UNIXFormat.NewParser(".."))
+			})
 
 		// Lookup of "nested/symlink_internal_absolute_path",
 		// being a symlink containing an absolute path starting
@@ -913,12 +894,10 @@ func TestBazelOutputServiceDirectoryBatchStat(t *testing.T) {
 		outputPath.EXPECT().LookupChild(path.MustNewComponent("nested")).Return(re_vfs.PrepopulatedDirectoryChild{}.FromDirectory(directory3), nil)
 		leaf3 := mock.NewMockLinkableLeaf(ctrl)
 		directory3.EXPECT().LookupChild(path.MustNewComponent("symlink_internal_absolute_path")).Return(re_vfs.PrepopulatedDirectoryChild{}.FromLeaf(leaf3), nil)
-		leaf3.EXPECT().VirtualApply(gomock.Any()).
-			Do(func(data any) {
-				p := data.(*re_vfs.ApplyReadlink)
-				p.Target = path.UNIXFormat.NewParser("/home/bob/bb_clientd/outputs/9da951b8cb759233037166e28f7ea186/hello")
-			}).
-			Return(true)
+		leaf3.EXPECT().VirtualGetAttributes(gomock.Any(), re_vfs.AttributesMaskSymlinkTarget, gomock.Any()).
+			Do(func(ctx context.Context, requested re_vfs.AttributesMask, attributes *re_vfs.Attributes) {
+				attributes.SetSymlinkTarget(path.UNIXFormat.NewParser("/home/bob/bb_clientd/outputs/9da951b8cb759233037166e28f7ea186/hello"))
+			})
 		directory4 := mock.NewMockPrepopulatedDirectory(ctrl)
 		outputPath.EXPECT().LookupChild(path.MustNewComponent("hello")).Return(re_vfs.PrepopulatedDirectoryChild{}.FromDirectory(directory4), nil)
 
@@ -929,12 +908,10 @@ func TestBazelOutputServiceDirectoryBatchStat(t *testing.T) {
 		outputPath.EXPECT().LookupChild(path.MustNewComponent("nested")).Return(re_vfs.PrepopulatedDirectoryChild{}.FromDirectory(directory5), nil)
 		leaf4 := mock.NewMockLinkableLeaf(ctrl)
 		directory5.EXPECT().LookupChild(path.MustNewComponent("symlink_internal_absolute_alias")).Return(re_vfs.PrepopulatedDirectoryChild{}.FromLeaf(leaf4), nil)
-		leaf4.EXPECT().VirtualApply(gomock.Any()).
-			Do(func(data any) {
-				p := data.(*re_vfs.ApplyReadlink)
-				p.Target = path.UNIXFormat.NewParser("/home/bob/.cache/bazel/_bazel_bob/9da951b8cb759233037166e28f7ea186/execroot/myproject/bazel-out/hello")
-			}).
-			Return(true)
+		leaf4.EXPECT().VirtualGetAttributes(gomock.Any(), re_vfs.AttributesMaskSymlinkTarget, gomock.Any()).
+			Do(func(ctx context.Context, requested re_vfs.AttributesMask, attributes *re_vfs.Attributes) {
+				attributes.SetSymlinkTarget(path.UNIXFormat.NewParser("/home/bob/.cache/bazel/_bazel_bob/9da951b8cb759233037166e28f7ea186/execroot/myproject/bazel-out/hello"))
+			})
 		directory6 := mock.NewMockPrepopulatedDirectory(ctrl)
 		outputPath.EXPECT().LookupChild(path.MustNewComponent("hello")).Return(re_vfs.PrepopulatedDirectoryChild{}.FromDirectory(directory6), nil)
 
@@ -945,12 +922,10 @@ func TestBazelOutputServiceDirectoryBatchStat(t *testing.T) {
 		outputPath.EXPECT().LookupChild(path.MustNewComponent("nested")).Return(re_vfs.PrepopulatedDirectoryChild{}.FromDirectory(directory7), nil)
 		leaf5 := mock.NewMockLinkableLeaf(ctrl)
 		directory7.EXPECT().LookupChild(path.MustNewComponent("symlink_external")).Return(re_vfs.PrepopulatedDirectoryChild{}.FromLeaf(leaf5), nil)
-		leaf5.EXPECT().VirtualApply(gomock.Any()).
-			Do(func(data any) {
-				p := data.(*re_vfs.ApplyReadlink)
-				p.Target = path.UNIXFormat.NewParser("/etc/passwd")
-			}).
-			Return(true)
+		leaf5.EXPECT().VirtualGetAttributes(gomock.Any(), re_vfs.AttributesMaskSymlinkTarget, gomock.Any()).
+			Do(func(ctx context.Context, requested re_vfs.AttributesMask, attributes *re_vfs.Attributes) {
+				attributes.SetSymlinkTarget(path.UNIXFormat.NewParser("/etc/passwd"))
+			})
 
 		// Lookup of "nonexistent".
 		outputPath.EXPECT().LookupChild(path.MustNewComponent("nonexistent")).Return(re_vfs.PrepopulatedDirectoryChild{}, syscall.ENOENT)
