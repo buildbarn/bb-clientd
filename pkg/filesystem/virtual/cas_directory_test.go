@@ -236,9 +236,15 @@ func TestCASDirectoryVirtualLookup(t *testing.T) {
 		require.Equal(t, filesystem.FileTypeSymlink, out.GetFileType())
 
 		_, actualLeaf := actualChild.GetPair()
-		target, s := actualLeaf.VirtualReadlink(ctx)
-		require.Equal(t, re_vfs.StatusOK, s)
-		require.Equal(t, []byte("target"), target)
+		var attributes re_vfs.Attributes
+		actualLeaf.VirtualGetAttributes(ctx, re_vfs.AttributesMaskSymlinkTarget, &attributes)
+
+		symlinkTarget, ok := attributes.GetSymlinkTarget()
+		require.True(t, ok)
+
+		symlinkTargetBuilder, scopeWalker := path.EmptyBuilder.Join(path.VoidScopeWalker)
+		require.NoError(t, path.Resolve(symlinkTarget, scopeWalker))
+		require.Equal(t, "target", symlinkTargetBuilder.GetUNIXString())
 	})
 }
 
@@ -587,8 +593,14 @@ func TestCASDirectoryHandleResolver(t *testing.T) {
 		require.Equal(t, re_vfs.StatusOK, s)
 
 		_, leaf := child.GetPair()
-		target, s := leaf.VirtualReadlink(ctx)
-		require.Equal(t, re_vfs.StatusOK, s)
-		require.Equal(t, []byte("target2"), target)
+		var attributes re_vfs.Attributes
+		leaf.VirtualGetAttributes(ctx, re_vfs.AttributesMaskSymlinkTarget, &attributes)
+
+		symlinkTarget, ok := attributes.GetSymlinkTarget()
+		require.True(t, ok)
+
+		symlinkTargetBuilder, scopeWalker := path.EmptyBuilder.Join(path.VoidScopeWalker)
+		require.NoError(t, path.Resolve(symlinkTarget, scopeWalker))
+		require.Equal(t, "target2", symlinkTargetBuilder.GetUNIXString())
 	})
 }

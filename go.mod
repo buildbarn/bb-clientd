@@ -14,7 +14,7 @@ replace github.com/envoyproxy/protoc-gen-validate => github.com/envoyproxy/proto
 require (
 	github.com/bazelbuild/buildtools v0.0.0-20260317083046-eb4b727fa099
 	github.com/bazelbuild/remote-apis v0.0.0-20260216160025-715b73f3f9e4
-	github.com/buildbarn/bb-remote-execution v0.0.0-20260303143927-9b1e3637cd58
+	github.com/buildbarn/bb-remote-execution v0.0.0-20260319042723-cd89f0554d18
 	github.com/buildbarn/bb-storage v0.0.0-20260317135248-dc342e1799d7
 	github.com/stretchr/testify v1.11.1
 	go.uber.org/mock v0.6.0

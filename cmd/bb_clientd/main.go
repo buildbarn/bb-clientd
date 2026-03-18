@@ -218,7 +218,9 @@ func main() {
 		// allowing data to be loaded lazily.
 		symlinkFactory := re_vfs.NewHandleAllocatingSymlinkFactory(
 			re_vfs.BaseSymlinkFactory,
-			rootHandleAllocator.New())
+			rootHandleAllocator.New(),
+			path.LocalFormat,
+		)
 		outputPathFactory := cd_vfs.NewInMemoryOutputPathFactory(filePool, symlinkFactory, rootHandleAllocator, sort.Sort, clock.SystemClock)
 		if persistencyConfiguration := configuration.OutputPathPersistency; persistencyConfiguration != nil {
 			// Upload local files at the end of every build. This

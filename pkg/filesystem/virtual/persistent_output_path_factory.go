@@ -100,7 +100,14 @@ func (sr *stateRestorer) restoreDirectoryRecursive(reader outputpathpersistency.
 			return status.Errorf(codes.InvalidArgument, "Directory contains multiple children named %#v", entry.Name)
 		}
 
-		initialNodes[component] = virtual.InitialChild{}.FromLeaf(sr.symlinkFactory.LookupSymlink([]byte(entry.Target)))
+		// TODO: Should this use path.LocalFormat? If so,
+		// ApplyAppendOutputPathPersistencyDirectoryNode should also be
+		// modified to take a path.Format.
+		symlinkNode, err := sr.symlinkFactory.LookupSymlink(path.UNIXFormat.NewParser(entry.Target))
+		if err != nil {
+			return status.Errorf(codes.InvalidArgument, "Failed to create symbolic link %#v with target %#v", entry.Name, entry.Target)
+		}
+		initialNodes[component] = virtual.InitialChild{}.FromLeaf(symlinkNode)
 	}
 	if err := d.CreateChildren(initialNodes, true); err != nil {
 		return util.StatusWrap(err, "Failed to create files and symbolic links")

@@ -230,7 +230,7 @@ func TestPersistentOutputPathFactoryStartInitialBuild(t *testing.T) {
 			/* readMonitor = */ nil,
 		).Return(file2)
 		symlink1 := mock.NewMockLinkableLeaf(ctrl)
-		symlinkFactory.EXPECT().LookupSymlink([]byte("target1")).Return(symlink1)
+		symlinkFactory.EXPECT().LookupSymlink(path.UNIXFormat.NewParser("target1")).Return(symlink1, nil)
 		baseOutputPath.EXPECT().CreateChildren(map[path.Component]re_vfs.InitialChild{
 			path.MustNewComponent("file1"):    re_vfs.InitialChild{}.FromLeaf(file1),
 			path.MustNewComponent("file2"):    re_vfs.InitialChild{}.FromLeaf(file2),
