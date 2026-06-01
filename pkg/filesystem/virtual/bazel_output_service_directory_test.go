@@ -514,7 +514,7 @@ func TestBazelOutputServiceDirectoryStartBuild(t *testing.T) {
 				child6.EXPECT().VirtualApply(gomock.Any()).
 					Do(func(data any) {
 						p := data.(*re_vfs.ApplyGetContainingDigests)
-						p.ContainingDigests = digest.NewSetBuilder().
+						p.ContainingDigests = digest.NewSetBuilder(2).
 							Add(digest.MustNewDigest("my-cluster", remoteexecution.DigestFunction_MD5, "23fef0c2a3414dd562ca70e4a4717609", 5)).
 							Add(digest.MustNewDigest("my-cluster", remoteexecution.DigestFunction_MD5, "a60ffc49592e5045a61a8c99f3c86b4f", 6)).
 							Build()
@@ -529,7 +529,7 @@ func TestBazelOutputServiceDirectoryStartBuild(t *testing.T) {
 				child7.EXPECT().VirtualApply(gomock.Any()).
 					Do(func(data any) {
 						p := data.(*re_vfs.ApplyGetContainingDigests)
-						p.ContainingDigests = digest.NewSetBuilder().
+						p.ContainingDigests = digest.NewSetBuilder(2).
 							Add(digest.MustNewDigest("my-cluster", remoteexecution.DigestFunction_MD5, "2c0f843d40e00603f0d71e0d11a6e045", 7)).
 							Add(digest.MustNewDigest("my-cluster", remoteexecution.DigestFunction_MD5, "6b9105a7125cb9f190a3e44ab5f22663", 8)).
 							Build()
@@ -546,7 +546,7 @@ func TestBazelOutputServiceDirectoryStartBuild(t *testing.T) {
 			// should be removed afterwards.
 			bareContentAddressableStorage.EXPECT().FindMissing(
 				ctx,
-				digest.NewSetBuilder().
+				digest.NewSetBuilder(6).
 					Add(digest.MustNewDigest("my-cluster", remoteexecution.DigestFunction_MD5, "a32ea15346cf1848ab49e0913ff07531", 3)).
 					Add(digest.MustNewDigest("my-cluster", remoteexecution.DigestFunction_MD5, "9435918583fd2e37882751bbc51f4085", 4)).
 					Add(digest.MustNewDigest("my-cluster", remoteexecution.DigestFunction_MD5, "23fef0c2a3414dd562ca70e4a4717609", 5)).
@@ -555,7 +555,7 @@ func TestBazelOutputServiceDirectoryStartBuild(t *testing.T) {
 					Add(digest.MustNewDigest("my-cluster", remoteexecution.DigestFunction_MD5, "6b9105a7125cb9f190a3e44ab5f22663", 8)).
 					Build(),
 			).Return(
-				digest.NewSetBuilder().
+				digest.NewSetBuilder(2).
 					Add(digest.MustNewDigest("my-cluster", remoteexecution.DigestFunction_MD5, "9435918583fd2e37882751bbc51f4085", 4)).
 					Add(digest.MustNewDigest("my-cluster", remoteexecution.DigestFunction_MD5, "2c0f843d40e00603f0d71e0d11a6e045", 7)).
 					Build(),
