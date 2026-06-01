@@ -207,7 +207,7 @@ func TestLocalFileUploadingOutputPathFactory(t *testing.T) {
 		// Transfer files that are missing.
 		contentAddressableStorage.EXPECT().FindMissing(
 			gomock.Any(),
-			digest.NewSetBuilder().Add(missingLocalFileDigest).Add(presentLocalFileDigest).Build(),
+			digest.NewSetBuilder(2).Add(missingLocalFileDigest).Add(presentLocalFileDigest).Build(),
 		).Return(missingLocalFileDigest.ToSingletonSet(), nil)
 		contentAddressableStorage.EXPECT().Put(gomock.Any(), missingLocalFileDigest, gomock.Any()).DoAndReturn(
 			func(ctx context.Context, digest digest.Digest, b buffer.Buffer) error {

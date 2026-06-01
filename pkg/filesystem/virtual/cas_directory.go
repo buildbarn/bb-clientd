@@ -59,7 +59,9 @@ func (d *casDirectory) createSelf() virtual.Directory {
 }
 
 func (d *casDirectory) createSymlink(index uint64, target string) (virtual.LinkableLeaf, virtual.Status) {
-	symlink, err := virtual.BaseSymlinkFactory.LookupSymlink(path.UNIXFormat.NewParser(target))
+	// TODO: Should LookupSymlink() be made part of DirectoryContext?
+	symlinkFactory := virtual.NewBaseSymlinkFactory(func(requested virtual.AttributesMask, attributes *virtual.Attributes) {})
+	symlink, err := symlinkFactory.LookupSymlink(path.UNIXFormat.NewParser(target))
 	if err != nil {
 		d.directoryContext.LogError(util.StatusWrapf(err, "Failed to create symbolic link with target %#v", target))
 		return nil, virtual.StatusErrIO

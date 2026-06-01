@@ -154,7 +154,7 @@ func (d *BazelOutputServiceDirectory) Clean(ctx context.Context, request *bazelo
 // batch of files from the output path that are no longer present in the
 // Content Addressable Storage.
 func (d *BazelOutputServiceDirectory) findMissingAndRemove(ctx context.Context, queue map[digest.Digest][]func() error) error {
-	set := digest.NewSetBuilder()
+	set := digest.NewSetBuilder(len(queue))
 	for digest := range queue {
 		set.Add(digest)
 	}

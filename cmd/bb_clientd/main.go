@@ -237,8 +237,9 @@ func main() {
 		// Output Service allows Bazel to place its bazel-out/
 		// directories on a virtual file system, thereby
 		// allowing data to be loaded lazily.
+		defaultAttributesSetter := func(requested re_vfs.AttributesMask, attributes *re_vfs.Attributes) {}
 		symlinkFactory := re_vfs.NewHandleAllocatingSymlinkFactory(
-			re_vfs.BaseSymlinkFactory,
+			re_vfs.NewBaseSymlinkFactory(defaultAttributesSetter),
 			rootHandleAllocator.New(),
 			path.LocalFormat,
 		)
@@ -298,7 +299,6 @@ func main() {
 		// - "cas": raw access to the Content Addressable Storage.
 		// - "outputs": outputs of builds performed using Bazel.
 		// - "scratch": a writable directory for testing.
-		defaultAttributesSetter := func(requested re_vfs.AttributesMask, attributes *re_vfs.Attributes) {}
 		namedAttributesFactory := re_vfs.NewInMemoryNamedAttributesFactory(
 			re_vfs.NewHandleAllocatingFileAllocator(
 				re_vfs.NewPoolBackedFileAllocator(

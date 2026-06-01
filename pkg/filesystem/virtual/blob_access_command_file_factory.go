@@ -80,6 +80,12 @@ func (f *commandFile) VirtualSetAttributes(ctx context.Context, in *virtual.Attr
 	if _, ok := in.GetPermissions(); ok {
 		return virtual.StatusErrPerm
 	}
+	if _, ok := in.GetOwnerUserID(); ok {
+		return virtual.StatusErrPerm
+	}
+	if _, ok := in.GetOwnerGroupID(); ok {
+		return virtual.StatusErrPerm
+	}
 	if _, ok := in.GetSizeBytes(); ok {
 		return virtual.StatusErrAccess
 	}
@@ -87,11 +93,11 @@ func (f *commandFile) VirtualSetAttributes(ctx context.Context, in *virtual.Attr
 	return virtual.StatusOK
 }
 
-func (f *commandFile) VirtualAllocate(off, size uint64) virtual.Status {
+func (f *commandFile) VirtualAllocate(ctx context.Context, off, size uint64) virtual.Status {
 	return virtual.StatusErrWrongType
 }
 
-func (f *commandFile) VirtualSeek(offset uint64, regionType filesystem.RegionType) (*uint64, virtual.Status) {
+func (f *commandFile) VirtualSeek(ctx context.Context, offset uint64, regionType filesystem.RegionType) (*uint64, virtual.Status) {
 	sizeBytes := f.size
 	switch regionType {
 	case filesystem.Data:
@@ -117,7 +123,7 @@ func (f *commandFile) VirtualOpenSelf(ctx context.Context, shareAccess virtual.S
 	return virtual.StatusOK
 }
 
-func (f *commandFile) VirtualRead(buf []byte, offset uint64) (int, bool, virtual.Status) {
+func (f *commandFile) VirtualRead(ctx context.Context, buf []byte, offset uint64) (int, bool, virtual.Status) {
 	buf, eof := virtual.BoundReadToFileSize(buf, offset, f.size)
 	if len(buf) > 0 {
 		w := regionExtractingWriter{
@@ -136,7 +142,7 @@ func (f *commandFile) VirtualRead(buf []byte, offset uint64) (int, bool, virtual
 
 func (f *commandFile) VirtualClose(shareAccess virtual.ShareMask) {}
 
-func (f *commandFile) VirtualWrite(buf []byte, offset uint64) (int, virtual.Status) {
+func (f *commandFile) VirtualWrite(ctx context.Context, buf []byte, offset uint64) (int, virtual.Status) {
 	panic("Request to write to read-only file should have been intercepted")
 }
 
