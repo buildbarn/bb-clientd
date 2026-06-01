@@ -39,7 +39,8 @@ func TestInMemoryOutputPathFactory(t *testing.T) {
 		path.MustNewComponent("my-output-path"),
 		casFileFactory,
 		digest.MustNewFunction("default-scheduler", remoteexecution.DigestFunction_SHA256),
-		errorLogger)
+		errorLogger,
+	)
 
 	// The last data modification time on the root directory
 	// should be the same as provided above.

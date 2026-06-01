@@ -317,8 +317,10 @@ func (d *BazelOutputServiceDirectory) StartBuild(ctx context.Context, request *b
 				virtual.NewBlobAccessCASFileFactory(
 					context.Background(),
 					d.retryingContentAddressableStorage,
-					errorLogger),
-				d.handleAllocator.New())
+					errorLogger,
+				),
+				d.handleAllocator.New(),
+			)
 			state = &outputPathState{
 				rootDirectory:  d.outputPathFactory.StartInitialBuild(outputBaseID, casFileFactory, digestFunction, errorLogger),
 				casFileFactory: casFileFactory,
@@ -500,7 +502,8 @@ func (d *BazelOutputServiceDirectory) StageArtifacts(ctx context.Context, reques
 			responses,
 			&bazeloutputservice.StageArtifactsResponse_Response{
 				Status: status.Convert(d.stageSingleArtifact(ctx, artifact, outputPathState, buildState)).Proto(),
-			})
+			},
+		)
 	}
 	return &bazeloutputservice.StageArtifactsResponse{
 		Responses: responses,
@@ -631,7 +634,8 @@ func (d *BazelOutputServiceDirectory) BatchStat(ctx context.Context, request *ba
 			stat:           &bazeloutputservice.BatchStatResponse_Stat{},
 		}
 		resolvedPath, scopeWalker := path.EmptyBuilder.Join(
-			buildState.scopeWalkerFactory.New(path.NewLoopDetectingScopeWalker(&statWalker)))
+			buildState.scopeWalkerFactory.New(path.NewLoopDetectingScopeWalker(&statWalker)),
+		)
 		if err := path.Resolve(path.UNIXFormat.NewParser(statPath), scopeWalker); err == syscall.ENOENT {
 			// Path does not exist.
 			response.Responses = append(response.Responses, &bazeloutputservice.BatchStatResponse_StatResponse{})

@@ -77,7 +77,8 @@ func (cdc *treeCASDirectoryContext) createRootDirectory() (re_vfs.Directory, re_
 		},
 		cdc.treeDigest.GetDigestFunction(),
 		cdc.handleAllocator.New(bytes.NewBuffer([]byte{0})),
-		uint64(cdc.treeDigest.GetSizeBytes()))
+		uint64(cdc.treeDigest.GetSizeBytes()),
+	)
 }
 
 func (cdc *treeCASDirectoryContext) createChildDirectory(childDigest digest.Digest) (re_vfs.Directory, re_vfs.HandleResolver) {
@@ -88,7 +89,8 @@ func (cdc *treeCASDirectoryContext) createChildDirectory(childDigest digest.Dige
 		},
 		cdc.treeDigest.GetDigestFunction(),
 		cdc.handleAllocator.New(bytes.NewBuffer(append([]byte{1}, childDigest.GetCompactBinary()...))),
-		uint64(cdc.treeDigest.GetSizeBytes()))
+		uint64(cdc.treeDigest.GetSizeBytes()),
+	)
 }
 
 func (cdc *treeCASDirectoryContext) resolve(r io.ByteReader) (re_vfs.DirectoryChild, re_vfs.Status) {

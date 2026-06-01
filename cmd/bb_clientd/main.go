@@ -97,7 +97,8 @@ func main() {
 				util.DefaultErrorLogger,
 				time.Second,
 				30*time.Second,
-				maximumDelay.AsDuration())
+				maximumDelay.AsDuration(),
+			)
 		}
 
 		// Create the virtual file system.
@@ -124,7 +125,9 @@ func main() {
 			re_cas.NewBlobAccessDirectoryFetcher(
 				retryingContentAddressableStorage,
 				int(configuration.MaximumMessageSizeBytes),
-				configuration.MaximumTreeSizeBytes))
+				configuration.MaximumTreeSizeBytes,
+			),
+		)
 		if err != nil {
 			return util.StatusWrap(err, "Failed to create caching directory fetcher")
 		}
@@ -132,20 +135,24 @@ func main() {
 			re_vfs.NewBlobAccessCASFileFactory(
 				context.Background(),
 				retryingContentAddressableStorage,
-				util.DefaultErrorLogger),
-			rootHandleAllocator.New())
+				util.DefaultErrorLogger,
+			),
+			rootHandleAllocator.New(),
+		)
 		decomposedCASDirectoryFactory := cd_vfs.NewDecomposedCASDirectoryFactory(
 			context.Background(),
 			casFileFactory,
 			directoryFetcher,
 			rootHandleAllocator.New(),
-			util.DefaultErrorLogger)
+			util.DefaultErrorLogger,
+		)
 		treeCASDirectoryFactory := cd_vfs.NewTreeCASDirectoryFactory(
 			context.Background(),
 			casFileFactory,
 			directoryFetcher,
 			rootHandleAllocator.New(),
-			util.DefaultErrorLogger)
+			util.DefaultErrorLogger,
+		)
 
 		// Factory function for per instance name "blobs" directories
 		// that give access to arbitrary files, directories and trees.
@@ -155,8 +162,10 @@ func main() {
 				context.Background(),
 				retryingContentAddressableStorage,
 				int(configuration.MaximumMessageSizeBytes),
-				util.DefaultErrorLogger),
-			rootHandleAllocator.New())
+				util.DefaultErrorLogger,
+			),
+			rootHandleAllocator.New(),
+		)
 		blobsDirectoryLookupFunc := func(instanceName digest.InstanceName) re_vfs.Directory {
 			handleAllocator := blobsDirectoryHandleAllocator.
 				New(re_vfs.ByteSliceID([]byte(instanceName.String()))).
@@ -182,32 +191,44 @@ func main() {
 									func(digest digest.Digest) (re_vfs.DirectoryChild, re_vfs.Status) {
 										f, s := commandFileFactory.LookupFile(digest)
 										return re_vfs.DirectoryChild{}.FromLeaf(f), s
-									}))),
+									},
+								)),
+							),
 							path.MustNewComponent("directory"): re_vfs.DirectoryChild{}.FromDirectory(
 								allocateHandle().AsStatelessDirectory(cd_vfs.NewDigestParsingDirectory(
 									digestFunction,
 									func(digest digest.Digest) (re_vfs.DirectoryChild, re_vfs.Status) {
 										return re_vfs.DirectoryChild{}.FromDirectory(decomposedCASDirectoryFactory.LookupDirectory(digest)), re_vfs.StatusOK
-									}))),
+									},
+								)),
+							),
 							path.MustNewComponent("executable"): re_vfs.DirectoryChild{}.FromDirectory(
 								allocateHandle().AsStatelessDirectory(cd_vfs.NewDigestParsingDirectory(
 									digestFunction,
 									func(digest digest.Digest) (re_vfs.DirectoryChild, re_vfs.Status) {
 										return re_vfs.DirectoryChild{}.FromLeaf(casFileFactory.LookupFile(digest, true, nil)), re_vfs.StatusOK
-									}))),
+									},
+								)),
+							),
 							path.MustNewComponent("file"): re_vfs.DirectoryChild{}.FromDirectory(
 								allocateHandle().AsStatelessDirectory(cd_vfs.NewDigestParsingDirectory(
 									digestFunction,
 									func(digest digest.Digest) (re_vfs.DirectoryChild, re_vfs.Status) {
 										return re_vfs.DirectoryChild{}.FromLeaf(casFileFactory.LookupFile(digest, false, nil)), re_vfs.StatusOK
-									}))),
+									},
+								)),
+							),
 							path.MustNewComponent("tree"): re_vfs.DirectoryChild{}.FromDirectory(
 								allocateHandle().AsStatelessDirectory(cd_vfs.NewDigestParsingDirectory(
 									digestFunction,
 									func(digest digest.Digest) (re_vfs.DirectoryChild, re_vfs.Status) {
 										return re_vfs.DirectoryChild{}.FromDirectory(treeCASDirectoryFactory.LookupDirectory(digest)), re_vfs.StatusOK
-									}))),
-						})))
+									},
+								)),
+							),
+						},
+					)),
+				)
 			}
 			return allocateHandle().AsStatelessDirectory(re_vfs.NewStaticDirectory(re_vfs.CaseSensitiveComponentNormalizer, blobsDirectoryContents))
 		}
@@ -232,7 +253,8 @@ func main() {
 					outputPathFactory,
 					bareContentAddressableStorage,
 					util.DefaultErrorLogger,
-					semaphore.NewWeighted(concurrency))
+					semaphore.NewWeighted(concurrency),
+				)
 			}
 
 			// Enable persistent storage of bazel-out/ directories.
@@ -249,12 +271,15 @@ func main() {
 				outputpathpersistency.NewMaximumAgeStore(
 					outputpathpersistency.NewDirectoryBackedStore(
 						stateDirectory,
-						persistencyConfiguration.MaximumStateFileSizeBytes),
+						persistencyConfiguration.MaximumStateFileSizeBytes,
+					),
 					clock.SystemClock,
-					maximumStateFileAge.AsDuration()),
+					maximumStateFileAge.AsDuration(),
+				),
 				clock.SystemClock,
 				util.DefaultErrorLogger,
-				symlinkFactory)
+				symlinkFactory,
+			)
 		}
 
 		outputsDirectory := cd_vfs.NewBazelOutputServiceDirectory(
@@ -264,7 +289,8 @@ func main() {
 			retryingContentAddressableStorage,
 			directoryFetcher,
 			symlinkFactory,
-			configuration.MaximumTreeSizeBytes)
+			configuration.MaximumTreeSizeBytes,
+		)
 
 		// Construct the top-level directory of the virtual file system
 		// mount. It contains three subdirectories:
@@ -296,7 +322,9 @@ func main() {
 						rootHandleAllocator.New(),
 						map[path.Component]cd_vfs.InstanceNameLookupFunc{
 							path.MustNewComponent("blobs"): blobsDirectoryLookupFunc,
-						})),
+						},
+					),
+				),
 				path.MustNewComponent("outputs"): re_vfs.DirectoryChild{}.FromDirectory(outputsDirectory),
 				path.MustNewComponent("scratch"): re_vfs.DirectoryChild{}.FromDirectory(
 					re_vfs.NewInMemoryPrepopulatedDirectory(
@@ -320,7 +348,8 @@ func main() {
 						namedAttributesFactory,
 					),
 				),
-			}))
+			},
+		))
 
 		if err := mount.Expose(siblingsGroup, rootDirectory); err != nil {
 			return util.StatusWrap(err, "Failed to expose virtual file system mount")
@@ -334,12 +363,16 @@ func main() {
 					s,
 					grpcservers.NewActionCacheServer(
 						actionCache,
-						int(configuration.MaximumMessageSizeBytes)))
+						int(configuration.MaximumMessageSizeBytes),
+					),
+				)
 				remoteexecution.RegisterContentAddressableStorageServer(
 					s,
 					grpcservers.NewContentAddressableStorageServer(
 						bareContentAddressableStorage,
-						configuration.MaximumMessageSizeBytes))
+						configuration.MaximumMessageSizeBytes,
+					),
+				)
 				bytestream.RegisterByteStreamServer(
 					s,
 					grpcservers.NewByteStreamServer(
@@ -360,7 +393,9 @@ func main() {
 								LowApiVersion:        &semver.SemVer{Major: 2, Minor: 0},
 								HighApiVersion:       &semver.SemVer{Major: 2, Minor: 11},
 							}),
-						})))
+						}),
+					),
+				)
 				remoteexecution.RegisterExecutionServer(s, buildQueue)
 
 				bazeloutputservice.RegisterBazelOutputServiceServer(s, outputsDirectory)

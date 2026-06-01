@@ -44,7 +44,8 @@ func TestInstanceNameParsingDirectory(t *testing.T) {
 		rootHandleAllocation,
 		map[path.Component]cd_vfs.InstanceNameLookupFunc{
 			path.MustNewComponent("blobs"): lookupFunc.Call,
-		})
+		},
+	)
 	attributesMask := re_vfs.AttributesMaskChangeID |
 		re_vfs.AttributesMaskFileType |
 		re_vfs.AttributesMaskLinkCount |
@@ -89,7 +90,8 @@ func TestInstanceNameParsingDirectory(t *testing.T) {
 				SetLinkCount(re_vfs.ImplicitDirectoryLinkCount).
 				SetPermissions(re_vfs.PermissionsExecute).
 				SetSizeBytes(0),
-			out1)
+			out1,
+		)
 
 		mockChildDirectory := mock.NewMockVirtualDirectory(ctrl)
 		lookupFunc.EXPECT().Call(util.Must(digest.NewInstanceName("hello"))).Return(mockChildDirectory)
@@ -127,7 +129,8 @@ func TestInstanceNameParsingDirectory(t *testing.T) {
 				SetLinkCount(re_vfs.ImplicitDirectoryLinkCount).
 				SetPermissions(re_vfs.PermissionsExecute).
 				SetSizeBytes(0),
-			out1)
+			out1,
+		)
 
 		instanceNameParsingDirectoryExpectCreate(t, ctrl, handleAllocator, []byte("hello/world//"))
 
@@ -145,7 +148,8 @@ func TestInstanceNameParsingDirectory(t *testing.T) {
 				SetLinkCount(re_vfs.ImplicitDirectoryLinkCount).
 				SetPermissions(re_vfs.PermissionsExecute).
 				SetSizeBytes(0),
-			out2)
+			out2,
+		)
 
 		mockChildDirectory := mock.NewMockVirtualDirectory(ctrl)
 		lookupFunc.EXPECT().Call(util.Must(digest.NewInstanceName("hello/world"))).Return(mockChildDirectory)
@@ -185,7 +189,8 @@ func TestInstanceNameParsingDirectory(t *testing.T) {
 				SetLinkCount(re_vfs.ImplicitDirectoryLinkCount).
 				SetPermissions(re_vfs.PermissionsExecute).
 				SetSizeBytes(0),
-			out1)
+			out1,
+		)
 
 		childDirectory1, _ := child1.GetPair()
 		var out2 re_vfs.Attributes
