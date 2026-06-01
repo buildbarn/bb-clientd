@@ -106,7 +106,8 @@ func (ba *errorRetryingBlobAccess) Get(ctx context.Context, digest digest.Digest
 			context:    ctx,
 			digest:     digest,
 			retryState: retryState,
-		})
+		},
+	)
 }
 
 func (ba *errorRetryingBlobAccess) GetFromComposite(ctx context.Context, parentDigest, childDigest digest.Digest, slicer slicing.BlobSlicer) buffer.Buffer {
@@ -120,7 +121,8 @@ func (ba *errorRetryingBlobAccess) GetFromComposite(ctx context.Context, parentD
 			childDigest:  childDigest,
 			slicer:       slicer,
 			retryState:   retryState,
-		})
+		},
+	)
 }
 
 func (ba *errorRetryingBlobAccess) FindMissing(ctx context.Context, digests digest.Set) (digest.Set, error) {

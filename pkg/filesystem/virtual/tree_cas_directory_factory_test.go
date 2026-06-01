@@ -93,7 +93,8 @@ func TestTreeCASDirectoryFactoryLookupDirectory(t *testing.T) {
 		casFileFactory,
 		directoryFetcher,
 		rootHandleAllocation,
-		errorLogger)
+		errorLogger,
+	)
 
 	treeHandleAllocator := treeCASDirectoryFactoryExpectLookupRootDirectory(
 		t,
@@ -111,7 +112,8 @@ func TestTreeCASDirectoryFactoryLookupDirectory(t *testing.T) {
 			0x07, 0x7a, 0x64, 0x8c, 0xd7, 0x36, 0xcd, 0x36,
 			// Size.
 			0xf6, 0x01,
-		})
+		},
+	)
 	treeCASDirectoryFactoryExpectLookupChildDirectory(
 		t,
 		ctrl,
@@ -119,7 +121,8 @@ func TestTreeCASDirectoryFactoryLookupDirectory(t *testing.T) {
 		// Root directory.
 		[]byte{0},
 		// Directory itself.
-		[]byte{0})
+		[]byte{0},
+	)
 
 	treeDigest := digest.MustNewDigest("hello", remoteexecution.DigestFunction_SHA256, "e0f28d311a9b2deff103e32f6105b2b29d636c287797ca72077a648cd736cd36", 123)
 	attributesMask := re_vfs.AttributesMaskFileType |
@@ -222,7 +225,8 @@ func TestTreeCASDirectoryFactoryLookupDirectory(t *testing.T) {
 			0xe0, 0x01,
 		},
 		// Directory itself.
-		[]byte{0})
+		[]byte{0},
+	)
 
 	var outChild re_vfs.Attributes
 	dChild, s := dRoot.VirtualLookup(ctx, path.MustNewComponent("directory"), attributesMask, &outChild)

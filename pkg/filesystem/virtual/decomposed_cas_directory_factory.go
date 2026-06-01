@@ -50,7 +50,8 @@ func (cdf *decomposedCASDirectoryFactory) createDirectory(blobDigest digest.Dige
 		},
 		blobDigest.GetDigestFunction(),
 		cdf.handleAllocator.New(blobDigest),
-		uint64(blobDigest.GetSizeBytes()))
+		uint64(blobDigest.GetSizeBytes()),
+	)
 }
 
 func (cdf *decomposedCASDirectoryFactory) resolve(blobDigest digest.Digest, r io.ByteReader) (re_vfs.DirectoryChild, re_vfs.Status) {

@@ -43,7 +43,8 @@ func TestBazelOutputServiceDirectoryClean(t *testing.T) {
 		retryingContentAddressableStorage,
 		directoryFetcher,
 		symlinkFactory,
-		/* maximumTreeSizeBytes = */ 10000)
+		/* maximumTreeSizeBytes = */ 10000,
+	)
 
 	t.Run("InvalidOutputBaseID", func(t *testing.T) {
 		// The output base ID must be a valid directory name.
@@ -147,7 +148,8 @@ func TestBazelOutputServiceDirectoryStartBuild(t *testing.T) {
 		retryingContentAddressableStorage,
 		directoryFetcher,
 		symlinkFactory,
-		/* maximumMessageSizeBytes = */ 10000)
+		/* maximumMessageSizeBytes = */ 10000,
+	)
 
 	t.Run("InvalidOutputBaseID", func(t *testing.T) {
 		// The output base ID must be a valid directory name.
@@ -557,7 +559,8 @@ func TestBazelOutputServiceDirectoryStartBuild(t *testing.T) {
 					Add(digest.MustNewDigest("my-cluster", remoteexecution.DigestFunction_MD5, "9435918583fd2e37882751bbc51f4085", 4)).
 					Add(digest.MustNewDigest("my-cluster", remoteexecution.DigestFunction_MD5, "2c0f843d40e00603f0d71e0d11a6e045", 7)).
 					Build(),
-				nil)
+				nil,
+			)
 			remover4.EXPECT().Call()
 			remover7.EXPECT().Call()
 
@@ -600,7 +603,8 @@ func TestBazelOutputServiceDirectoryStageArtifacts(t *testing.T) {
 		retryingContentAddressableStorage,
 		directoryFetcher,
 		symlinkFactory,
-		/* maximumMessageSizeBytes = */ 10000)
+		/* maximumMessageSizeBytes = */ 10000,
+	)
 
 	t.Run("InvalidBuildID", func(t *testing.T) {
 		// StartBuild() should be called first.
@@ -758,7 +762,8 @@ func TestBazelOutputServiceDirectoryBatchStat(t *testing.T) {
 		retryingContentAddressableStorage,
 		directoryFetcher,
 		symlinkFactory,
-		/* maximumMessageSizeBytes = */ 10000)
+		/* maximumMessageSizeBytes = */ 10000,
+	)
 
 	t.Run("InvalidBuildID", func(t *testing.T) {
 		// StartBuild() should be called first.
@@ -1044,7 +1049,8 @@ func TestBazelOutputServiceDirectoryVirtualLookup(t *testing.T) {
 		retryingContentAddressableStorage,
 		directoryFetcher,
 		symlinkFactory,
-		/* maximumMessageSizeBytes = */ 10000)
+		/* maximumMessageSizeBytes = */ 10000,
+	)
 
 	// No output paths exist, so VirtualLookup() should always fail.
 	var out1 re_vfs.Attributes
@@ -1133,7 +1139,8 @@ func TestBazelOutputServiceDirectoryVirtualReadDir(t *testing.T) {
 		retryingContentAddressableStorage,
 		directoryFetcher,
 		symlinkFactory,
-		/* maximumMessageSizeBytes = */ 10000)
+		/* maximumMessageSizeBytes = */ 10000,
+	)
 
 	t.Run("InitialState", func(t *testing.T) {
 		// The directory should initially be empty.
@@ -1142,7 +1149,8 @@ func TestBazelOutputServiceDirectoryVirtualReadDir(t *testing.T) {
 		require.Equal(
 			t,
 			re_vfs.StatusOK,
-			d.VirtualReadDir(ctx, 0, re_vfs.AttributesMaskInodeNumber, reporter))
+			d.VirtualReadDir(ctx, 0, re_vfs.AttributesMaskInodeNumber, reporter),
+		)
 	})
 
 	// Create two output paths.
@@ -1237,7 +1245,8 @@ func TestBazelOutputServiceDirectoryVirtualReadDir(t *testing.T) {
 		require.Equal(
 			t,
 			re_vfs.StatusOK,
-			d.VirtualReadDir(ctx, 0, re_vfs.AttributesMaskInodeNumber, reporter))
+			d.VirtualReadDir(ctx, 0, re_vfs.AttributesMaskInodeNumber, reporter),
+		)
 	})
 
 	t.Run("Partial", func(t *testing.T) {
@@ -1259,7 +1268,8 @@ func TestBazelOutputServiceDirectoryVirtualReadDir(t *testing.T) {
 		require.Equal(
 			t,
 			re_vfs.StatusOK,
-			d.VirtualReadDir(ctx, 1, re_vfs.AttributesMaskInodeNumber, reporter))
+			d.VirtualReadDir(ctx, 1, re_vfs.AttributesMaskInodeNumber, reporter),
+		)
 	})
 
 	t.Run("AtEOF", func(t *testing.T) {
@@ -1267,7 +1277,8 @@ func TestBazelOutputServiceDirectoryVirtualReadDir(t *testing.T) {
 		require.Equal(
 			t,
 			re_vfs.StatusOK,
-			d.VirtualReadDir(ctx, 2, re_vfs.AttributesMaskInodeNumber, reporter))
+			d.VirtualReadDir(ctx, 2, re_vfs.AttributesMaskInodeNumber, reporter),
+		)
 	})
 
 	t.Run("BeyondEOF", func(t *testing.T) {
@@ -1275,7 +1286,8 @@ func TestBazelOutputServiceDirectoryVirtualReadDir(t *testing.T) {
 		require.Equal(
 			t,
 			re_vfs.StatusOK,
-			d.VirtualReadDir(ctx, 3, re_vfs.AttributesMaskInodeNumber, reporter))
+			d.VirtualReadDir(ctx, 3, re_vfs.AttributesMaskInodeNumber, reporter),
+		)
 	})
 
 	// Remove all output paths.
@@ -1299,6 +1311,7 @@ func TestBazelOutputServiceDirectoryVirtualReadDir(t *testing.T) {
 		require.Equal(
 			t,
 			re_vfs.StatusOK,
-			d.VirtualReadDir(ctx, 0, re_vfs.AttributesMaskInodeNumber, reporter))
+			d.VirtualReadDir(ctx, 0, re_vfs.AttributesMaskInodeNumber, reporter),
+		)
 	})
 }

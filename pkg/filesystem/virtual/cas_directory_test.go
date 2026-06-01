@@ -62,7 +62,8 @@ func TestCASDirectoryVirtualLookup(t *testing.T) {
 		directoryContext,
 		digest.MustNewFunction("example", remoteexecution.DigestFunction_SHA256),
 		rootHandleAllocation,
-		/* sizeBytes = */ 42)
+		/* sizeBytes = */ 42,
+	)
 
 	t.Run("IOError", func(t *testing.T) {
 		// I/O error while loading directory contents. There is
@@ -260,7 +261,8 @@ func TestCASDirectoryVirtualReadDir(t *testing.T) {
 		directoryContext,
 		digest.MustNewFunction("example", remoteexecution.DigestFunction_SHA256),
 		rootHandleAllocation,
-		/* sizeBytes = */ 42)
+		/* sizeBytes = */ 42,
+	)
 
 	t.Run("IOError", func(t *testing.T) {
 		// I/O error while loading directory contents. There is
@@ -272,7 +274,8 @@ func TestCASDirectoryVirtualReadDir(t *testing.T) {
 		require.Equal(
 			t,
 			re_vfs.StatusErrIO,
-			d.VirtualReadDir(ctx, 0, re_vfs.AttributesMaskInodeNumber, reporter))
+			d.VirtualReadDir(ctx, 0, re_vfs.AttributesMaskInodeNumber, reporter),
+		)
 	})
 
 	t.Run("MalformedDirectory1", func(t *testing.T) {
@@ -294,7 +297,8 @@ func TestCASDirectoryVirtualReadDir(t *testing.T) {
 		require.Equal(
 			t,
 			re_vfs.StatusErrIO,
-			d.VirtualReadDir(ctx, 0, re_vfs.AttributesMaskInodeNumber, reporter))
+			d.VirtualReadDir(ctx, 0, re_vfs.AttributesMaskInodeNumber, reporter),
+		)
 	})
 
 	t.Run("MalformedDirectory2", func(t *testing.T) {
@@ -316,7 +320,8 @@ func TestCASDirectoryVirtualReadDir(t *testing.T) {
 		require.Equal(
 			t,
 			re_vfs.StatusErrIO,
-			d.VirtualReadDir(ctx, 0, re_vfs.AttributesMaskInodeNumber, reporter))
+			d.VirtualReadDir(ctx, 0, re_vfs.AttributesMaskInodeNumber, reporter),
+		)
 	})
 
 	t.Run("NoSpaceDirectory", func(t *testing.T) {
@@ -362,7 +367,8 @@ func TestCASDirectoryVirtualReadDir(t *testing.T) {
 		require.Equal(
 			t,
 			re_vfs.StatusOK,
-			d.VirtualReadDir(ctx, 0, re_vfs.AttributesMaskInodeNumber, reporter))
+			d.VirtualReadDir(ctx, 0, re_vfs.AttributesMaskInodeNumber, reporter),
+		)
 	})
 
 	directoryContext.EXPECT().GetDirectoryContents().Return(&remoteexecution.Directory{
@@ -468,7 +474,8 @@ func TestCASDirectoryVirtualReadDir(t *testing.T) {
 		require.Equal(
 			t,
 			re_vfs.StatusOK,
-			d.VirtualReadDir(ctx, 0, re_vfs.AttributesMaskInodeNumber, reporter))
+			d.VirtualReadDir(ctx, 0, re_vfs.AttributesMaskInodeNumber, reporter),
+		)
 	})
 
 	t.Run("Partial", func(t *testing.T) {
@@ -503,7 +510,8 @@ func TestCASDirectoryVirtualReadDir(t *testing.T) {
 		require.Equal(
 			t,
 			re_vfs.StatusOK,
-			d.VirtualReadDir(ctx, 2, re_vfs.AttributesMaskInodeNumber, reporter))
+			d.VirtualReadDir(ctx, 2, re_vfs.AttributesMaskInodeNumber, reporter),
+		)
 	})
 
 	t.Run("AtEOF", func(t *testing.T) {
@@ -512,7 +520,8 @@ func TestCASDirectoryVirtualReadDir(t *testing.T) {
 		require.Equal(
 			t,
 			re_vfs.StatusOK,
-			d.VirtualReadDir(ctx, 4, re_vfs.AttributesMaskInodeNumber, reporter))
+			d.VirtualReadDir(ctx, 4, re_vfs.AttributesMaskInodeNumber, reporter),
+		)
 	})
 
 	t.Run("BeyondEOF", func(t *testing.T) {
@@ -521,7 +530,8 @@ func TestCASDirectoryVirtualReadDir(t *testing.T) {
 		require.Equal(
 			t,
 			re_vfs.StatusOK,
-			d.VirtualReadDir(ctx, 5, re_vfs.AttributesMaskInodeNumber, reporter))
+			d.VirtualReadDir(ctx, 5, re_vfs.AttributesMaskInodeNumber, reporter),
+		)
 	})
 }
 
@@ -537,7 +547,8 @@ func TestCASDirectoryHandleResolver(t *testing.T) {
 		directoryContext,
 		digest.MustNewFunction("example", remoteexecution.DigestFunction_SHA256),
 		rootHandleAllocation,
-		/* sizeBytes = */ 42)
+		/* sizeBytes = */ 42,
+	)
 
 	t.Run("EmptyIdentifier", func(t *testing.T) {
 		// A variable length encoded integer should be provided

@@ -77,7 +77,8 @@ func TestDecomposedCASDirectoryFactoryLookupDirectory(t *testing.T) {
 		casFileFactory,
 		directoryFetcher,
 		rootHandleAllocation,
-		errorLogger)
+		errorLogger,
+	)
 
 	directoryDigest := digest.MustNewDigest("hello", remoteexecution.DigestFunction_SHA256, "e0f28d311a9b2deff103e32f6105b2b29d636c287797ca72077a648cd736cd36", 123)
 	attributesMask := re_vfs.AttributesMaskChangeID |
@@ -105,7 +106,8 @@ func TestDecomposedCASDirectoryFactoryLookupDirectory(t *testing.T) {
 			0xf6, 0x01,
 		},
 		// Directory itself.
-		[]byte{0})
+		[]byte{0},
+	)
 
 	d := casDirectoryFactory.LookupDirectory(directoryDigest)
 	var out re_vfs.Attributes
@@ -121,7 +123,8 @@ func TestDecomposedCASDirectoryFactoryLookupDirectory(t *testing.T) {
 			SetLinkCount(re_vfs.ImplicitDirectoryLinkCount).
 			SetPermissions(re_vfs.PermissionsRead|re_vfs.PermissionsExecute).
 			SetSizeBytes(123),
-		out.SetInodeNumber(0))
+		out.SetInodeNumber(0),
+	)
 
 	t.Run("IOError", func(t *testing.T) {
 		// I/O errors when requesting the directory contents
@@ -172,7 +175,8 @@ func TestDecomposedCASDirectoryFactoryLookupDirectory(t *testing.T) {
 				// Size.
 				0xe0, 0x01,
 			},
-			[]byte{0})
+			[]byte{0},
+		)
 		executable := mock.NewMockLinkableLeaf(ctrl)
 		casFileFactory.EXPECT().LookupFile(
 			digest.MustNewDigest("hello", remoteexecution.DigestFunction_SHA256, "32d757ab2b5c09e11daf0b0c04a3ba9da78e96fd24f9f838be0333f093354c82", 42),

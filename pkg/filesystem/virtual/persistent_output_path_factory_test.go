@@ -264,7 +264,8 @@ func TestPersistentOutputPathFactoryClean(t *testing.T) {
 		testutil.RequireEqualStatus(
 			t,
 			status.Error(codes.Internal, "Disk failure while cleaning output path"),
-			outputPathFactory.Clean(outputBaseID))
+			outputPathFactory.Clean(outputBaseID),
+		)
 	})
 
 	t.Run("StoreFailure", func(t *testing.T) {
@@ -275,7 +276,8 @@ func TestPersistentOutputPathFactoryClean(t *testing.T) {
 		testutil.RequireEqualStatus(
 			t,
 			status.Error(codes.Internal, "Failed to remove persistent state for output path: Disk failure"),
-			outputPathFactory.Clean(outputBaseID))
+			outputPathFactory.Clean(outputBaseID),
+		)
 	})
 
 	t.Run("Success", func(t *testing.T) {

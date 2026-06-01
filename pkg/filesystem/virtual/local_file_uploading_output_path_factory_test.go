@@ -35,7 +35,8 @@ func TestLocalFileUploadingOutputPathFactory(t *testing.T) {
 		baseOutputPathFactory,
 		contentAddressableStorage,
 		globalErrorLogger,
-		semaphore.NewWeighted(1))
+		semaphore.NewWeighted(1),
+	)
 
 	// Construct an output path.
 	outputBaseID := path.MustNewComponent("15c974d0b2820c3ae15a237e186cd84b")
@@ -54,7 +55,8 @@ func TestLocalFileUploadingOutputPathFactory(t *testing.T) {
 		outputBaseID,
 		casFileFactory,
 		digestFunction,
-		fileErrorLogger)
+		fileErrorLogger,
+	)
 
 	t.Run("Empty", func(t *testing.T) {
 		// Output path is empty, meaning there is nothing to upload.
@@ -75,11 +77,13 @@ func TestLocalFileUploadingOutputPathFactory(t *testing.T) {
 				{Name: path.MustNewComponent("subdirectory"), Child: subDirectory},
 			},
 			nil,
-			nil)
+			nil,
+		)
 		subDirectory.EXPECT().LookupAllChildren().Return(
 			nil,
 			nil,
-			status.Error(codes.Internal, "I/O error"))
+			status.Error(codes.Internal, "I/O error"),
+		)
 		globalErrorLogger.EXPECT().Log(testutil.EqStatus(t, status.Error(codes.Internal, "Failed to look up children of directory \"subdirectory\" in output path \"15c974d0b2820c3ae15a237e186cd84b\": I/O error")))
 
 		outputPath.FinalizeBuild(ctx, digestFunction)
@@ -95,7 +99,8 @@ func TestLocalFileUploadingOutputPathFactory(t *testing.T) {
 			[]re_vfs.LeafPrepopulatedDirEntry{
 				{Name: path.MustNewComponent("leaf"), Child: leaf},
 			},
-			nil)
+			nil,
+		)
 		leaf.EXPECT().VirtualApply(gomock.Any()).
 			Do(func(data any) {
 				p := data.(*re_vfs.ApplyUploadFile)
@@ -117,7 +122,8 @@ func TestLocalFileUploadingOutputPathFactory(t *testing.T) {
 			[]re_vfs.LeafPrepopulatedDirEntry{
 				{Name: path.MustNewComponent("leaf"), Child: leaf},
 			},
-			nil)
+			nil,
+		)
 		leafDigest := digest.MustNewDigest("example", remoteexecution.DigestFunction_SHA256, "64ec88ca00b268e5ba1a35678a1b5316d212f4f366b2477232534a8aeca37f3c", 11)
 		leaf.EXPECT().VirtualApply(gomock.Any()).
 			Do(func(data any) {
@@ -149,7 +155,8 @@ func TestLocalFileUploadingOutputPathFactory(t *testing.T) {
 			[]re_vfs.LeafPrepopulatedDirEntry{
 				{Name: path.MustNewComponent("symlink"), Child: symlink},
 			},
-			nil)
+			nil,
+		)
 
 		missingLocalFile := mock.NewMockLinkableLeaf(ctrl)
 		presentLocalFile := mock.NewMockLinkableLeaf(ctrl)
@@ -161,7 +168,8 @@ func TestLocalFileUploadingOutputPathFactory(t *testing.T) {
 				{Name: path.MustNewComponent("present_local_file"), Child: presentLocalFile},
 				{Name: path.MustNewComponent("remote_file"), Child: remoteFile},
 			},
-			nil)
+			nil,
+		)
 
 		// Attempt to upload all files in the file system. Some
 		// of those are not uploadable, or they don't result in
@@ -207,7 +215,8 @@ func TestLocalFileUploadingOutputPathFactory(t *testing.T) {
 				require.NoError(t, err)
 				require.Equal(t, []byte("Hello world"), data)
 				return nil
-			})
+			},
+		)
 
 		outputPath.FinalizeBuild(ctx, digestFunction)
 	})

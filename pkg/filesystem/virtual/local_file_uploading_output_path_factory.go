@@ -60,7 +60,8 @@ func (op *localFileUploadingOutputPath) FinalizeBuild(ctx context.Context, diges
 		op.factory.contentAddressableStorage,
 		digest.KeyWithoutInstance,
 		blobstore.RecommendedFindMissingDigestsCount,
-		op.factory.concurrency)
+		op.factory.concurrency,
+	)
 
 	// For the Bazel Output Service use case it's not important
 	// enough to have a configurable delay here, because the time it

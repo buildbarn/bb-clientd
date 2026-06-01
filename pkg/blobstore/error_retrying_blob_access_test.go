@@ -34,7 +34,8 @@ func TestErrorRetryingBlobAccessGet(t *testing.T) {
 		errorLogger,
 		1*time.Second,
 		3*time.Second,
-		5*time.Minute)
+		5*time.Minute,
+	)
 
 	helloDigest := digest.MustNewDigest("instance_name", remoteexecution.DigestFunction_MD5, "8b1a9953c4611296a827abf8c47804d7", 5)
 	helloDigestSet := helloDigest.ToSingletonSet()

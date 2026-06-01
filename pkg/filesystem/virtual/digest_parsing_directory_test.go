@@ -21,7 +21,8 @@ func TestDigestParsingDirectory(t *testing.T) {
 	lookupFunc := mock.NewMockDigestLookupFunc(ctrl)
 	d := cd_vfs.NewDigestParsingDirectory(
 		digest.MustNewFunction("hello", remoteexecution.DigestFunction_MD5),
-		lookupFunc.Call)
+		lookupFunc.Call,
+	)
 
 	t.Run("NoDash", func(t *testing.T) {
 		// The filename must contain a dash to separate the hash

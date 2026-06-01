@@ -134,7 +134,8 @@ func TestDirectoryBackedStoreWrite(t *testing.T) {
 			writer.Finalize(&outputpathpersistency_pb.RootDirectory{
 				InitialCreationTime: &timestamppb.Timestamp{Seconds: 1619157611},
 				Contents:            &outputpathpersistency_pb.Directory{},
-			}))
+			}),
+		)
 	})
 
 	t.Run("SyncFailure", func(t *testing.T) {
@@ -158,7 +159,8 @@ func TestDirectoryBackedStoreWrite(t *testing.T) {
 			writer.Finalize(&outputpathpersistency_pb.RootDirectory{
 				InitialCreationTime: &timestamppb.Timestamp{Seconds: 1619157611},
 				Contents:            &outputpathpersistency_pb.Directory{},
-			}))
+			}),
+		)
 	})
 
 	t.Run("CloseFailure", func(t *testing.T) {
@@ -182,7 +184,8 @@ func TestDirectoryBackedStoreWrite(t *testing.T) {
 			writer.Finalize(&outputpathpersistency_pb.RootDirectory{
 				InitialCreationTime: &timestamppb.Timestamp{Seconds: 1619157611},
 				Contents:            &outputpathpersistency_pb.Directory{},
-			}))
+			}),
+		)
 	})
 
 	t.Run("CloseFailure", func(t *testing.T) {
@@ -207,7 +210,8 @@ func TestDirectoryBackedStoreWrite(t *testing.T) {
 			writer.Finalize(&outputpathpersistency_pb.RootDirectory{
 				InitialCreationTime: &timestamppb.Timestamp{Seconds: 1619157611},
 				Contents:            &outputpathpersistency_pb.Directory{},
-			}))
+			}),
+		)
 	})
 
 	t.Run("Success", func(t *testing.T) {
@@ -230,6 +234,7 @@ func TestDirectoryBackedStoreWrite(t *testing.T) {
 			writer.Finalize(&outputpathpersistency_pb.RootDirectory{
 				InitialCreationTime: &timestamppb.Timestamp{Seconds: 1619157611},
 				Contents:            &outputpathpersistency_pb.Directory{},
-			}))
+			}),
+		)
 	})
 }
