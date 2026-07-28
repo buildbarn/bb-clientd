@@ -1,12 +1,9 @@
 module github.com/buildbarn/bb-clientd
 
-go 1.26.3
+go 1.26.5
 
 // rules_go doesn't support gomock's package mode.
 replace go.uber.org/mock => go.uber.org/mock v0.4.0
-
-// Existing patches don't apply against newer go-fuse.
-replace github.com/hanwen/go-fuse/v2 => github.com/hanwen/go-fuse/v2 v2.5.1
 
 // v0.25.2 is not in BCR yet.
 replace cel.dev/expr => cel.dev/expr v0.25.1
@@ -14,7 +11,7 @@ replace cel.dev/expr => cel.dev/expr v0.25.1
 require (
 	github.com/bazelbuild/buildtools v0.0.0-20260528135316-84fa6c32aee6
 	github.com/bazelbuild/remote-apis v0.0.0-20260331222004-becdd8f9ff81
-	github.com/buildbarn/bb-remote-execution v0.0.0-20260601183023-ca3fedba831b
+	github.com/buildbarn/bb-remote-execution v0.0.0-20260722162832-236bcd95eb8f
 	github.com/buildbarn/bb-storage v0.0.0-20260527152149-3991d6ebefb4
 	github.com/stretchr/testify v1.11.1
 	go.uber.org/mock v0.6.0
@@ -83,7 +80,7 @@ require (
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0 // indirect
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.29.0 // indirect
-	github.com/hanwen/go-fuse/v2 v2.9.0 // indirect
+	github.com/hanwen/go-fuse/v2 v2.10.1 // indirect
 	github.com/jhump/protoreflect/v2 v2.0.0-beta.2 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51 // indirect
@@ -99,7 +96,7 @@ require (
 	github.com/prometheus/procfs v0.20.1 // indirect
 	github.com/sercand/kuberesolver/v5 v5.1.1 // indirect
 	github.com/spiffe/go-spiffe/v2 v2.6.0 // indirect
-	github.com/winfsp/go-winfsp v1.0.3 // indirect
+	github.com/winfsp/go-winfsp v1.0.4-0.20260614140859-496ed3bd9019 // indirect
 	github.com/zeebo/blake3 v0.2.4 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/contrib/detectors/gcp v1.44.0 // indirect
