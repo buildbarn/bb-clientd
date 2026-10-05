@@ -57,7 +57,7 @@ require (
 	github.com/aws/smithy-go v1.26.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/buildbarn/go-sha256tree v0.0.0-20250310211320-0f70f20e855b // indirect
-	github.com/buildbarn/go-xdr v0.0.0-20240702182809-236788cf9e89 // indirect
+	github.com/buildbarn/go-xdr v0.0.0-20261005144839-a2095890273e // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/cncf/xds/go v0.0.0-20260202195803-dba9d589def2 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
