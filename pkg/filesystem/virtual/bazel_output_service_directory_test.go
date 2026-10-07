@@ -4,6 +4,8 @@ import (
 	"context"
 	"syscall"
 	"testing"
+	"testing/synctest"
+	"time"
 
 	remoteexecution "github.com/bazelbuild/remote-apis/build/bazel/remote/execution/v2"
 	"github.com/buildbarn/bb-clientd/internal/mock"
@@ -14,6 +16,7 @@ import (
 	"github.com/buildbarn/bb-storage/pkg/digest"
 	"github.com/buildbarn/bb-storage/pkg/filesystem/path"
 	"github.com/buildbarn/bb-storage/pkg/testutil"
+	"github.com/buildbarn/bb-storage/pkg/util"
 	"github.com/stretchr/testify/require"
 
 	"google.golang.org/grpc/codes"
@@ -1314,4 +1317,186 @@ func TestBazelOutputServiceDirectoryVirtualReadDir(t *testing.T) {
 			d.VirtualReadDir(ctx, 0, re_vfs.AttributesMaskInodeNumber, reporter),
 		)
 	})
+}
+
+func TestBazelOutputServiceDirectoryLifecycleContention(t *testing.T) {
+	for _, phase := range []string{"Restore", "Filter", "Finalize", "Clean", "UnopenedClean"} {
+		t.Run(phase, func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				ctrl, ctx := gomock.WithContext(context.Background(), t)
+				handleAllocator := mock.NewMockStatefulHandleAllocator(ctrl)
+				outputPathFactory := mock.NewMockOutputPathFactory(ctrl)
+				dHandleAllocation := mock.NewMockStatefulHandleAllocation(ctrl)
+				handleAllocator.EXPECT().New().Return(dHandleAllocation)
+				dHandle := mock.NewMockStatefulDirectoryHandle(ctrl)
+				dHandleAllocation.EXPECT().AsStatefulDirectory(gomock.Any()).Return(dHandle)
+				d := cd_vfs.NewBazelOutputServiceDirectory(
+					handleAllocator,
+					outputPathFactory,
+					mock.NewMockBlobAccess(ctrl),
+					mock.NewMockBlobAccess(ctrl),
+					mock.NewMockDirectoryFetcher(ctrl),
+					mock.NewMockSymlinkFactory(ctrl),
+					10000,
+				)
+
+				casFileHandleAllocation := mock.NewMockStatefulHandleAllocation(ctrl)
+				handleAllocator.EXPECT().New().Return(casFileHandleAllocation).AnyTimes()
+				casFileHandleAllocation.EXPECT().AsStatelessAllocator().Return(mock.NewMockStatelessHandleAllocator(ctrl)).AnyTimes()
+				digestFunction := digest.MustNewFunction("", remoteexecution.DigestFunction_SHA256)
+				args, err := anypb.New(&bazeloutputservicerev2.StartBuildArgs{
+					DigestFunction: remoteexecution.DigestFunction_SHA256,
+				})
+				require.NoError(t, err)
+				startBuild := func(ctx context.Context, baseID, buildID string) error {
+					_, err := d.StartBuild(ctx, &bazeloutputservice.StartBuildRequest{
+						OutputBaseId:     baseID,
+						BuildId:          buildID,
+						Args:             args,
+						OutputPathPrefix: "/outputs",
+					})
+					return err
+				}
+
+				entered, resume := make(chan struct{}), make(chan struct{})
+				block := func() {
+					close(entered)
+					<-resume
+				}
+				outputPath := mock.NewMockOutputPath(ctrl)
+				if phase != "UnopenedClean" {
+					restore := outputPathFactory.EXPECT().StartInitialBuild(path.MustNewComponent("base"), gomock.Any(), digestFunction, gomock.Any()).Return(outputPath)
+					filter := outputPath.EXPECT().FilterChildren(gomock.Any())
+					if phase == "Restore" {
+						restore.Do(func(path.Component, re_vfs.CASFileFactory, digest.Function, util.ErrorLogger) { block() })
+					} else if phase == "Filter" {
+						filter.Do(func(re_vfs.ChildFilter) { block() })
+					} else {
+						require.NoError(t, startBuild(ctx, "base", "build"))
+					}
+				}
+
+				var operation func() error
+				switch phase {
+				case "Restore", "Filter":
+					operation = func() error { return startBuild(ctx, "base", "build") }
+				case "Finalize":
+					outputPath.EXPECT().FinalizeBuild(ctx, digestFunction).Do(func(context.Context, digest.Function) { block() })
+					operation = func() error {
+						_, err := d.FinalizeBuild(ctx, &bazeloutputservice.FinalizeBuildRequest{BuildId: "build"})
+						return err
+					}
+				case "Clean", "UnopenedClean":
+					if phase == "Clean" {
+						outputPath.EXPECT().RemoveAllChildren(true).Do(func(bool) { block() })
+						dHandle.EXPECT().NotifyRemoval(path.MustNewComponent("base"))
+					} else {
+						outputPathFactory.EXPECT().Clean(path.MustNewComponent("base")).Do(func(path.Component) { block() })
+					}
+					operation = func() error {
+						_, err := d.Clean(ctx, &bazeloutputservice.CleanRequest{OutputBaseId: "base"})
+						return err
+					}
+				}
+				done := make(chan error, 1)
+				go func() { done <- operation() }()
+				<-entered
+
+				// New stage/stat calls fail immediately while a lifecycle call
+				// owns the base, even though its build ID is still registered.
+				if phase != "Restore" && phase != "UnopenedClean" {
+					_, err = d.StageArtifacts(ctx, &bazeloutputservice.StageArtifactsRequest{BuildId: "build"})
+					testutil.RequireEqualStatus(t, status.Error(codes.FailedPrecondition, "Output base is busy"), err)
+					_, err = d.BatchStat(ctx, &bazeloutputservice.BatchStatRequest{BuildId: "build"})
+					testutil.RequireEqualStatus(t, status.Error(codes.FailedPrecondition, "Output base is busy"), err)
+				}
+
+				// Every RPC on another base can finish while this one is busy.
+				otherPath := mock.NewMockOutputPath(ctrl)
+				outputPathFactory.EXPECT().StartInitialBuild(path.MustNewComponent("other"), gomock.Any(), digestFunction, gomock.Any()).Return(otherPath)
+				otherPath.EXPECT().FilterChildren(gomock.Any())
+				require.NoError(t, startBuild(ctx, "other", "other-build"))
+				_, err = d.StageArtifacts(ctx, &bazeloutputservice.StageArtifactsRequest{BuildId: "other-build"})
+				require.NoError(t, err)
+				_, err = d.BatchStat(ctx, &bazeloutputservice.BatchStatRequest{BuildId: "other-build"})
+				require.NoError(t, err)
+				otherPath.EXPECT().FinalizeBuild(ctx, digestFunction)
+				_, err = d.FinalizeBuild(ctx, &bazeloutputservice.FinalizeBuildRequest{BuildId: "other-build"})
+				require.NoError(t, err)
+				otherPath.EXPECT().RemoveAllChildren(true)
+				dHandle.EXPECT().NotifyRemoval(path.MustNewComponent("other"))
+				_, err = d.Clean(ctx, &bazeloutputservice.CleanRequest{OutputBaseId: "other"})
+				require.NoError(t, err)
+
+				// Same-base lifecycle calls wait, and cancellation releases only
+				// the waiter, not the operation that owns the base.
+				waitCtx, cancel := context.WithCancel(ctx)
+				defer cancel()
+				canceled := make(chan error, 3)
+				go func() { canceled <- startBuild(waitCtx, "base", "canceled-build") }()
+				go func() {
+					_, err := d.Clean(waitCtx, &bazeloutputservice.CleanRequest{OutputBaseId: "base"})
+					canceled <- err
+				}()
+				waiters := 2
+				if phase != "Restore" && phase != "UnopenedClean" {
+					waiters++
+					go func() {
+						_, err := d.FinalizeBuild(waitCtx, &bazeloutputservice.FinalizeBuildRequest{BuildId: "build"})
+						canceled <- err
+					}()
+				}
+				synctest.Wait()
+				require.Len(t, canceled, 0)
+				cancel()
+				for range waiters {
+					require.Equal(t, codes.Canceled, status.Code(<-canceled))
+				}
+				require.Len(t, done, 0)
+
+				if phase == "Finalize" {
+					deadlineCtx, cancel := context.WithTimeout(ctx, time.Second)
+					defer cancel()
+					_, err := d.Clean(deadlineCtx, &bazeloutputservice.CleanRequest{OutputBaseId: "base"})
+					require.Equal(t, codes.DeadlineExceeded, status.Code(err))
+				}
+
+				// A finalizer already waiting on a removed/completed build must
+				// not finalize the next build, even if that build wins the race.
+				// A duplicate FinalizeBuild() must wait, not treat busy as unknown.
+				var finalized chan error
+				if phase == "Finalize" || phase == "Clean" {
+					finalized = make(chan error, 1)
+					go func() {
+						_, err := d.FinalizeBuild(ctx, &bazeloutputservice.FinalizeBuildRequest{BuildId: "build"})
+						finalized <- err
+					}()
+				}
+				if phase == "Clean" || phase == "UnopenedClean" {
+					outputPathFactory.EXPECT().StartInitialBuild(path.MustNewComponent("base"), gomock.Any(), digestFunction, gomock.Any()).Return(outputPath)
+				}
+				outputPath.EXPECT().FilterChildren(gomock.Any())
+				started := make(chan error, 1)
+				go func() { started <- startBuild(ctx, "base", "next-build") }()
+				synctest.Wait()
+				require.Len(t, started, 0)
+				require.Len(t, finalized, 0, "FinalizeBuild must wait for the busy base")
+
+				close(resume)
+				require.NoError(t, <-done)
+				require.NoError(t, <-started)
+				if finalized != nil {
+					require.NoError(t, <-finalized)
+				}
+				_, err = d.BatchStat(ctx, &bazeloutputservice.BatchStatRequest{BuildId: "build"})
+				require.Equal(t, codes.FailedPrecondition, status.Code(err))
+				_, err = d.StageArtifacts(ctx, &bazeloutputservice.StageArtifactsRequest{BuildId: "next-build"})
+				require.NoError(t, err)
+				_, err = d.BatchStat(ctx, &bazeloutputservice.BatchStatRequest{BuildId: "next-build"})
+				require.NoError(t, err)
+				_, err = d.FinalizeBuild(ctx, &bazeloutputservice.FinalizeBuildRequest{BuildId: "build"})
+				require.NoError(t, err)
+			})
+		})
+	}
 }
