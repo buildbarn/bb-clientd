@@ -79,7 +79,9 @@ type BazelOutputServiceDirectory struct {
 	outputBaseIDs map[path.Component]*outputPathState
 	buildIDs      map[string]*outputPathState
 	outputPaths   outputPathState
-	busyBases     map[path.Component]chan struct{}
+
+	busyOutputBaseIDsLock sync.Mutex
+	busyOutputBaseIDs     map[path.Component]<-chan struct{}
 }
 
 var (
@@ -101,7 +103,8 @@ func NewBazelOutputServiceDirectory(handleAllocator virtual.StatefulHandleAlloca
 
 		outputBaseIDs: map[path.Component]*outputPathState{},
 		buildIDs:      map[string]*outputPathState{},
-		busyBases:     map[path.Component]chan struct{}{},
+
+		busyOutputBaseIDs: map[path.Component]<-chan struct{}{},
 	}
 	d.handle = handleAllocator.New().AsStatefulDirectory(d)
 	d.outputPaths.previous = &d.outputPaths
@@ -113,33 +116,26 @@ func NewBazelOutputServiceDirectory(handleAllocator virtual.StatefulHandleAlloca
 // that do not have an output path yet. Waiting does not hold the registry lock.
 func (d *BazelOutputServiceDirectory) acquireOutputBase(ctx context.Context, outputBaseID path.Component) (func(), error) {
 	for {
-		if err := ctx.Err(); err != nil {
-			return nil, status.FromContextError(err).Err()
-		}
-
-		d.lock.Lock()
-		if err := ctx.Err(); err != nil {
-			d.lock.Unlock()
-			return nil, status.FromContextError(err).Err()
-		}
-		if busy, ok := d.busyBases[outputBaseID]; ok {
-			d.lock.Unlock()
+		d.busyOutputBaseIDsLock.Lock()
+		if busy, ok := d.busyOutputBaseIDs[outputBaseID]; ok {
+			d.busyOutputBaseIDsLock.Unlock()
 			select {
 			case <-busy:
+				continue
 			case <-ctx.Done():
+				return nil, util.StatusFromContext(ctx)
 			}
-			continue
 		}
 
 		busy := make(chan struct{})
-		d.busyBases[outputBaseID] = busy
-		d.lock.Unlock()
+		d.busyOutputBaseIDs[outputBaseID] = busy
+		d.busyOutputBaseIDsLock.Unlock()
 
 		return func() {
-			d.lock.Lock()
-			delete(d.busyBases, outputBaseID)
+			d.busyOutputBaseIDsLock.Lock()
+			delete(d.busyOutputBaseIDs, outputBaseID)
 			close(busy)
-			d.lock.Unlock()
+			d.busyOutputBaseIDsLock.Unlock()
 		}, nil
 	}
 }
@@ -430,8 +426,11 @@ func (d *BazelOutputServiceDirectory) getOutputPathAndBuildState(buildID string)
 	if !ok {
 		return nil, nil, status.Error(codes.FailedPrecondition, "Build ID is not associated with any running build")
 	}
-	if _, ok := d.busyBases[outputPathState.outputBaseID]; ok {
-		return nil, nil, status.Error(codes.FailedPrecondition, "Output base is busy")
+	d.busyOutputBaseIDsLock.Lock()
+	_, busy := d.busyOutputBaseIDs[outputPathState.outputBaseID]
+	d.busyOutputBaseIDsLock.Unlock()
+	if busy {
+		return nil, nil, status.Error(codes.FailedPrecondition, "Output base is currently finalizing a build or getting cleaned")
 	}
 	return outputPathState, outputPathState.buildState, nil
 }
@@ -720,33 +719,31 @@ func (d *BazelOutputServiceDirectory) FinalizeArtifacts(ctx context.Context, req
 // build has completed. This prevents successive StageArtifacts() and
 // BatchStat() calls from being processed.
 func (d *BazelOutputServiceDirectory) FinalizeBuild(ctx context.Context, request *bazeloutputservice.FinalizeBuildRequest) (*bazeloutputservice.FinalizeBuildResponse, error) {
-	// Silently ignore requests for unknown build IDs. This ensures
-	// that FinalizeBuild() remains idempotent.
+	// Look up the output base ID associated with the build ID,
+	// so that we may mark that output base ID busy.
 	d.lock.Lock()
 	outputPathState, ok := d.buildIDs[request.BuildId]
+	d.lock.Unlock()
 	if !ok {
-		d.lock.Unlock()
 		return &bazeloutputservice.FinalizeBuildResponse{}, nil
 	}
-	buildState := outputPathState.buildState
-	d.lock.Unlock()
 
-	// Unlike stage/stat admission, lifecycle calls wait for a busy base.
 	release, err := d.acquireOutputBase(ctx, outputPathState.outputBaseID)
 	if err != nil {
 		return nil, err
 	}
 	defer release()
 
-	// The build may have been finalized or replaced while we waited.
+	// Silently ignore requests for unknown build IDs. This ensures
+	// that FinalizeBuild() remains idempotent.
 	d.lock.Lock()
-	stillCurrent := outputPathState.buildState == buildState
-	d.lock.Unlock()
-	if stillCurrent {
-		outputPathState.rootDirectory.FinalizeBuild(ctx, buildState.digestFunction)
-		d.lock.Lock()
+	if outputPathState, ok := d.buildIDs[request.BuildId]; ok {
+		buildState := outputPathState.buildState
 		delete(d.buildIDs, buildState.id)
 		outputPathState.buildState = nil
+		d.lock.Unlock()
+		outputPathState.rootDirectory.FinalizeBuild(ctx, buildState.digestFunction)
+	} else {
 		d.lock.Unlock()
 	}
 	return &bazeloutputservice.FinalizeBuildResponse{}, nil

@@ -1403,12 +1403,16 @@ func TestBazelOutputServiceDirectoryLifecycleContention(t *testing.T) {
 				<-entered
 
 				// New stage/stat calls fail immediately while a lifecycle call
-				// owns the base, even though its build ID is still registered.
+				// owns the base. Finalization unregisters its build first.
 				if phase != "Restore" && phase != "UnopenedClean" {
+					expected := status.Error(codes.FailedPrecondition, "Output base is currently finalizing a build or getting cleaned")
+					if phase == "Finalize" {
+						expected = status.Error(codes.FailedPrecondition, "Build ID is not associated with any running build")
+					}
 					_, err = d.StageArtifacts(ctx, &bazeloutputservice.StageArtifactsRequest{BuildId: "build"})
-					testutil.RequireEqualStatus(t, status.Error(codes.FailedPrecondition, "Output base is busy"), err)
+					testutil.RequireEqualStatus(t, expected, err)
 					_, err = d.BatchStat(ctx, &bazeloutputservice.BatchStatRequest{BuildId: "build"})
-					testutil.RequireEqualStatus(t, status.Error(codes.FailedPrecondition, "Output base is busy"), err)
+					testutil.RequireEqualStatus(t, expected, err)
 				}
 
 				// Every RPC on another base can finish while this one is busy.
@@ -1439,7 +1443,7 @@ func TestBazelOutputServiceDirectoryLifecycleContention(t *testing.T) {
 					canceled <- err
 				}()
 				waiters := 2
-				if phase != "Restore" && phase != "UnopenedClean" {
+				if phase == "Filter" || phase == "Clean" {
 					waiters++
 					go func() {
 						_, err := d.FinalizeBuild(waitCtx, &bazeloutputservice.FinalizeBuildRequest{BuildId: "build"})
@@ -1461,9 +1465,10 @@ func TestBazelOutputServiceDirectoryLifecycleContention(t *testing.T) {
 					require.Equal(t, codes.DeadlineExceeded, status.Code(err))
 				}
 
-				// A finalizer already waiting on a removed/completed build must
-				// not finalize the next build, even if that build wins the race.
-				// A duplicate FinalizeBuild() must wait, not treat busy as unknown.
+				// A finalizer already waiting on a removed build must not
+				// finalize the next build, even if that build wins the race.
+				// Once finalization has unregistered the build, a duplicate
+				// FinalizeBuild() succeeds without waiting.
 				var finalized chan error
 				if phase == "Finalize" || phase == "Clean" {
 					finalized = make(chan error, 1)
@@ -1480,7 +1485,12 @@ func TestBazelOutputServiceDirectoryLifecycleContention(t *testing.T) {
 				go func() { started <- startBuild(ctx, "base", "next-build") }()
 				synctest.Wait()
 				require.Len(t, started, 0)
-				require.Len(t, finalized, 0, "FinalizeBuild must wait for the busy base")
+				if phase == "Finalize" {
+					require.NoError(t, <-finalized)
+					finalized = nil
+				} else {
+					require.Len(t, finalized, 0, "FinalizeBuild must wait for the busy base")
+				}
 
 				close(resume)
 				require.NoError(t, <-done)
