@@ -1,6 +1,6 @@
 module github.com/buildbarn/bb-clientd
 
-go 1.26.5
+go 1.27.1
 
 // rules_go doesn't support gomock's package mode.
 replace go.uber.org/mock => go.uber.org/mock v0.4.0
@@ -12,7 +12,7 @@ require (
 	github.com/bazelbuild/buildtools v0.0.0-20260528135316-84fa6c32aee6
 	github.com/bazelbuild/remote-apis v0.0.0-20260331222004-becdd8f9ff81
 	github.com/buildbarn/bb-remote-execution v0.0.0-20260722162832-236bcd95eb8f
-	github.com/buildbarn/bb-storage v0.0.0-20260527152149-3991d6ebefb4
+	github.com/buildbarn/bb-storage v0.0.0-20261009185544-6ded598f64a3
 	github.com/stretchr/testify v1.11.1
 	go.uber.org/mock v0.6.0
 	golang.org/x/lint v0.0.0-20241112194109-818c5a804067
