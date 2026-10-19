@@ -19,10 +19,12 @@ import (
 	re_vfs "github.com/buildbarn/bb-remote-execution/pkg/filesystem/virtual"
 	virtual_configuration "github.com/buildbarn/bb-remote-execution/pkg/filesystem/virtual/configuration"
 	"github.com/buildbarn/bb-remote-execution/pkg/proto/bazeloutputservice"
+	"github.com/buildbarn/bb-storage/pkg/auth"
 	blobstore_configuration "github.com/buildbarn/bb-storage/pkg/blobstore/configuration"
 	"github.com/buildbarn/bb-storage/pkg/blobstore/grpcservers"
 	"github.com/buildbarn/bb-storage/pkg/builder"
 	"github.com/buildbarn/bb-storage/pkg/capabilities"
+	bb_cas "github.com/buildbarn/bb-storage/pkg/cas"
 	"github.com/buildbarn/bb-storage/pkg/clock"
 	"github.com/buildbarn/bb-storage/pkg/digest"
 	"github.com/buildbarn/bb-storage/pkg/filesystem"
@@ -55,14 +57,15 @@ func main() {
 			return util.StatusWrap(err, "Failed to apply global configuration options")
 		}
 
-		// Storage access.
+		// ZSTD encoder/decoder pool for the ByteStream server.
 		zstdPool := zstd.NewPoolFromConfiguration(configuration.ZstdPool)
-		bareContentAddressableStorage, actionCache, err := blobstore_configuration.NewCASAndACBlobAccessFromConfiguration(
+
+		// Storage access.
+		casInfo, actionCache, err := blobstore_configuration.NewCASAndACFromConfiguration(
 			dependenciesGroup,
 			configuration.Blobstore,
 			grpcClientFactory,
 			int(configuration.MaximumMessageSizeBytes),
-			zstdPool,
 		)
 		if err != nil {
 			return err
@@ -81,17 +84,35 @@ func main() {
 			return util.StatusWrap(err, "Failed to create file pool")
 		}
 
-		// Separate BlobAccess that does retries in case of read errors.
-		// This is necessary, because it isn't always possible to
-		// directly propagate I/O errors returned by the virtual file
-		// system to clients.
-		retryingContentAddressableStorage := bareContentAddressableStorage
+		// Separate decorators that do retries in case of read
+		// errors. This is necessary, because it isn't always
+		// possible to directly propagate I/O errors returned by the
+		// virtual file system to clients.
+		readInfo := casInfo.ReadInfo
 		if maximumDelay := configuration.MaximumFileSystemRetryDelay; maximumDelay != nil {
 			if err := maximumDelay.CheckValid(); err != nil {
 				return util.StatusWrap(err, "Invalid maximum file system retry delay")
 			}
-			retryingContentAddressableStorage = cd_blobstore.NewErrorRetryingBlobAccess(
-				bareContentAddressableStorage,
+			readInfo.ChunkBytesReader = cd_blobstore.NewErrorRetryingReader(
+				casInfo.ChunkBytesReader,
+				clock.SystemClock,
+				random.FastThreadSafeGenerator,
+				util.DefaultErrorLogger,
+				time.Second,
+				30*time.Second,
+				maximumDelay.AsDuration(),
+			)
+			readInfo.ChunkMappingFetcher = cd_blobstore.NewErrorRetryingMappingFetcher(
+				casInfo.ChunkMappingFetcher,
+				clock.SystemClock,
+				random.FastThreadSafeGenerator,
+				util.DefaultErrorLogger,
+				time.Second,
+				30*time.Second,
+				maximumDelay.AsDuration(),
+			)
+			readInfo.CDCParametersFetcher = cd_blobstore.NewErrorRetryingCDCParametersFetcher(
+				casInfo.CDCParametersFetcher,
 				clock.SystemClock,
 				random.FastThreadSafeGenerator,
 				util.DefaultErrorLogger,
@@ -122,10 +143,14 @@ func main() {
 		// directory hierarchy, especially through "outputs/*".
 		directoryFetcher, err := re_cas.NewCachingDirectoryFetcherFromConfiguration(
 			configuration.DirectoryCache,
-			re_cas.NewBlobAccessDirectoryFetcher(
-				retryingContentAddressableStorage,
-				int(configuration.MaximumMessageSizeBytes),
-				configuration.MaximumTreeSizeBytes,
+			re_cas.NewCASDirectoryFetcher(
+				bb_cas.NewMessageReader[remoteexecution.Directory](
+					readInfo,
+					int(configuration.MaximumMessageSizeBytes),
+				),
+				bb_cas.NewStorageBackedStreamReader(readInfo),
+				/* maximumDirectorySizeBytes = */ configuration.MaximumMessageSizeBytes,
+				/* maximumTreeSizeBytes = */ configuration.MaximumTreeSizeBytes,
 			),
 		)
 		if err != nil {
@@ -134,7 +159,7 @@ func main() {
 		casFileFactory := re_vfs.NewResolvableHandleAllocatingCASFileFactory(
 			re_vfs.NewBlobAccessCASFileFactory(
 				context.Background(),
-				retryingContentAddressableStorage,
+				readInfo,
 				util.DefaultErrorLogger,
 			),
 			rootHandleAllocator.New(),
@@ -158,10 +183,12 @@ func main() {
 		// that give access to arbitrary files, directories and trees.
 		blobsDirectoryHandleAllocator := rootHandleAllocator.New().AsStatelessAllocator()
 		commandFileFactory := cd_vfs.NewHandleAllocatingCommandFileFactory(
-			cd_vfs.NewBlobAccessCommandFileFactory(
+			cd_vfs.NewMessageReaderCommandFileFactory(
 				context.Background(),
-				retryingContentAddressableStorage,
-				int(configuration.MaximumMessageSizeBytes),
+				bb_cas.NewMessageReader[remoteexecution.Command](
+					readInfo,
+					int(configuration.MaximumMessageSizeBytes),
+				),
 				util.DefaultErrorLogger,
 			),
 			rootHandleAllocator.New(),
@@ -250,11 +277,20 @@ func main() {
 			// PersistentOutputPathFactory, as it also ensures that
 			// local files have a digest.
 			if concurrency := persistencyConfiguration.LocalFileUploadConcurrency; concurrency > 0 {
+				blobUploader, blobUploaderFlusher := re_cas.NewBatchingBlobUploader(
+					casInfo.ChunkStorage,
+					casInfo.ChunkMappingStorage,
+					casInfo.CDCParametersFetcher,
+					casInfo.DigestKeyFormat,
+					100,
+					semaphore.NewWeighted(concurrency),
+					bb_cas.NewReaderPutter(casInfo.ChunkStorage, casInfo.ChunkMappingStorage),
+				)
 				outputPathFactory = cd_vfs.NewLocalFileUploadingOutputPathFactory(
 					outputPathFactory,
-					bareContentAddressableStorage,
+					blobUploader,
+					blobUploaderFlusher,
 					util.DefaultErrorLogger,
-					semaphore.NewWeighted(concurrency),
 				)
 			}
 
@@ -286,8 +322,10 @@ func main() {
 		outputsDirectory := cd_vfs.NewBazelOutputServiceDirectory(
 			rootHandleAllocator,
 			outputPathFactory,
-			bareContentAddressableStorage,
-			retryingContentAddressableStorage,
+			casInfo.ChunkStorage,
+			casInfo.ChunkMappingStorage,
+			casInfo.CDCParametersFetcher,
+			readInfo,
 			directoryFetcher,
 			symlinkFactory,
 			configuration.MaximumTreeSizeBytes,
@@ -361,31 +399,36 @@ func main() {
 			func(s grpc.ServiceRegistrar) {
 				remoteexecution.RegisterActionCacheServer(
 					s,
-					grpcservers.NewActionCacheServer(
-						actionCache,
-						int(configuration.MaximumMessageSizeBytes),
-					),
+					grpcservers.NewActionCacheServer(actionCache),
 				)
 				remoteexecution.RegisterContentAddressableStorageServer(
 					s,
 					grpcservers.NewContentAddressableStorageServer(
-						bareContentAddressableStorage,
+						casInfo.ChunkStorage,
+						casInfo.ChunkMappingStorage,
+						casInfo.CDCParametersFetcher,
+						bb_cas.NewReaderPutter(casInfo.ChunkStorage, casInfo.ChunkMappingStorage),
+						auth.NewStaticAuthorizer(func(in digest.InstanceName) bool { return true }),
+						auth.NewStaticAuthorizer(func(in digest.InstanceName) bool { return true }),
 						configuration.MaximumMessageSizeBytes,
+						0,
 					),
 				)
 				bytestream.RegisterByteStreamServer(
 					s,
 					grpcservers.NewByteStreamServer(
-						bareContentAddressableStorage,
-						/* readChunkSizeBytes = */ 1<<16,
+						casInfo.ChunkStorage,
+						casInfo.ChunkMappingStorage,
+						casInfo.CDCParametersFetcher,
 						zstdPool,
+						bb_cas.NewReaderPutter(casInfo.ChunkStorage, casInfo.ChunkMappingStorage),
 					),
 				)
 				remoteexecution.RegisterCapabilitiesServer(
 					s,
 					capabilities.NewServer(
 						capabilities.NewMergingProvider([]capabilities.Provider{
-							bareContentAddressableStorage,
+							casInfo.ChunkStorage,
 							actionCache,
 							buildQueue,
 							capabilities.NewStaticProvider(&remoteexecution.ServerCapabilities{

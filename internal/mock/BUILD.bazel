@@ -19,19 +19,19 @@ gomock(
     out = "blobstore.go",
     interfaces = ["BlobAccess"],
     library = "@com_github_buildbarn_bb_storage//pkg/blobstore",
-    mockgen_model_library = "@org_uber_go_mock//mockgen/model",
     mockgen_tool = "@org_uber_go_mock//mockgen",
     package = "mock",
+    source = "@com_github_buildbarn_bb_storage//pkg/blobstore:blob_access.go",
 )
 
 gomock(
-    name = "blobstore_slicing",
-    out = "blobstore_slicing.go",
-    interfaces = ["BlobSlicer"],
-    library = "@com_github_buildbarn_bb_storage//pkg/blobstore/slicing",
-    mockgen_model_library = "@org_uber_go_mock//mockgen/model",
+    name = "blobstore_reader",
+    out = "blobstore_reader.go",
+    interfaces = ["Reader"],
+    library = "@com_github_buildbarn_bb_storage//pkg/cas/reader",
     mockgen_tool = "@org_uber_go_mock//mockgen",
     package = "mock",
+    source = "@com_github_buildbarn_bb_storage//pkg/cas/reader:reader.go",
 )
 
 gomock(
@@ -52,7 +52,9 @@ gomock(
     out = "filesystem.go",
     interfaces = [
         "Directory",
+        "DirectoryCloser",
         "FileReader",
+        "FileReadWriter",
         "FileWriter",
     ],
     library = "@com_github_buildbarn_bb_storage//pkg/filesystem",
@@ -110,7 +112,10 @@ gomock(
 gomock(
     name = "re_cas",
     out = "re_cas.go",
-    interfaces = ["DirectoryFetcher"],
+    interfaces = [
+        "BlobUploader",
+        "DirectoryFetcher",
+    ],
     library = "@com_github_buildbarn_bb_remote_execution//pkg/cas",
     mockgen_model_library = "@org_uber_go_mock//mockgen/model",
     mockgen_tool = "@org_uber_go_mock//mockgen",
@@ -159,6 +164,26 @@ gomock(
 )
 
 gomock(
+    name = "storage_chunk",
+    out = "storage_chunk.go",
+    interfaces = ["MappingFetcher"],
+    library = "@com_github_buildbarn_bb_storage//pkg/blobstore/chunk",
+    mockgen_model_library = "@org_uber_go_mock//mockgen/model",
+    mockgen_tool = "@org_uber_go_mock//mockgen",
+    package = "mock",
+)
+
+gomock(
+    name = "storage_capabilities",
+    out = "storage_capabilities.go",
+    interfaces = ["CDCParametersFetcher"],
+    library = "@com_github_buildbarn_bb_storage//pkg/capabilities",
+    mockgen_model_library = "@org_uber_go_mock//mockgen/model",
+    mockgen_tool = "@org_uber_go_mock//mockgen",
+    package = "mock",
+)
+
+gomock(
     name = "storage_util",
     out = "storage_util.go",
     interfaces = ["ErrorLogger"],
@@ -173,7 +198,7 @@ go_library(
     srcs = [
         "aliases.go",
         "blobstore.go",
-        "blobstore_slicing.go",
+        "blobstore_reader.go",
         "clock.go",
         "dummy.go",
         "filesystem.go",
@@ -183,6 +208,8 @@ go_library(
         "re_cas.go",
         "re_filesystem_pool.go",
         "re_filesystem_virtual.go",
+        "storage_capabilities.go",
+        "storage_chunk.go",
         "storage_util.go",
     ],
     importpath = "github.com/buildbarn/bb-clientd/internal/mock",
@@ -198,8 +225,9 @@ go_library(
         "@com_github_buildbarn_bb_remote_execution//pkg/proto/bazeloutputservice",
         "@com_github_buildbarn_bb_remote_execution//pkg/proto/outputpathpersistency",
         "@com_github_buildbarn_bb_storage//pkg/blobstore",
-        "@com_github_buildbarn_bb_storage//pkg/blobstore/buffer",
-        "@com_github_buildbarn_bb_storage//pkg/blobstore/slicing",
+        "@com_github_buildbarn_bb_storage//pkg/blobstore/chunk",
+        "@com_github_buildbarn_bb_storage//pkg/capabilities",
+        "@com_github_buildbarn_bb_storage//pkg/cas/reader",
         "@com_github_buildbarn_bb_storage//pkg/clock",
         "@com_github_buildbarn_bb_storage//pkg/digest",
         "@com_github_buildbarn_bb_storage//pkg/filesystem",

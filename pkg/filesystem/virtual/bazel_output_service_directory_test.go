@@ -13,6 +13,8 @@ import (
 	re_vfs "github.com/buildbarn/bb-remote-execution/pkg/filesystem/virtual"
 	"github.com/buildbarn/bb-remote-execution/pkg/proto/bazeloutputservice"
 	bazeloutputservicerev2 "github.com/buildbarn/bb-remote-execution/pkg/proto/bazeloutputservice/rev2"
+	"github.com/buildbarn/bb-storage/pkg/blobstore/chunk"
+	bb_cas "github.com/buildbarn/bb-storage/pkg/cas"
 	"github.com/buildbarn/bb-storage/pkg/digest"
 	"github.com/buildbarn/bb-storage/pkg/filesystem/path"
 	"github.com/buildbarn/bb-storage/pkg/testutil"
@@ -31,8 +33,12 @@ func TestBazelOutputServiceDirectoryClean(t *testing.T) {
 
 	handleAllocator := mock.NewMockStatefulHandleAllocator(ctrl)
 	outputPathFactory := mock.NewMockOutputPathFactory(ctrl)
-	bareContentAddressableStorage := mock.NewMockBlobAccess(ctrl)
-	retryingContentAddressableStorage := mock.NewMockBlobAccess(ctrl)
+	bareChunkStorage := mock.NewMockBlobAccess[*chunk.Chunk](ctrl)
+	bareChunkMappingStorage := mock.NewMockBlobAccess[chunk.Mapping](ctrl)
+	cdcParametersFetcher := mock.NewMockCDCParametersFetcher(ctrl)
+	retryingChunkBytesReader := mock.NewMockReader[[]byte](ctrl)
+	retryingChunkMappingFetcher := mock.NewMockMappingFetcher(ctrl)
+	retryingCdcParametersFetcher := mock.NewMockCDCParametersFetcher(ctrl)
 	directoryFetcher := mock.NewMockDirectoryFetcher(ctrl)
 	symlinkFactory := mock.NewMockSymlinkFactory(ctrl)
 	dHandleAllocation := mock.NewMockStatefulHandleAllocation(ctrl)
@@ -42,8 +48,14 @@ func TestBazelOutputServiceDirectoryClean(t *testing.T) {
 	d := cd_vfs.NewBazelOutputServiceDirectory(
 		handleAllocator,
 		outputPathFactory,
-		bareContentAddressableStorage,
-		retryingContentAddressableStorage,
+		bareChunkStorage,
+		bareChunkMappingStorage,
+		cdcParametersFetcher,
+		bb_cas.ReadInfo{
+			ChunkBytesReader:     retryingChunkBytesReader,
+			ChunkMappingFetcher:  retryingChunkMappingFetcher,
+			CDCParametersFetcher: retryingCdcParametersFetcher,
+		},
 		directoryFetcher,
 		symlinkFactory,
 		/* maximumTreeSizeBytes = */ 10000,
@@ -136,8 +148,12 @@ func TestBazelOutputServiceDirectoryStartBuild(t *testing.T) {
 
 	handleAllocator := mock.NewMockStatefulHandleAllocator(ctrl)
 	outputPathFactory := mock.NewMockOutputPathFactory(ctrl)
-	bareContentAddressableStorage := mock.NewMockBlobAccess(ctrl)
-	retryingContentAddressableStorage := mock.NewMockBlobAccess(ctrl)
+	bareChunkStorage := mock.NewMockBlobAccess[*chunk.Chunk](ctrl)
+	bareChunkMappingStorage := mock.NewMockBlobAccess[chunk.Mapping](ctrl)
+	cdcParametersFetcher := mock.NewMockCDCParametersFetcher(ctrl)
+	retryingChunkBytesReader := mock.NewMockReader[[]byte](ctrl)
+	retryingChunkMappingFetcher := mock.NewMockMappingFetcher(ctrl)
+	retryingCdcParametersFetcher := mock.NewMockCDCParametersFetcher(ctrl)
 	directoryFetcher := mock.NewMockDirectoryFetcher(ctrl)
 	symlinkFactory := mock.NewMockSymlinkFactory(ctrl)
 	dHandleAllocation := mock.NewMockStatefulHandleAllocation(ctrl)
@@ -147,11 +163,17 @@ func TestBazelOutputServiceDirectoryStartBuild(t *testing.T) {
 	d := cd_vfs.NewBazelOutputServiceDirectory(
 		handleAllocator,
 		outputPathFactory,
-		bareContentAddressableStorage,
-		retryingContentAddressableStorage,
+		bareChunkStorage,
+		bareChunkMappingStorage,
+		cdcParametersFetcher,
+		bb_cas.ReadInfo{
+			ChunkBytesReader:     retryingChunkBytesReader,
+			ChunkMappingFetcher:  retryingChunkMappingFetcher,
+			CDCParametersFetcher: retryingCdcParametersFetcher,
+		},
 		directoryFetcher,
 		symlinkFactory,
-		/* maximumMessageSizeBytes = */ 10000,
+		/* maximumTreeSizeBytes = */ 10000,
 	)
 
 	t.Run("InvalidOutputBaseID", func(t *testing.T) {
@@ -390,7 +412,9 @@ func TestBazelOutputServiceDirectoryStartBuild(t *testing.T) {
 				require.True(t, childFilter(re_vfs.InitialChild{}.FromLeaf(child), remover.Call))
 				return nil
 			})
-			bareContentAddressableStorage.EXPECT().FindMissing(ctx, digests).
+			cdcParametersFetcher.EXPECT().FetchCDCParameters(ctx, digest.EmptyInstanceName).Return(&remoteexecution.RepMaxCdcParams{}, nil)
+			bareChunkStorage.EXPECT().FindMissing(gomock.Any(), digest.EmptySet).Return(digest.EmptySet, nil)
+			bareChunkMappingStorage.EXPECT().FindMissing(gomock.Any(), digests).
 				Return(digest.EmptySet, status.Error(codes.Unavailable, "CAS unavailable"))
 
 			args, err := anypb.New(&bazeloutputservicerev2.StartBuildArgs{
@@ -427,7 +451,9 @@ func TestBazelOutputServiceDirectoryStartBuild(t *testing.T) {
 				require.True(t, childFilter(re_vfs.InitialChild{}.FromLeaf(child), remover.Call))
 				return nil
 			})
-			bareContentAddressableStorage.EXPECT().FindMissing(ctx, digests).Return(digests, nil)
+			cdcParametersFetcher.EXPECT().FetchCDCParameters(ctx, digest.EmptyInstanceName).Return(&remoteexecution.RepMaxCdcParams{}, nil)
+			bareChunkStorage.EXPECT().FindMissing(gomock.Any(), digest.EmptySet).Return(digest.EmptySet, nil)
+			bareChunkMappingStorage.EXPECT().FindMissing(gomock.Any(), digests).Return(digests, nil)
 			remover.EXPECT().Call().Return(status.Error(codes.Internal, "Disk on fire"))
 
 			args, err := anypb.New(&bazeloutputservicerev2.StartBuildArgs{
@@ -547,8 +573,10 @@ func TestBazelOutputServiceDirectoryStartBuild(t *testing.T) {
 			// removed immediately. The file and directory
 			// corresponding to the ones reported as missing
 			// should be removed afterwards.
-			bareContentAddressableStorage.EXPECT().FindMissing(
-				ctx,
+			cdcParametersFetcher.EXPECT().FetchCDCParameters(ctx, digest.EmptyInstanceName).Return(&remoteexecution.RepMaxCdcParams{}, nil)
+			bareChunkStorage.EXPECT().FindMissing(gomock.Any(), digest.EmptySet).Return(digest.EmptySet, nil)
+			bareChunkMappingStorage.EXPECT().FindMissing(
+				gomock.Any(),
 				digest.NewSetBuilder(6).
 					Add(digest.MustNewDigest("my-cluster", remoteexecution.DigestFunction_MD5, "a32ea15346cf1848ab49e0913ff07531", 3)).
 					Add(digest.MustNewDigest("my-cluster", remoteexecution.DigestFunction_MD5, "9435918583fd2e37882751bbc51f4085", 4)).
@@ -591,8 +619,12 @@ func TestBazelOutputServiceDirectoryStageArtifacts(t *testing.T) {
 
 	handleAllocator := mock.NewMockStatefulHandleAllocator(ctrl)
 	outputPathFactory := mock.NewMockOutputPathFactory(ctrl)
-	bareContentAddressableStorage := mock.NewMockBlobAccess(ctrl)
-	retryingContentAddressableStorage := mock.NewMockBlobAccess(ctrl)
+	bareChunkStorage := mock.NewMockBlobAccess[*chunk.Chunk](ctrl)
+	bareChunkMappingStorage := mock.NewMockBlobAccess[chunk.Mapping](ctrl)
+	cdcParametersFetcher := mock.NewMockCDCParametersFetcher(ctrl)
+	retryingChunkBytesReader := mock.NewMockReader[[]byte](ctrl)
+	retryingChunkMappingFetcher := mock.NewMockMappingFetcher(ctrl)
+	retryingCdcParametersFetcher := mock.NewMockCDCParametersFetcher(ctrl)
 	directoryFetcher := mock.NewMockDirectoryFetcher(ctrl)
 	symlinkFactory := mock.NewMockSymlinkFactory(ctrl)
 	dHandleAllocation := mock.NewMockStatefulHandleAllocation(ctrl)
@@ -602,11 +634,17 @@ func TestBazelOutputServiceDirectoryStageArtifacts(t *testing.T) {
 	d := cd_vfs.NewBazelOutputServiceDirectory(
 		handleAllocator,
 		outputPathFactory,
-		bareContentAddressableStorage,
-		retryingContentAddressableStorage,
+		bareChunkStorage,
+		bareChunkMappingStorage,
+		cdcParametersFetcher,
+		bb_cas.ReadInfo{
+			ChunkBytesReader:     retryingChunkBytesReader,
+			ChunkMappingFetcher:  retryingChunkMappingFetcher,
+			CDCParametersFetcher: retryingCdcParametersFetcher,
+		},
 		directoryFetcher,
 		symlinkFactory,
-		/* maximumMessageSizeBytes = */ 10000,
+		/* maximumTreeSizeBytes = */ 10000,
 	)
 
 	t.Run("InvalidBuildID", func(t *testing.T) {
@@ -750,8 +788,12 @@ func TestBazelOutputServiceDirectoryBatchStat(t *testing.T) {
 
 	handleAllocator := mock.NewMockStatefulHandleAllocator(ctrl)
 	outputPathFactory := mock.NewMockOutputPathFactory(ctrl)
-	bareContentAddressableStorage := mock.NewMockBlobAccess(ctrl)
-	retryingContentAddressableStorage := mock.NewMockBlobAccess(ctrl)
+	bareChunkStorage := mock.NewMockBlobAccess[*chunk.Chunk](ctrl)
+	bareChunkMappingStorage := mock.NewMockBlobAccess[chunk.Mapping](ctrl)
+	cdcParametersFetcher := mock.NewMockCDCParametersFetcher(ctrl)
+	retryingChunkBytesReader := mock.NewMockReader[[]byte](ctrl)
+	retryingChunkMappingFetcher := mock.NewMockMappingFetcher(ctrl)
+	retryingCdcParametersFetcher := mock.NewMockCDCParametersFetcher(ctrl)
 	directoryFetcher := mock.NewMockDirectoryFetcher(ctrl)
 	symlinkFactory := mock.NewMockSymlinkFactory(ctrl)
 	dHandleAllocation := mock.NewMockStatefulHandleAllocation(ctrl)
@@ -761,11 +803,17 @@ func TestBazelOutputServiceDirectoryBatchStat(t *testing.T) {
 	d := cd_vfs.NewBazelOutputServiceDirectory(
 		handleAllocator,
 		outputPathFactory,
-		bareContentAddressableStorage,
-		retryingContentAddressableStorage,
+		bareChunkStorage,
+		bareChunkMappingStorage,
+		cdcParametersFetcher,
+		bb_cas.ReadInfo{
+			ChunkBytesReader:     retryingChunkBytesReader,
+			ChunkMappingFetcher:  retryingChunkMappingFetcher,
+			CDCParametersFetcher: retryingCdcParametersFetcher,
+		},
 		directoryFetcher,
 		symlinkFactory,
-		/* maximumMessageSizeBytes = */ 10000,
+		/* maximumTreeSizeBytes = */ 10000,
 	)
 
 	t.Run("InvalidBuildID", func(t *testing.T) {
@@ -1037,8 +1085,12 @@ func TestBazelOutputServiceDirectoryVirtualLookup(t *testing.T) {
 
 	handleAllocator := mock.NewMockStatefulHandleAllocator(ctrl)
 	outputPathFactory := mock.NewMockOutputPathFactory(ctrl)
-	bareContentAddressableStorage := mock.NewMockBlobAccess(ctrl)
-	retryingContentAddressableStorage := mock.NewMockBlobAccess(ctrl)
+	bareChunkStorage := mock.NewMockBlobAccess[*chunk.Chunk](ctrl)
+	bareChunkMappingStorage := mock.NewMockBlobAccess[chunk.Mapping](ctrl)
+	cdcParametersFetcher := mock.NewMockCDCParametersFetcher(ctrl)
+	retryingChunkBytesReader := mock.NewMockReader[[]byte](ctrl)
+	retryingChunkMappingFetcher := mock.NewMockMappingFetcher(ctrl)
+	retryingCdcParametersFetcher := mock.NewMockCDCParametersFetcher(ctrl)
 	directoryFetcher := mock.NewMockDirectoryFetcher(ctrl)
 	symlinkFactory := mock.NewMockSymlinkFactory(ctrl)
 	dHandleAllocation := mock.NewMockStatefulHandleAllocation(ctrl)
@@ -1048,11 +1100,17 @@ func TestBazelOutputServiceDirectoryVirtualLookup(t *testing.T) {
 	d := cd_vfs.NewBazelOutputServiceDirectory(
 		handleAllocator,
 		outputPathFactory,
-		bareContentAddressableStorage,
-		retryingContentAddressableStorage,
+		bareChunkStorage,
+		bareChunkMappingStorage,
+		cdcParametersFetcher,
+		bb_cas.ReadInfo{
+			ChunkBytesReader:     retryingChunkBytesReader,
+			ChunkMappingFetcher:  retryingChunkMappingFetcher,
+			CDCParametersFetcher: retryingCdcParametersFetcher,
+		},
 		directoryFetcher,
 		symlinkFactory,
-		/* maximumMessageSizeBytes = */ 10000,
+		/* maximumTreeSizeBytes = */ 10000,
 	)
 
 	// No output paths exist, so VirtualLookup() should always fail.
@@ -1127,8 +1185,12 @@ func TestBazelOutputServiceDirectoryVirtualReadDir(t *testing.T) {
 
 	handleAllocator := mock.NewMockStatefulHandleAllocator(ctrl)
 	outputPathFactory := mock.NewMockOutputPathFactory(ctrl)
-	bareContentAddressableStorage := mock.NewMockBlobAccess(ctrl)
-	retryingContentAddressableStorage := mock.NewMockBlobAccess(ctrl)
+	bareChunkStorage := mock.NewMockBlobAccess[*chunk.Chunk](ctrl)
+	bareChunkMappingStorage := mock.NewMockBlobAccess[chunk.Mapping](ctrl)
+	cdcParametersFetcher := mock.NewMockCDCParametersFetcher(ctrl)
+	retryingChunkBytesReader := mock.NewMockReader[[]byte](ctrl)
+	retryingChunkMappingFetcher := mock.NewMockMappingFetcher(ctrl)
+	retryingCdcParametersFetcher := mock.NewMockCDCParametersFetcher(ctrl)
 	directoryFetcher := mock.NewMockDirectoryFetcher(ctrl)
 	symlinkFactory := mock.NewMockSymlinkFactory(ctrl)
 	dHandleAllocation := mock.NewMockStatefulHandleAllocation(ctrl)
@@ -1138,11 +1200,17 @@ func TestBazelOutputServiceDirectoryVirtualReadDir(t *testing.T) {
 	d := cd_vfs.NewBazelOutputServiceDirectory(
 		handleAllocator,
 		outputPathFactory,
-		bareContentAddressableStorage,
-		retryingContentAddressableStorage,
+		bareChunkStorage,
+		bareChunkMappingStorage,
+		cdcParametersFetcher,
+		bb_cas.ReadInfo{
+			ChunkBytesReader:     retryingChunkBytesReader,
+			ChunkMappingFetcher:  retryingChunkMappingFetcher,
+			CDCParametersFetcher: retryingCdcParametersFetcher,
+		},
 		directoryFetcher,
 		symlinkFactory,
-		/* maximumMessageSizeBytes = */ 10000,
+		/* maximumTreeSizeBytes = */ 10000,
 	)
 
 	t.Run("InitialState", func(t *testing.T) {
@@ -1333,8 +1401,14 @@ func TestBazelOutputServiceDirectoryLifecycleContention(t *testing.T) {
 				d := cd_vfs.NewBazelOutputServiceDirectory(
 					handleAllocator,
 					outputPathFactory,
-					mock.NewMockBlobAccess(ctrl),
-					mock.NewMockBlobAccess(ctrl),
+					mock.NewMockBlobAccess[*chunk.Chunk](ctrl),
+					mock.NewMockBlobAccess[chunk.Mapping](ctrl),
+					mock.NewMockCDCParametersFetcher(ctrl),
+					bb_cas.ReadInfo{
+						ChunkBytesReader:     mock.NewMockReader[[]byte](ctrl),
+						ChunkMappingFetcher:  mock.NewMockMappingFetcher(ctrl),
+						CDCParametersFetcher: mock.NewMockCDCParametersFetcher(ctrl),
+					},
 					mock.NewMockDirectoryFetcher(ctrl),
 					mock.NewMockSymlinkFactory(ctrl),
 					10000,
