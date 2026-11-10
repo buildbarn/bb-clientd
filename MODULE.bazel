@@ -10,33 +10,33 @@ bazel_dep(name = "gazelle", version = "0.51.3")
 bazel_dep(name = "jsonnet_go", version = "0.22.0")
 bazel_dep(name = "platforms", version = "1.1.0")
 bazel_dep(name = "protobuf", version = "35.0")
-bazel_dep(name = "rules_go", version = "0.63.0")
+bazel_dep(name = "rules_go", version = "0.64.2")
 bazel_dep(name = "rules_jsonnet", version = "0.7.2")
 bazel_dep(name = "rules_pkg", version = "1.2.0")
 bazel_dep(name = "toolchains_llvm", version = "1.7.0")
 
 git_override(
     module_name = "bazel_remote_apis",
-    commit = "becdd8f9ff811df88a22d3eadd6341753d51d167",
+    commit = "76ddd98e1f92c0e2e71d0d3aa6906eca31754c03",
     patches = ["//:patches/bazel_remote_apis/upstream-pr-378.diff"],
     remote = "https://github.com/bazelbuild/remote-apis.git",
 )
 
 git_override(
     module_name = "com_github_buildbarn_bb_remote_execution",
-    commit = "236bcd95eb8fd2136807f8f6b47093639311a9f1",
+    commit = "c9ba98cf52456c400278f45a9679635daa40dcd2",
     remote = "https://github.com/buildbarn/bb-remote-execution.git",
 )
 
 git_override(
     module_name = "com_github_buildbarn_bb_storage",
-    commit = "6ded598f64a3a92cfae0bc7de6d33bedc660f635",
+    commit = "ca3d8b49a5af52eb02ed473dd689d19b949c9e41",
     remote = "https://github.com/buildbarn/bb-storage.git",
 )
 
 git_override(
     module_name = "com_github_buildbarn_go_xdr",
-    commit = "a2095890273efee7f8bb2b0007914f8b66398c57",
+    commit = "236788cf9e8948a1e8875c7dd243e2be180cdfd7",
     remote = "https://github.com/buildbarn/go-xdr.git",
 )
 

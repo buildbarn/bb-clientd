@@ -3,23 +3,21 @@ package virtual
 import (
 	"context"
 
-	re_blobstore "github.com/buildbarn/bb-remote-execution/pkg/blobstore"
+	re_cas "github.com/buildbarn/bb-remote-execution/pkg/cas"
 	"github.com/buildbarn/bb-remote-execution/pkg/filesystem/virtual"
-	"github.com/buildbarn/bb-storage/pkg/blobstore"
 	"github.com/buildbarn/bb-storage/pkg/digest"
 	"github.com/buildbarn/bb-storage/pkg/filesystem/path"
 	"github.com/buildbarn/bb-storage/pkg/util"
 
-	"golang.org/x/sync/semaphore"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
 type localFileUploadingOutputPathFactory struct {
 	OutputPathFactory
-	contentAddressableStorage blobstore.BlobAccess
-	errorLogger               util.ErrorLogger
-	concurrency               *semaphore.Weighted
+	blobUploader        re_cas.BlobUploader
+	blobUploaderFlusher func(context.Context) error
+	errorLogger         util.ErrorLogger
 }
 
 // NewLocalFileUploadingOutputPathFactory creates a decorator for
@@ -30,12 +28,17 @@ type localFileUploadingOutputPathFactory struct {
 // This decorator can be used to ensure that PersistentOutputPathFactory
 // is capable of persisting and restoring all files in the output path,
 // even if they were at no point uploaded by Bazel.
-func NewLocalFileUploadingOutputPathFactory(base OutputPathFactory, contentAddressableStorage blobstore.BlobAccess, errorLogger util.ErrorLogger, concurrency *semaphore.Weighted) OutputPathFactory {
+func NewLocalFileUploadingOutputPathFactory(
+	base OutputPathFactory,
+	blobUploader re_cas.BlobUploader,
+	blobUploaderFlusher func(context.Context) error,
+	errorLogger util.ErrorLogger,
+) OutputPathFactory {
 	return &localFileUploadingOutputPathFactory{
-		OutputPathFactory:         base,
-		contentAddressableStorage: contentAddressableStorage,
-		errorLogger:               errorLogger,
-		concurrency:               concurrency,
+		OutputPathFactory:   base,
+		blobUploader:        blobUploader,
+		blobUploaderFlusher: blobUploaderFlusher,
+		errorLogger:         errorLogger,
 	}
 }
 
@@ -56,30 +59,15 @@ type localFileUploadingOutputPath struct {
 func (op *localFileUploadingOutputPath) FinalizeBuild(ctx context.Context, digestFunction digest.Function) {
 	op.OutputPath.FinalizeBuild(ctx, digestFunction)
 
-	contentAddressableStorage, flusher := re_blobstore.NewBatchedStoreBlobAccess(
-		op.factory.contentAddressableStorage,
-		digest.KeyWithoutInstance,
-		blobstore.RecommendedFindMissingDigestsCount,
-		op.factory.concurrency,
-	)
-
-	// For the Bazel Output Service use case it's not important
-	// enough to have a configurable delay here, because the time it
-	// takes until Bazel calls FinalizeBuild() is sufficiently high.
-	// Furthermore, if we upload files with missing contents, a
-	// subsequent build would repair these files.
-	writableFileUploadDelay := make(chan struct{})
-	close(writableFileUploadDelay)
-
 	uploader := localFileUploader{
-		context:                   ctx,
-		contentAddressableStorage: contentAddressableStorage,
-		digestFunction:            digestFunction,
-		outputBaseID:              op.outputBaseID,
-		writableFileUploadDelay:   writableFileUploadDelay,
+		context:                 ctx,
+		blobUploader:            op.factory.blobUploader,
+		digestFunction:          digestFunction,
+		outputBaseID:            op.outputBaseID,
+		writableFileUploadDelay: make(chan struct{}),
 	}
 	err1 := uploader.uploadLocalFilesRecursive(op.OutputPath, nil)
-	err2 := flusher(ctx)
+	err2 := op.factory.blobUploaderFlusher(ctx)
 	if err1 != nil {
 		op.factory.errorLogger.Log(err1)
 	} else if err2 != nil {
@@ -88,11 +76,11 @@ func (op *localFileUploadingOutputPath) FinalizeBuild(ctx context.Context, diges
 }
 
 type localFileUploader struct {
-	context                   context.Context
-	contentAddressableStorage blobstore.BlobAccess
-	digestFunction            digest.Function
-	outputBaseID              path.Component
-	writableFileUploadDelay   <-chan struct{}
+	context                 context.Context
+	blobUploader            re_cas.BlobUploader
+	digestFunction          digest.Function
+	outputBaseID            path.Component
+	writableFileUploadDelay <-chan struct{}
 }
 
 func (u *localFileUploader) uploadLocalFilesRecursive(d virtual.PrepopulatedDirectory, dPath *path.Trace) error {
@@ -108,10 +96,10 @@ func (u *localFileUploader) uploadLocalFilesRecursive(d virtual.PrepopulatedDire
 	}
 	for _, entry := range leaves {
 		p := virtual.ApplyUploadFile{
-			Context:                   u.context,
-			ContentAddressableStorage: u.contentAddressableStorage,
-			DigestFunction:            u.digestFunction,
-			WritableFileUploadDelay:   u.writableFileUploadDelay,
+			Context:                 u.context,
+			BlobUploader:            u.blobUploader,
+			DigestFunction:          u.digestFunction,
+			WritableFileUploadDelay: u.writableFileUploadDelay,
 		}
 		if !entry.Child.VirtualApply(&p) {
 			panic("output path contains leaves that don't support ApplyUploadFile")
