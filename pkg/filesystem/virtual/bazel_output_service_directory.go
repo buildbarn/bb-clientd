@@ -11,6 +11,9 @@ import (
 	"github.com/buildbarn/bb-remote-execution/pkg/proto/bazeloutputservice"
 	bazeloutputservicerev2 "github.com/buildbarn/bb-remote-execution/pkg/proto/bazeloutputservice/rev2"
 	"github.com/buildbarn/bb-storage/pkg/blobstore"
+	"github.com/buildbarn/bb-storage/pkg/blobstore/chunk"
+	"github.com/buildbarn/bb-storage/pkg/capabilities"
+	bb_cas "github.com/buildbarn/bb-storage/pkg/cas"
 	"github.com/buildbarn/bb-storage/pkg/digest"
 	"github.com/buildbarn/bb-storage/pkg/filesystem"
 	"github.com/buildbarn/bb-storage/pkg/filesystem/path"
@@ -65,14 +68,16 @@ type outputPathState struct {
 type BazelOutputServiceDirectory struct {
 	virtual.ReadOnlyDirectory
 
-	handleAllocator                   virtual.StatefulHandleAllocator
-	handle                            virtual.StatefulDirectoryHandle
-	outputPathFactory                 OutputPathFactory
-	bareContentAddressableStorage     blobstore.BlobAccess
-	retryingContentAddressableStorage blobstore.BlobAccess
-	directoryFetcher                  re_cas.DirectoryFetcher
-	symlinkFactory                    virtual.SymlinkFactory
-	maximumTreeSizeBytes              int64
+	handleAllocator              virtual.StatefulHandleAllocator
+	handle                       virtual.StatefulDirectoryHandle
+	outputPathFactory            OutputPathFactory
+	bareChunkStorage             blobstore.BlobAccess[*chunk.Chunk]
+	bareChunkMappingStorage      blobstore.BlobAccess[chunk.Mapping]
+	cdcParametersFetcher         capabilities.CDCParametersFetcher
+	readInfo                     bb_cas.ReadInfo
+	directoryFetcher             re_cas.DirectoryFetcher
+	symlinkFactory               virtual.SymlinkFactory
+	maximumTreeSizeBytes         int64
 
 	lock          sync.Mutex
 	changeID      uint64
@@ -91,15 +96,27 @@ var (
 
 // NewBazelOutputServiceDirectory creates a new instance of
 // BazelOutputServiceDirectory.
-func NewBazelOutputServiceDirectory(handleAllocator virtual.StatefulHandleAllocator, outputPathFactory OutputPathFactory, bareContentAddressableStorage, retryingContentAddressableStorage blobstore.BlobAccess, directoryFetcher re_cas.DirectoryFetcher, symlinkFactory virtual.SymlinkFactory, maximumTreeSizeBytes int64) *BazelOutputServiceDirectory {
+func NewBazelOutputServiceDirectory(
+	handleAllocator virtual.StatefulHandleAllocator,
+	outputPathFactory OutputPathFactory,
+	bareChunkStorage blobstore.BlobAccess[*chunk.Chunk],
+	bareChunkMappingStorage blobstore.BlobAccess[chunk.Mapping],
+	cdcParametersFetcher capabilities.CDCParametersFetcher,
+	readInfo bb_cas.ReadInfo,
+	directoryFetcher re_cas.DirectoryFetcher,
+	symlinkFactory virtual.SymlinkFactory,
+	maximumTreeSizeBytes int64,
+) *BazelOutputServiceDirectory {
 	d := &BazelOutputServiceDirectory{
-		handleAllocator:                   handleAllocator,
-		outputPathFactory:                 outputPathFactory,
-		bareContentAddressableStorage:     bareContentAddressableStorage,
-		retryingContentAddressableStorage: retryingContentAddressableStorage,
-		directoryFetcher:                  directoryFetcher,
-		symlinkFactory:                    symlinkFactory,
-		maximumTreeSizeBytes:              maximumTreeSizeBytes,
+		handleAllocator:         handleAllocator,
+		outputPathFactory:       outputPathFactory,
+		bareChunkStorage:        bareChunkStorage,
+		bareChunkMappingStorage: bareChunkMappingStorage,
+		cdcParametersFetcher:    cdcParametersFetcher,
+		readInfo:                readInfo,
+		directoryFetcher:        directoryFetcher,
+		symlinkFactory:          symlinkFactory,
+		maximumTreeSizeBytes:    maximumTreeSizeBytes,
 
 		outputBaseIDs: map[path.Component]*outputPathState{},
 		buildIDs:      map[string]*outputPathState{},
@@ -197,7 +214,11 @@ func (d *BazelOutputServiceDirectory) findMissingAndRemove(ctx context.Context, 
 	for digest := range queue {
 		set.Add(digest)
 	}
-	missing, err := d.bareContentAddressableStorage.FindMissing(ctx, set.Build())
+	params, err := d.cdcParametersFetcher.FetchCDCParameters(ctx, digest.EmptyInstanceName)
+	if err != nil {
+		return util.StatusWrap(err, "Failed to fetch CDC parameters")
+	}
+	missing, err := bb_cas.FindMissing(ctx, d.bareChunkStorage, d.bareChunkMappingStorage, params, set.Build())
 	if err != nil {
 		return util.StatusWrap(err, "Failed to find missing blobs")
 	}
@@ -362,7 +383,7 @@ func (d *BazelOutputServiceDirectory) StartBuild(ctx context.Context, request *b
 			casFileFactory := virtual.NewStatelessHandleAllocatingCASFileFactory(
 				virtual.NewBlobAccessCASFileFactory(
 					context.Background(),
-					d.retryingContentAddressableStorage,
+					d.readInfo,
 					errorLogger,
 				),
 				d.handleAllocator.New(),
@@ -825,6 +846,6 @@ func (d *BazelOutputServiceDirectory) VirtualReadDir(ctx context.Context, firstC
 // VirtualApply can be used to apply any custom operations against the
 // directory object. For this directory type, no custom operations are
 // defined.
-func (BazelOutputServiceDirectory) VirtualApply(data any) bool {
+func (*BazelOutputServiceDirectory) VirtualApply(data any) bool {
 	return false
 }

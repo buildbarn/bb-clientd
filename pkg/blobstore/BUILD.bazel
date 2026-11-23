@@ -2,14 +2,14 @@ load("@rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "blobstore",
-    srcs = ["error_retrying_blob_access.go"],
+    srcs = ["error_retrying_readers.go"],
     importpath = "github.com/buildbarn/bb-clientd/pkg/blobstore",
     visibility = ["//visibility:public"],
     deps = [
         "@bazel_remote_apis//build/bazel/remote/execution/v2:remote_execution_go_proto",
-        "@com_github_buildbarn_bb_storage//pkg/blobstore",
-        "@com_github_buildbarn_bb_storage//pkg/blobstore/buffer",
-        "@com_github_buildbarn_bb_storage//pkg/blobstore/slicing",
+        "@com_github_buildbarn_bb_storage//pkg/blobstore/chunk",
+        "@com_github_buildbarn_bb_storage//pkg/capabilities",
+        "@com_github_buildbarn_bb_storage//pkg/cas/reader",
         "@com_github_buildbarn_bb_storage//pkg/clock",
         "@com_github_buildbarn_bb_storage//pkg/digest",
         "@com_github_buildbarn_bb_storage//pkg/random",
@@ -19,12 +19,12 @@ go_library(
 
 go_test(
     name = "blobstore_test",
-    srcs = ["error_retrying_blob_access_test.go"],
+    srcs = ["error_retrying_readers_test.go"],
     deps = [
         ":blobstore",
         "//internal/mock",
         "@bazel_remote_apis//build/bazel/remote/execution/v2:remote_execution_go_proto",
-        "@com_github_buildbarn_bb_storage//pkg/blobstore/buffer",
+        "@com_github_buildbarn_bb_storage//pkg/blobstore/chunk",
         "@com_github_buildbarn_bb_storage//pkg/digest",
         "@com_github_buildbarn_bb_storage//pkg/testutil",
         "@com_github_buildbarn_bb_storage//pkg/util",

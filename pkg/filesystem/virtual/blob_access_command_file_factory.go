@@ -7,35 +7,33 @@ import (
 	remoteexecution "github.com/bazelbuild/remote-apis/build/bazel/remote/execution/v2"
 	"github.com/buildbarn/bb-remote-execution/pkg/builder"
 	"github.com/buildbarn/bb-remote-execution/pkg/filesystem/virtual"
-	"github.com/buildbarn/bb-storage/pkg/blobstore"
+	"github.com/buildbarn/bb-storage/pkg/cas/reader"
 	"github.com/buildbarn/bb-storage/pkg/digest"
 	"github.com/buildbarn/bb-storage/pkg/filesystem"
 	"github.com/buildbarn/bb-storage/pkg/util"
 )
 
-type blobAccessCommandFileFactory struct {
-	context                   context.Context
-	contentAddressableStorage blobstore.BlobAccess
-	maximumMessageSizeBytes   int
-	errorLogger               util.ErrorLogger
+type messageReaderCommandFileFactory struct {
+	context       context.Context
+	commandReader reader.Reader[*remoteexecution.Command]
+	errorLogger   util.ErrorLogger
 }
 
-// NewBlobAccessCommandFileFactory creates a new CommandFileFactory that
-// loads REv2 Command messages from the provided Content Addressable
+// NewMessageReaderCommandFileFactory creates a new CommandFileFactory
+// that loads REv2 Command messages from the provided Content Addressable
 // Storage, turning them into shell scripts capable of launching build
 // actions.
-func NewBlobAccessCommandFileFactory(ctx context.Context, contentAddressableStorage blobstore.BlobAccess, maximumMessageSizeBytes int, errorLogger util.ErrorLogger) CommandFileFactory {
-	return &blobAccessCommandFileFactory{
-		context:                   ctx,
-		contentAddressableStorage: contentAddressableStorage,
-		maximumMessageSizeBytes:   maximumMessageSizeBytes,
-		errorLogger:               errorLogger,
+func NewMessageReaderCommandFileFactory(ctx context.Context, commandReader reader.Reader[*remoteexecution.Command], errorLogger util.ErrorLogger) CommandFileFactory {
+	return &messageReaderCommandFileFactory{
+		context:       ctx,
+		commandReader: commandReader,
+		errorLogger:   errorLogger,
 	}
 }
 
 // LookupFile creates a FUSE file that corresponds with the REv2 Command
 // message of a given digest.
-func (ff *blobAccessCommandFileFactory) LookupFile(blobDigest digest.Digest) (virtual.Leaf, virtual.Status) {
+func (ff *messageReaderCommandFileFactory) LookupFile(blobDigest digest.Digest) (virtual.Leaf, virtual.Status) {
 	var w sizeCountingWriter
 	if s := ff.writeShellScript(blobDigest, &w); s != virtual.StatusOK {
 		return nil, s
@@ -48,13 +46,13 @@ func (ff *blobAccessCommandFileFactory) LookupFile(blobDigest digest.Digest) (vi
 	return f, virtual.StatusOK
 }
 
-func (ff *blobAccessCommandFileFactory) writeShellScript(blobDigest digest.Digest, w io.StringWriter) virtual.Status {
-	m, err := ff.contentAddressableStorage.Get(ff.context, blobDigest).ToProto(&remoteexecution.Command{}, ff.maximumMessageSizeBytes)
+func (ff *messageReaderCommandFileFactory) writeShellScript(blobDigest digest.Digest, w io.StringWriter) virtual.Status {
+	command, err := ff.commandReader.Read(ff.context, blobDigest)
 	if err != nil {
 		ff.errorLogger.Log(util.StatusWrapf(err, "Failed to load command %#v", blobDigest.String()))
 		return virtual.StatusErrIO
 	}
-	if err := builder.ConvertCommandToShellScript(m.(*remoteexecution.Command), w); err != nil {
+	if err := builder.ConvertCommandToShellScript(command, w); err != nil {
 		ff.errorLogger.Log(util.StatusWrapf(err, "Failed to convert command %#v to a shell script", blobDigest.String()))
 		return virtual.StatusErrIO
 	}
@@ -62,7 +60,7 @@ func (ff *blobAccessCommandFileFactory) writeShellScript(blobDigest digest.Diges
 }
 
 type commandFile struct {
-	factory    *blobAccessCommandFileFactory
+	factory    *messageReaderCommandFileFactory
 	blobDigest digest.Digest
 	size       uint64
 }

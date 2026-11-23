@@ -1,6 +1,6 @@
 module github.com/buildbarn/bb-clientd
 
-go 1.27.1
+go 1.27.3
 
 // rules_go doesn't support gomock's package mode.
 replace go.uber.org/mock => go.uber.org/mock v0.4.0
@@ -10,13 +10,13 @@ replace cel.dev/expr => cel.dev/expr v0.25.1
 
 require (
 	github.com/bazelbuild/buildtools v0.0.0-20260528135316-84fa6c32aee6
-	github.com/bazelbuild/remote-apis v0.0.0-20260331222004-becdd8f9ff81
-	github.com/buildbarn/bb-remote-execution v0.0.0-20260722162832-236bcd95eb8f
-	github.com/buildbarn/bb-storage v0.0.0-20261009185544-6ded598f64a3
+	github.com/bazelbuild/remote-apis v0.0.0-20260908115904-76ddd98e1f92
+	github.com/buildbarn/bb-remote-execution v0.0.0-20261102094740-c9ba98cf5245
+	github.com/buildbarn/bb-storage v0.0.0-20261102091443-ca3d8b49a5af
 	github.com/stretchr/testify v1.11.1
 	go.uber.org/mock v0.6.0
 	golang.org/x/lint v0.0.0-20241112194109-818c5a804067
-	golang.org/x/sync v0.20.0
+	golang.org/x/sync v0.22.0
 	google.golang.org/genproto/googleapis/bytestream v0.0.0-20260526163538-3dc84a4a5aaa
 	google.golang.org/grpc v1.81.1
 	google.golang.org/protobuf v1.36.12-0.20260120151049-f2248ac996af
@@ -56,6 +56,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/sts v1.42.3 // indirect
 	github.com/aws/smithy-go v1.26.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
+	github.com/buildbarn/go-cdc v0.0.10 // indirect
 	github.com/buildbarn/go-sha256tree v0.0.0-20250310211320-0f70f20e855b // indirect
 	github.com/buildbarn/go-xdr v0.0.0-20261005144839-a2095890273e // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
@@ -96,7 +97,7 @@ require (
 	github.com/prometheus/procfs v0.20.1 // indirect
 	github.com/sercand/kuberesolver/v5 v5.1.1 // indirect
 	github.com/spiffe/go-spiffe/v2 v2.6.0 // indirect
-	github.com/winfsp/go-winfsp v1.0.4-0.20260614140859-496ed3bd9019 // indirect
+	github.com/winfsp/go-winfsp v1.0.6-0.20261004153322-200f73eb2a95 // indirect
 	github.com/zeebo/blake3 v0.2.4 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/contrib/detectors/gcp v1.44.0 // indirect
@@ -112,14 +113,14 @@ require (
 	go.opentelemetry.io/otel/trace v1.44.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.10.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.4 // indirect
-	golang.org/x/crypto v0.52.0 // indirect
-	golang.org/x/mod v0.36.0 // indirect
-	golang.org/x/net v0.55.0 // indirect
+	golang.org/x/crypto v0.54.0 // indirect
+	golang.org/x/mod v0.38.0 // indirect
+	golang.org/x/net v0.57.0 // indirect
 	golang.org/x/oauth2 v0.36.0 // indirect
-	golang.org/x/sys v0.45.0 // indirect
-	golang.org/x/text v0.37.0 // indirect
+	golang.org/x/sys v0.47.0 // indirect
+	golang.org/x/text v0.40.0 // indirect
 	golang.org/x/time v0.15.0 // indirect
-	golang.org/x/tools v0.45.0 // indirect
+	golang.org/x/tools v0.48.0 // indirect
 	google.golang.org/api v0.282.0 // indirect
 	google.golang.org/genproto v0.0.0-20260526163538-3dc84a4a5aaa // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260526163538-3dc84a4a5aaa // indirect
