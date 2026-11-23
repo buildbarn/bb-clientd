@@ -83,12 +83,14 @@ local cacheDirectory = std.extVar('XDG_CACHE_HOME') + '/bb_clientd';
       // Instance names starting with 'local' can be used to set up
       // bb_clientd as a system-local cache.
       'local': { backend: { 'local': {
-        keyLocationMapOnBlockDevice: { file: {
-          path: cacheDirectory + '/ac/key_location_map',
-          sizeBytes: $.acKeyLocationMapSizeBytes,
-        } },
-        keyLocationMapMaximumGetAttempts: 16,
-        keyLocationMapMaximumPutAttempts: 64,
+        keyLocationMap: {
+          onBlockDevice: { file: {
+            path: cacheDirectory + '/ac/key_location_map',
+            sizeBytes: $.acKeyLocationMapSizeBytes,
+          } },
+          maximumGetAttempts: 16,
+          maximumPutAttempts: 64,
+        },
         oldBlocks: 1,
         currentBlocks: 5,
         newBlocks: 1,
@@ -150,12 +152,14 @@ local cacheDirectory = std.extVar('XDG_CACHE_HOME') + '/bb_clientd';
         // MiB index is large enough to accommodate approximately one
         // million objects.
         localCAS: { 'local': {
-          keyLocationMapOnBlockDevice: { file: {
-            path: cacheDirectory + '/cas/key_location_map',
-            sizeBytes: $.casKeyLocationMapSizeBytes,
-          } },
-          keyLocationMapMaximumGetAttempts: 16,
-          keyLocationMapMaximumPutAttempts: 64,
+          keyLocationMap: {
+            onBlockDevice: { file: {
+              path: cacheDirectory + '/cas/key_location_map',
+              sizeBytes: $.casKeyLocationMapSizeBytes,
+            } },
+            maximumGetAttempts: 16,
+            maximumPutAttempts: 64,
+          },
           oldBlocks: 1,
           currentBlocks: 5,
           newBlocks: 1,
